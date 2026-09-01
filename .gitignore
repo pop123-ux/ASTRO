@@ -1,0 +1,19 @@
+# Build and tool caches
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+__pycache__/
+*.py[cod]
+
+# Intermediate render; paper.pdf is the deliverable and IS committed.
+docs/paper/paper.html
+
+# Benchmark output. Note "artifacts/*", not "artifacts/": git does not descend
+# into an ignored directory, so a negation inside one never fires.
+artifacts/*
+results/
+
+# ...except the measurement record itself, which is not output -- it is the
+# provenance for every number the paper prints, and it was invisible to anyone
+# cloning this repository for the whole project.
+!artifacts/measured.json

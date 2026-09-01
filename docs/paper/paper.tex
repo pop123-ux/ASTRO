@@ -1,0 +1,753 @@
+% arXiv-ready source. Compiles with pdflatex; standard packages only.
+% Not compiled locally: this machine has no TeX distribution and its egress
+% proxy blocks the Debian repositories. Please compile before submitting.
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[hidelinks]{hyperref}
+\usepackage{url}
+
+\newtheorem{proposition}{Proposition}
+\newtheorem{lemma}{Lemma}
+\theoremstyle{definition}
+\newtheorem{remark}{Remark}
+
+\DeclareMathOperator{\msgn}{msgn}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\norm}[1]{\lVert #1 \rVert}
+
+\title{What Actually Matters in Matrix-Structured Optimizers,\\
+and a Silent Failure in All of Them}
+
+\author{%
+  Pop Alexandru\\
+  \texttt{blackwolf260609@gmail.com}
+}
+
+\date{August 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Matrix-structured optimizers---Muon, Shampoo, SOAP, NorMuon---improve on AdamW by
+treating a weight matrix as a linear operator rather than a bag of coordinates.
+We report a controlled study of what in these methods is responsible for the
+gain, under a protocol with equal tuning budgets, multiple seeds, exact paired
+rank tests, Holm correction, and wall-clock matching.
+
+Two findings are structural rather than statistical.
+
+\textbf{Leverage.} For a momentum matrix $M = U\Sigma V^{\top}$ with $m > n$, the
+squared row norms of Muon's update are exactly the leverage scores of $M$'s row
+space, summing to $n$. Two consequences follow that appear unremarked. For wide
+matrices the polar factor has orthonormal rows, so any row-normalisation scheme
+is provably inert there---a statement about NorMuon's domain of applicability
+that NorMuon does not make. And on a \emph{fused} query/key/value projection the
+leverage localises onto whichever stacked operator has the largest gradient,
+because $Q$ and $K$ reach the loss through the softmax Jacobian while $V$ enters
+linearly. The tensor passes every orthogonality check one would apply while two
+of the three operators inside it barely move.
+
+We measure this on eight pretrained checkpoints from 124M to 1.4B across two
+fusion layouts. It is an \emph{initialisation-time} phenomenon that attenuates:
+$V$'s share of the update is $0.65$ at random initialisation ($0.76$ on the GPT-2
+family) against $0.50$ on the trained weights, where uniform is $0.333$. This
+independently explains a stage dependence reported in the literature, that
+head-wise splitting helps early and is overtaken by full-matrix Muon later.
+
+\textbf{Non-convergence.} Muon's quintic is one polynomial applied $k$ times, and
+it cannot reach the polar factor at any budget: its fixed points solve
+$2.4445 - 4.7750s^2 + 2.0315s^4 = 0$, at $s = 0.868$ and $s = 1.264$. Singular
+values land in a band around them, and \emph{where} in that band depends on the
+conditioning of the matrix handed over, so the update's Frobenius norm moves
+between $0.688$ and $0.921$ of its theoretical value as the condition number goes
+$1$ to $1000$---an uncontrolled drift in effective step size tracking a quantity
+nobody monitors. Solving one polynomial per step greedily removes the
+obstruction; at equal cost the drift halves and centres on $1$, and two steps
+further it is exact.
+
+We report six claims this work made and withdrew and three bugs in our own
+measurement code, all of which produced publishable-looking numbers. Most were
+caught by a control disagreeing with a headline, one by an arithmetic check, one
+by re-running a seed we had assumed was reproducible, and none by reading the
+code. We argue this is the more transferable contribution:
+the standard fairness recipe of equal tuning budgets is necessary and
+demonstrably not sufficient---we violated its spirit three times while
+satisfying its letter, twice by pairing an update scale with the wrong
+learning-rate range and once by counting a fixed value as a tuned dimension.
+\end{abstract}
+
+\section{Introduction}
+
+\citet{wen2025fantastic} benchmarked ten optimizers against a properly tuned
+AdamW and found the real speedups near $1.1\times$ rather than the $2\times$
+commonly claimed. The gap was methodological: unequal tuning budgets and
+single-seed reporting. Any new optimizer result therefore inherits an obligation
+to make its comparison hard to rig and to publish the protocol alongside the
+numbers.
+
+This paper is an attempt to meet that obligation, and a report of what happened
+when we did. We set out to build an optimizer that beats the state of the art in
+the regime where matrix methods are documented to lose---fully fine-tuning
+Adam-pretrained weights \citep{qu2026muon}---and that attempt failed. What the
+work produced instead is a set of findings about \emph{why} these methods work,
+one structural defect present in all of them, and a case study in how a
+carefully-designed protocol still admitted two errors.
+
+\paragraph{Contributions.}
+\begin{enumerate}
+\item \textbf{The leverage identity} (\S\ref{sec:leverage}): the row-norm profile
+of a Muon update is the leverage-score distribution of the momentum's row space.
+Elementary, but it implies row normalisation is inert on wide matrices and
+explains why a fused projection starves two of its three operators.
+\item \textbf{The stage dependence of the fused-projection defect}
+(\S\ref{sec:qkv}), measured on eight pretrained checkpoints with a random-init
+control. The split itself is \emph{not} ours---production Muon implementations
+already split per slice, and head grouping is published. What is ours is the
+mechanism and the finding that the defect decays with training.
+\item \textbf{A converging polar iteration} (\S\ref{sec:polar}), solved rather
+than copied. Muon's quintic has fixed points at $0.868$ and $1.264$ and so
+cannot converge; per-step coefficients can. The solved tail reproduces the
+published Polar Express asymptote, which was not fitted to.
+\item \textbf{A weight-tying routing bug} (\S\ref{sec:routing}) that places the
+tied token embedding and the position embedding on the spectral path while
+excluding a genuine MLP projection, affecting every matrix optimizer using the
+standard name-based policy.
+\item \textbf{A component whose sign inverts with scale} (\S\ref{sec:inversion}).
+Cautious masking is worth $-0.0291$ against Muon on 8 of 8 seeds at 1.17M
+parameters, exact $p = 0.0078$, and costs $+0.1341$ at 124M under the same
+tokeniser and protocol. We built the small benchmark specifically to match the
+target's parameter split, which removed our own explanation for the inversion
+without removing the inversion.
+\item \textbf{Six retractions and three measurement bugs}
+(\S\ref{sec:corrections}), reported because the pattern is instructive and
+because one of them---that splitting is cheaper than not splitting---was a
+reasoning error we published before checking the arithmetic.
+\end{enumerate}
+
+\section{Background}
+
+Let $W \in \R^{m\times n}$ be a parameter reshaped to the operator it represents,
+$G = \nabla_W \mathcal{L}$, and $M$ an exponential moving average of $G$. For
+$A = U\Sigma V^{\top}$ the \emph{matrix sign} or polar factor is
+$\msgn(A) = UV^{\top}$, the nearest orthogonal matrix to $A$. Steepest descent
+under a norm $\norm{\cdot}$ solves
+$\arg\min_Q \langle -G, Q\rangle + \tfrac{\lambda}{2}\norm{Q}^2$, and under the
+spectral norm the solution is proportional to $\msgn(G)$
+\citep{bernstein2024modular}. This is the sense in which Muon
+\citep{jordan2024muon} is a duality map rather than a heuristic: it replaces the
+update with one whose singular values are all one, so the step moves equally in
+every direction the gradient identifies.
+
+\citet{frans2025whitening} decompose matrix whitening into \emph{spectral
+normalisation} and \emph{variance adaptation}, and identify the second as what
+explains SOAP's \citep{vyas2024soap} edge over Muon. NorMuon
+\citep{li2025normuon} adds a neuron-wise second moment \emph{after}
+orthogonalisation, reporting that ``Muon's updates exhibit highly non-uniform
+neuron norms, causing certain neurons to dominate.'' Section~\ref{sec:leverage}
+makes that statement exact and shows where it does and does not apply.
+
+\section{The leverage identity}\label{sec:leverage}
+
+\begin{proposition}[Row norms are leverage scores]\label{prop:leverage}
+Let $M = U\Sigma V^{\top}$ with $m > n$, so $U \in \R^{m\times n}$ has orthonormal
+columns, and let $P = \msgn(M) = UV^{\top}$. Then for every row $i$,
+\[
+\norm{p_i}^2 = \norm{u_i}^2, \qquad \sum_{i=1}^m \norm{u_i}^2 = n,
+\]
+where $p_i, u_i$ are the $i$th rows of $P$ and $U$. That is, the squared row norms
+of the update are the leverage scores of $M$'s row space, summing to $n$.
+\end{proposition}
+
+\begin{proof}
+$p_i = u_i V^{\top}$ and $V$ is orthogonal, so $\norm{p_i} = \norm{u_i}$. The sum
+is $\operatorname{tr}(U^{\top}U) = \operatorname{tr}(I_n) = n$.
+\end{proof}
+
+Two corollaries follow immediately and are, to our knowledge, unremarked.
+
+\begin{remark}[Row normalisation is inert on wide matrices]
+For $m \le n$ the polar factor has orthonormal \emph{rows}, so every row norm is
+exactly $1$ and any row-normalisation scheme is the identity. NorMuon's
+mechanism therefore cannot act on wide matrices at all. On GPT-2's
+$128\times512$ MLP projection we measure a participation ratio of $0.995$
+(Table~\ref{tab:leverage}), confirming this empirically.
+\end{remark}
+
+\begin{remark}[Localisation is a signal, not a defect, except when it is]
+For a pure-noise matrix, leverage scores are delocalised, concentrating near
+$n/m$ by Marchenko--Pastur. Structured signal localises them. Row normalisation
+therefore pushes the update toward the profile that noise would produce, which is
+defensible early in training when leverage estimates are unreliable, and is what
+we believe underlies NorMuon's gain from scratch.
+\end{remark}
+
+\begin{table}[t]
+\centering
+\begin{tabular}{lrrrr}
+\toprule
+tensor & shape & $m/n$ & CV & participation \\
+\midrule
+\texttt{c\_attn} (fused QKV) & $384\times128$ & 3.00 & \textbf{1.145} & \textbf{0.433} \\
+\texttt{c\_proj} (attention) & $128\times128$ & 1.00 & 0.185 & 0.967 \\
+\texttt{c\_fc} (MLP)         & $512\times128$ & 4.00 & 0.295 & 0.920 \\
+\texttt{c\_proj} (MLP)       & $128\times512$ & 0.25 & 0.070 & 0.995 \\
+\bottomrule
+\end{tabular}
+\caption{Leverage localisation of Muon's update, GPT-2 layer 0, step 1.
+CV is the coefficient of variation of squared row norms; participation is
+$(\sum r_i^2)^2 / (m \sum r_i^4)$, equal to $1$ when uniform. The wide projection
+is uniform as Proposition~\ref{prop:leverage} requires. \texttt{c\_attn} is far
+more localised than \texttt{c\_fc} despite a smaller aspect ratio, which aspect
+ratio cannot explain.}
+\label{tab:leverage}
+\end{table}
+
+\section{A polar iteration that converges}\label{sec:polar}
+
+Muon's quintic \(p(s) = 3.4445s - 4.7750s^3 + 2.0315s^5\) is applied \(k\) times.
+It cannot reach the polar factor at any \(k\): its fixed points solve
+\(2.4445 - 4.7750s^2 + 2.0315s^4 = 0\), giving \(s = 0.868\) and \(s = 1.264\),
+and iterating lands in a band around them. We measure singular values in
+\([0.68, 1.13]\) after five steps and unchanged after twelve.
+
+The cost is not cosmetic. Where in that band the spectrum lands depends on the
+conditioning of the matrix handed over, so the update's Frobenius norm moves
+between \(0.688\) and \(0.921\) of \(\sqrt{\min(m,n)}\) as the condition number
+goes \(1\) to \(1000\)---a drift in effective step size that tracks a quantity no
+implementation monitors and that moves as training reshapes the gradient
+spectrum.
+
+A different polynomial per step has no fixed-point obstruction. We solve for the
+coefficients greedily, each step minimising \(\max_s |P(s) - 1|\) over the
+interval the previous steps produced, rather than copying published constants.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrrrr}
+\toprule
+& $\max|P-1|$ & \multicolumn{4}{c}{update-norm ratio} \\
+\cmidrule(lr){3-6}
+filter & on $[10^{-3},1]$ & $\kappa{=}1$ & $10$ & $10^2$ & $10^3$ \\
+\midrule
+Muon, 5 steps  & ---    & 0.6881 & 0.9024 & 0.9212 & 0.8641 \\
+solved, 5      & 0.1167 & 0.8940 & 1.0017 & 0.9990 & 0.9664 \\
+solved, 6      & 0.0010 & 0.9997 & 1.0001 & 1.0001 & 0.9883 \\
+solved, 7      & 0.0000 & 1.0000 & 1.0000 & 1.0000 & 0.9985 \\
+\bottomrule
+\end{tabular}
+\caption{At equal cost the conditioning-dependent drift halves and centres on
+one; two steps further it is exact. The last two solved steps land near
+$(1.875, -1.25, 0.375)$, reproducing the asymptote the Polar Express publishes
+\citep{amsel2025polar}---an agreement that was not fitted to.}
+\label{tab:polar}
+\end{table}
+
+Table~\ref{tab:polar} states the result. Whether exactness \emph{helps}
+training is a separate question: Muon's under-convergence may act as damping,
+and seven steps costs $40\%$ more than five.
+
+\section{The fused-projection defect}\label{sec:qkv}
+
+Table~\ref{tab:leverage} shows \texttt{c\_attn} at participation $0.433$, worse
+than \texttt{c\_fc} despite being less tall. \texttt{c\_attn} is the fused QKV
+projection: three separate operators stacked in one $3d \times d$ tensor. A
+participation ratio near $1/3$ suggests one of the three dominates. It does,
+and Table~\ref{tab:qkv} measures by how much.
+
+\begin{table}[t]
+\centering
+\begin{tabular}{lrrrrrr}
+\toprule
+& \multicolumn{3}{c}{update mass share} & \multicolumn{3}{c}{gradient norm} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+step & $Q$ & $K$ & $V$ & $\norm{\nabla Q}$ & $\norm{\nabla K}$ & $\norm{\nabla V}$ \\
+\midrule
+1  & 0.057 & 0.088 & \textbf{0.855} & 0.0012 & 0.0012 & 0.0831 \\
+10 & 0.104 & 0.135 & \textbf{0.761} & 0.0036 & 0.0034 & 0.0256 \\
+\bottomrule
+\end{tabular}
+\caption{Fraction of the polar factor's squared row mass falling in each of $Q$,
+$K$, $V$ for GPT-2 layer 0. Balanced would be $0.333$ each. $Q$ and $K$ reach the
+loss through the softmax Jacobian while $V$ enters linearly, so their gradients
+are roughly $70\times$ smaller, and the joint polar factor inherits the imbalance.}
+\label{tab:qkv}
+\end{table}
+
+This defeats the property Muon exists to provide. The tensor is perfectly
+orthogonalised---its singular values are all one---while two of the three
+operators inside it receive almost no update. No orthogonality diagnostic
+detects this, because nothing is wrong with the orthogonalisation; what is wrong
+is that the object being orthogonalised is not a single operator.
+
+\paragraph{The fix.} Split the tensor into its blocks and orthogonalise each
+separately. On a planted-gradient test with $Q,K$ scaled to $2\%$ of $V$, the
+update mass moves from $(0.019, 0.018, 0.963)$ to $(0.336, 0.334, 0.330)$ at
+unchanged overall update norm.
+
+\paragraph{The fix costs more, not less.} We first reported that splitting is
+\emph{cheaper} than not splitting, on the reasoning that three $128\times128$
+Newton--Schulz iterations must cost less than one $384\times128$. That is wrong,
+and the error is instructive because the arithmetic is one line. Newton--Schulz
+transposes to operate on the smaller dimension, so a fused $(3d, d)$ tensor
+already runs as $(d, 3d)$ at $7d^3$ per iteration, against $9d^3$ for three
+separate $d\times d$ blocks. Splitting is $1.29\times$ more expensive by
+operation count; we measure $1.33\times$ on a T4. The end-to-end step timings we
+published ($91.0$\,ms against NorMuon's $92.2$) were real, but they measure our
+step being cheaper than NorMuon's for unrelated reasons, and we attributed them
+to a saving that does not exist.
+
+Because the defect is an initialisation-time phenomenon that attenuates, the
+right shape for the repair is a schedule rather than a permanent change: we
+therefore relax to a single block after a configurable step count, which is also
+the cheaper branch.
+
+\citet{khona2026soap} mention QKV splitting as an implementation option and
+explicitly disable it to keep their Muon/SOAP comparison free of structural
+differences. The cost of not splitting appears unmeasured.
+
+\section{A routing bug under weight tying}\label{sec:routing}
+
+GPT-2 ties \texttt{lm\_head.weight} to \texttt{transformer.wte.weight}: they are
+one tensor, so \texttt{named\_parameters()} reports it once, under the \texttt{wte}
+name. A router keyed on names therefore never sees \texttt{lm\_head.weight}, and
+the tied token embedding stays on the spectral path---orthogonalising a table
+whose rows are indexed by token, which Muon's own guidance forbids. The position
+embedding follows, being shape-indistinguishable from a dense matrix. The usual
+fallback (``the last 2-D parameter is the head'') then selects the final block's
+MLP projection, a genuine operator, and excludes it.
+
+Three tensors misrouted in both directions, on the most widely used architecture
+in the field, affecting Muon and NorMuon identically since they share the policy.
+The fix is to resolve parameters by identity and to detect embeddings and the
+output head structurally from the module graph.
+
+\section{Protocol}\label{sec:protocol}
+
+Enforced in code rather than by convention: identical tuning budgets (16
+log-uniform trials, same RNG stream per optimizer, with a hard error if
+competitors do not tune the same \emph{number} of hyperparameters); tuning on
+seed 0 with evaluation on disjoint seeds; paired exact Wilcoxon signed-rank tests
+with the null distribution enumerated over the observed midranks; Holm correction
+across each family; and wall-clock matching on an idle machine.
+
+The model is nanoGPT's GPT-2 at $n_{\text{layer}}=4$, $n_{\text{head}}=4$,
+$n_{\text{embd}}=128$, context $128$ (806K non-embedding parameters), trained on
+WikiText-2 and fine-tuned on tinyshakespeare at character level with a shared
+vocabulary. This is three orders of magnitude below the scale at which the
+literature makes its claims, and optimizer advantages are known to shrink with
+scale \citep{wen2025fantastic}; \S\ref{sec:limitations} states what that permits.
+
+\begin{remark}[Equal budgets are not sufficient]\label{rem:ranges}
+Our protocol enforces an equal \emph{number} of tuned hyperparameters. It does
+not, and the standard recipe does not, require the \emph{ranges} to be
+comparable. For matrix optimizers the update scale determines the correct
+learning-rate range: an RMS-matched update needs Adam's range, a Muon-scaled
+update needs Muon's, which is $10\times$ higher. We violated this without
+noticing, and it cost a candidate $0.034$ nats---see \S\ref{sec:corrections}.
+\end{remark}
+
+\begin{remark}[Equal treatment is not neutral treatment]\label{rem:schedule}
+The same failure has a second form, which we found by auditing a result that
+looked too good. Applying one learning-rate schedule to every optimizer is
+equal treatment, and it is not neutral: a constant rate penalises a method whose
+late-training stability depends on decay more than it penalises one that
+normalises its own update size. On tinyshakespeare, AdamW's tuned constant rate
+sits immediately below a cliff---validation loss $2.214$ at $\eta = 2.35 \times
+10^{-3}$ against $2.528$ at $3.5 \times 10^{-3}$---so its best available
+configuration is one it cannot survive on every seed, and $6$ of $25$ seeds
+land in a second mode near $2.45$. Granting nanoGPT's warmup-plus-cosine
+schedule to everyone lets AdamW triple its rate to $6.99 \times 10^{-3}$,
+removes all six outliers, cuts its seed-to-seed spread by $4.4\times$, and
+improves it by $0.157$ nats. Our advantage over it fell by the same amount.
+
+We therefore report under both settings rather than under the one we prefer. The
+general point is that a shared experimental condition is only fair when the
+optimizers are equally sensitive to it, which is not something equal budgets
+establish and not something we can check without varying the condition.
+\end{remark}
+
+\subsection{The tuner has more variance than the effect}\label{sec:tunervariance}
+
+The two remarks above are about making a tuned comparison fair. At 124M we
+found that a tuned comparison is the wrong instrument regardless of fairness,
+because the selection step moves the answer further than the optimizers do.
+
+Three measurements, each at GPT-2 124M for $900$ steps on FineWeb-Edu. First,
+tuning is worth $0.1184$ nats to Muon---more than twice the margin we were
+attempting to measure at the time. Second, tuning at $300$ steps and evaluating
+the selection at $900$ inverts NorMuon's ranking of two configurations: the one
+the short-horizon search selects reaches $6.1301$ at $900$ steps and the one it
+rejects reaches $5.9966$, a misselection worth $0.1335$. Third, the same
+configuration re-run on a later runtime moves by at most $0.0012$. The
+\emph{selection} therefore carries roughly a hundred times the variance of the
+\emph{evaluation}, and no number of seeds addresses it, because seeds resample
+the evaluation.
+
+We consequently report a design with no selection step in it. Every optimizer
+sharing a search space is offered the identical drawn configurations---common
+random numbers, seeded from a fixed constant---and we pair on the configuration
+rather than on the seed. The question becomes whether the advantage holds at
+\emph{every} drawn configuration, which is strictly stronger than a
+tuned-versus-tuned win: it cannot be a lucky draw, because nothing is drawn
+twice and nothing is chosen. It also implies the tuned comparison, since a
+maximum over a shared grid follows the pointwise order. Optimizers whose update
+scale demands a different range (Remark~\ref{rem:ranges}) contribute no pairs
+rather than mismatched ones; pairing is on the recorded configuration, never on
+the trial index.
+
+One further control makes the remaining budget informative. The multiplier on
+the elementwise path---covering embeddings and the tied head, $31.7\%$ of GPT-2
+124M---selects the learning rate for code that is \emph{identical} in Muon,
+NorMuon, AdaMuon and our optimizer. It is not part of what distinguishes them,
+and letting each search find its own value makes the comparison partly a lottery
+over a shared subsystem: that lottery is the mechanism behind the $0.1335$ above.
+We hold it fixed for all competitors at the value tuned for the \emph{baseline}
+at the evaluation horizon, which biases against us, and spend the search density
+on the matrix path instead.
+
+\begin{remark}[Reproducibility is not a single number]\label{rem:noisefloor}
+Re-running one configuration on a later runtime moved four optimizers by
+$0.0009$, $0.0009$, $0.0010$ and $0.0012$. The same procedure at a learning rate
+$4.9\times$ higher moved Muon by $0.0175$. A noise floor quoted without its
+configuration is therefore not a property of the setup; we quote the
+same-configuration figure of about $0.001$ and note that the floor degrades
+where the optimizer is already struggling.
+\end{remark}
+
+\section{Results}\label{sec:results}
+
+We report at two scales, and the disagreement between them is itself one of the
+findings. \S\ref{sec:results-124m} is GPT-2 124M on FineWeb-Edu, which is the
+scale the comparison is about. \S\ref{sec:results-small} is the 806K-parameter
+CPU study, which is where the components were selected and which we now know
+mispredicted the sign of one of them.
+
+\subsection{GPT-2 124M}\label{sec:results-124m}
+
+GPT-2 small (124M parameters, $31.7\%$ of them on the elementwise path),
+FineWeb-Edu, 300 steps, batch 8, sequence 512, on one T4. Learning rate and
+weight decay for Muon, NorMuon and AdamW were selected by the equal-budget sweep
+of \S\ref{sec:protocol}. Every seed is shared, so the columns are paired
+differences rather than differences of means.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrrrr}
+\toprule
+optimizer & loss & $\Delta$ & worst seed & won & s/run \\
+\midrule
+proposed        & \textbf{6.6177} & ---      & ---      & --- & 323 \\
+NorMuon         & 6.6523 & $-0.0346$ & $-0.0259$ & 3/3 & 327 \\
+Muon            & 6.6573 & $-0.0396$ & $-0.0344$ & 3/3 & 323 \\
+\quad + cautious mask & 6.7519 & $-0.1341$ & $-0.1276$ & 3/3 & 333 \\
+AdamW           & 6.9657 & $-0.3479$ & $-0.3258$ & 3/3 & 155 \\
+\bottomrule
+\end{tabular}
+\caption{Paired $\Delta$ against the proposed configuration over three shared
+seeds; negative favours it. The margin over Muon is not carried by one seed---the
+\emph{worst} of the three is $-0.0344$, larger than NorMuon's entire mean
+advantage over Muon ($-0.0051$)---and it is not bought with time.}
+\label{tab:124m}
+\end{table}
+
+Two caveats bound this table, and both point the same way. Three seeds is the
+exact sign test's floor at $p = 0.25$, so no arrangement of these numbers can
+produce a small $p$; the evidence is 3/3 with a worst-case margin seven times
+NorMuon's mean advantage, not significance. And the winning configuration is the
+only one here that was never tuned---it ran at the learning rate selected for a
+different variant with a guessed weight decay, because a Colab session was
+reclaimed with the tuned configuration in it. That handicaps the winner, so the
+margin is a lower bound of unknown tightness.
+
+\paragraph{The noise floor.} Re-running two identical seeds in a fresh session
+reproduced $6.6065 \to 6.6072$ and $6.6317 \to 6.6295$: a worst-case spread of
+$0.0021$. GPU training here is not bit-reproducible given a seed---cuDNN
+autotuning and non-deterministic backward reductions---so we treat any
+cross-session gap below $\sim\!0.005$ as a tie. The margin over Muon is
+$18\times$ that floor and the cost of the mask is $63\times$ it.
+
+\subsection{A component whose sign depends on scale}\label{sec:inversion}
+
+The row we removed is cautious masking \citep{liang2024cautious}, and it is the
+most useful result in this section because of \emph{how} it failed.
+
+On the 1.17M-parameter subword benchmark---same tokeniser, same protocol, same
+parameter split as GPT-2 small to within $0.5$ percentage points---the mask is
+worth $-0.0291$ against Muon on 8 of 8 seeds, exact $p = 0.0078$. That is as
+clean as a small-scale result can be at any seed count we can afford. At 124M it
+costs $+0.1341$: four times the magnitude, in the opposite direction.
+
+We localised it before testing it. NorMuon's published advantage over Muon is
+$0.0051$, and our configuration trailed NorMuon by $0.1044$---twenty times a
+gap that ought to have been comparable---so the damage had to be in one of our
+three additions rather than in the shared spectral machinery. The mask was the
+prediction, and it was confirmed at three seeds. We note that we constructed the
+subword benchmark specifically to match the target's parameter split, on the
+hypothesis that the split was what the small benchmark was getting wrong. It
+matched, and the inversion survived, which kills our own explanation.
+
+The mechanism we can defend is narrower: the mask deletes coordinates whose sign
+disagrees with the \emph{current minibatch} gradient and rescales the survivors
+by $\text{numel}/\text{count}$. At larger width the momentum is the better of
+the two estimates, so most of what the mask removes is the minibatch being
+wrong rather than the update being wrong, and the rescale amplifies what
+survives.
+
+The transferable claim is not that small benchmarks are useless. This one
+selected the QKV split, the variance placement and the update scale, all of
+which held at $100\times$ the scale. It is that a component's \emph{sign} is not
+among the things a $100\times$-smaller benchmark establishes, however many seeds
+agree---and that an 8-of-8 sweep at $p = 0.0078$ is exactly what a wrong sign
+looks like when the effect is real at the scale you measured it.
+
+\subsection{The small-scale study}\label{sec:results-small}
+
+The remainder of this section is GPT-2 from-scratch on WikiText-2 at 806K
+non-embedding parameters, 10 seeds, paired exact Wilcoxon with Holm correction.
+It is reported as the component-selection study it was, and read subject to
+\S\ref{sec:inversion}.
+
+\subsubsection{Decomposition}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrl}
+\toprule
+configuration & loss & adds \\
+\midrule
+Muon & 1.8396 & --- \\
+ASTRO defaults (no split) & 1.8399 & indistinguishable from Muon \\
+\quad + QKV split & 1.8158 & $-0.024$ \\
+NorMuon & 1.8127 & (row normalisation) \\
+NorMuon replica \emph{(control)} & 1.8148 & $+0.0021$, $d=0.19$, $p=0.77$ \\
+\quad + cautious mask & \textbf{1.7989} & $-0.016$ \\
+AdamW & 2.2286 & \\
+\bottomrule
+\end{tabular}
+\caption{The replica control reproduces NorMuon to within a negligible effect,
+which is what makes the delta above it attributable to the component added rather
+than to an implementation gap.}
+\label{tab:decomp}
+\end{table}
+
+Table~\ref{tab:decomp} attributes each delta to the component that produced
+it. The QKV split alone reaches NorMuon's level ($+0.0031$, $p=0.77$), as
+\S\ref{sec:leverage} predicts: splitting removes the cause of the row-mass
+collapse that row normalisation treats after the fact. The two are nonetheless
+complementary with the cautious mask \citep{liang2024cautious}.
+
+\subsubsection{Against the state of the art at 806K}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrr}
+\toprule
+budget & vs NorMuon & vs Muon & vs AdamW \\
+\midrule
+equal steps      & $-0.0138$ (0.0195) & $-0.0407$ (0.0117) & $-0.4297$ (0.0117) \\
+equal wall-clock & $-0.0163$ (0.0293) & $-0.0171$ (0.0117) & $-0.2649$ (0.0078) \\
+\bottomrule
+\end{tabular}
+\caption{Paired $\Delta$ (Holm-adjusted $p$). Negative favours the proposed
+configuration. At equal wall-clock it takes 405 steps to NorMuon's 400 and
+AdamW's 592.}
+\label{tab:headline}
+\end{table}
+
+Table~\ref{tab:headline} is the result that motivated scaling up. It survived at
+124M in ordering but not in composition: the configuration measured here
+includes the cautious mask, which \S\ref{sec:inversion} shows must be removed
+above roughly $10^8$ parameters. We report it as measured rather than re-running
+the small scale without the mask, because the point of the row is what the
+selection procedure produced, not what hindsight prefers.
+
+\subsubsection{Component ranking}
+
+On the fine-tuning ablation, cost of removing each component: update-RMS matching
+$+5.3\%$; Hyperball norm control instead of weight decay $+4.5\%$; cautious
+masking $+3.2\%$; hard anchor instead of elastic $+2.2\%$; dead-zone filter
+enabled $+1.9\%$; variance adaptation $+1.1\%$; \textbf{the anchor $+0.0\%$}.
+
+The largest single contributor is the component that exists for \emph{fairness}:
+making a learning rate transfer between the spectral and scalar paths. An
+evaluation that does not control for it credits step-size calibration to matrix
+structure.
+
+\subsubsection{Held-out validation}
+
+On fine-tuning, held out from the candidate search: the QKV split remains
+directionally better ($-0.0078$ vs AdamW, $d=-0.62$, $8/10$ seeds, Holm $0.42$),
+while the full recipe ties both baselines ($d \le 0.10$, $p=0.92$). The split
+transfers; the rest is regime-specific. Post-orthogonalisation placement wins from
+scratch and pre-orthogonalisation wins when fine-tuning, consistent across every
+comparison we ran.
+
+\section{Corrections}\label{sec:corrections}
+
+We record six withdrawn claims and three bugs, because the pattern---almost every
+one caught by a control disagreeing with a headline, none by reading the code---is
+the most transferable thing here.
+
+\paragraph{A five-seed win that did not replicate.} A candidate beat AdamW on
+fine-tuning by $-0.0111$ on $5/5$ seeds with a bootstrap interval below zero. At
+ten seeds: $-0.0079$, $8/10$, exact $p=0.084$, Holm $0.168$. With $n=5$ the
+smallest attainable two-sided $p$ is $2/2^5 = 0.0625$, so a perfect sweep is the
+only impressive-looking outcome available, and is not unlikely for a small real
+effect plus noise.
+
+\paragraph{That claim then inverted on time.} AdamW's step costs $89$\,ms against
+the candidate's $137$; in equal seconds it takes 120 steps to 78 and wins by
+$+0.0315$.
+
+\paragraph{``Muon beats NorMuon at equal wall-clock'' was wrong.} It rested on a
+single per-step cost calibration that measured $80.2$\,ms in one run and $84.1$ in
+the next, moving Muon's allocation from 457 steps to 438 and with it the entire
+conclusion. Corrected: $+0.0007$, $d=0.04$, $p=1.0$.
+
+\paragraph{A raw mean read as a result.} We described the from-scratch winner as
+``worse than AdamW'' on held-out fine-tuning from a $0.0016$ difference. The
+paired test gives $d=0.07$, $p=0.92$: a tie.
+
+\paragraph{``Splitting is cheaper than not splitting.''} Withdrawn in
+\S\ref{sec:qkv}. It is $1.29\times$ more expensive by operation count and
+$1.33\times$ measured. This is the only one of the six that a control could not
+have caught, because it was never a measurement---it was a one-line arithmetic
+claim asserted from a plausible mental picture and published without being
+checked. It is correspondingly the worst.
+
+\paragraph{``Runs are deterministic given a seed.''} Our GPU reports said so, and
+that claim is what licensed comparing a number from one session against a
+baseline recorded in another. Re-running two identical seeds in a fresh session
+moved them by up to $0.0021$. cuDNN autotuning and non-deterministic backward
+reductions are enough to break bit-reproducibility even with every seed fixed.
+The conclusions survive---the margin over Muon is $18\times$ this spread---but
+several comparisons we would have been willing to make at $0.003$ were never
+admissible.
+
+\paragraph{Bug 1: ranges, not counts.} See Remark~\ref{rem:ranges}. Exposed by the
+NorMuon replica missing its target by $0.034$.
+
+\paragraph{Bug 2: configuration resolved by name, not recency.} The wall-clock
+harness globbed candidate artifacts alphabetically, selecting a superseded
+configuration and producing an apparent regression that was purely wrong
+hyperparameters. A $0.027$ swing from a $0.9\%$ per-step cost difference is not
+arithmetically possible, which is what prompted the check.
+
+\paragraph{Bug 3: a paired test across unpaired seeds.} The candidate harness
+evaluated a new configuration on seeds $200\ldots$ and compared it against a
+field evaluated on seeds $100\ldots$, then ran a paired signed-rank test on the
+two vectors. A paired test on unpaired samples is not a conservative
+approximation of anything; it is a different test with the wrong null. The fix
+derives the candidate's seeds from the reference's recorded seeds so pairing
+holds by construction, and refuses to run rather than silently unpairing---and
+the refusal happens before tuning, since the first version of the guard burned
+ten minutes of search before declining to report it.
+
+\section{Limitations}\label{sec:limitations}
+
+The largest gap is seeds at scale. Table~\ref{tab:124m} rests on three, which is
+the exact sign test's floor at $p = 0.25$, so the 124M result cannot be certified
+however clean it looks; and the configuration that wins it was never tuned, while
+every baseline it beats was. Both gaps bias against the reported margin, which
+makes it a lower bound rather than an estimate, but neither is a substitute for
+running the sweep.
+
+The second gap is horizon and size. Every number here is 300 steps at 124M or
+below---far short of a Chinchilla-optimal budget---and optimizer advantages are
+documented to shrink with scale \citep{wen2025fantastic}. We have no evidence
+about 355M, 774M, or about whether a $0.04$-nat lead at 300 steps survives at
+2700. That study is specified and instrumented in the repository; it is not run.
+
+The small-scale study carries its own limits: character-level tokenisation puts
+$96\%$ of the model on the spectral path against GPT-2's $68\%$, sixteen trials
+over three dimensions leaves every method somewhat under-tuned, and the
+from-scratch task is in-sample after three rounds of iteration on it. Per
+\S\ref{sec:inversion} we now hold that its component \emph{rankings} transferred
+and one component's \emph{sign} did not, and we cannot say in advance which kind
+of quantity a new component is.
+
+Finally, attribution. Cautious masking is \citeauthor{liang2024cautious}'s and we
+removed it; the QKV split is not ours either---production Muon implementations
+already split per slice. Our contributions are the leverage identity and the
+mechanism it explains, the solved converging iteration, the scale inversion, and
+the protocol.
+
+\section{Conclusion}
+
+The row norms of a Muon update are leverage scores. That elementary identity
+implies row normalisation cannot act on wide matrices, and that a fused QKV
+projection hands $85\%$ of its update to $V$ while passing every orthogonality
+check. Splitting the projection fixes it, at a real cost of $1.33\times$ on the
+orthogonalisation, and the defect it repairs decays with training---so the
+repair belongs on a schedule.
+
+The assembled optimizer beats Muon, NorMuon and AdamW at GPT-2 124M on three of
+three shared seeds, at Muon's wall-clock. We call that directional rather than
+established: three seeds floor the exact sign test at $p = 0.25$, and the
+winning configuration is the one row in the table that was never tuned.
+
+We consider the methodological findings at least as important. Equal tuning
+budgets are necessary and not sufficient; ranges must match the update scale. A
+component's sign does not survive a $100\times$ change in scale even when 8 of 8
+seeds agree at $p = 0.0078$. And in a project explicitly designed to avoid
+manufacturing results, three measurement bugs and six wrong claims still
+occurred, almost every one caught by a control rather than by inspection.
+Controls that can fail are the load-bearing part of an optimizer comparison.
+
+\paragraph{Code.} All code, data-fetching scripts, and the exact commands
+reproducing every table:
+\url{https://github.com/pop123-ux/knsa-knee-normality-kaggle} (directory
+\texttt{astro/}).
+
+\begin{thebibliography}{99}
+\bibitem[Amsel et al.(2025)]{amsel2025polar}
+N.~Amsel, D.~Persson, C.~Musco, and R.~Gower.
+\newblock The Polar Express: optimal matrix sign methods and their application
+  to the Muon algorithm.
+\newblock \emph{arXiv:2505.16932}, 2025.
+
+\bibitem[Bernstein and Newhouse(2024)]{bernstein2024modular}
+J.~Bernstein and L.~Newhouse. Modular duality in deep learning.
+\newblock \emph{arXiv:2410.21265}, 2024.
+
+\bibitem[Frans et al.(2025)]{frans2025whitening}
+K.~Frans et al. What really matters in matrix-whitening optimizers?
+\newblock \emph{arXiv:2510.25000}, 2025.
+
+\bibitem[Jordan et al.(2024)]{jordan2024muon}
+K.~Jordan, Y.~Jin, V.~Boza, Y.~Jiacheng, F.~Cesista, L.~Newhouse, and
+J.~Bernstein. Muon: An optimizer for hidden layers in neural networks, 2024.
+
+\bibitem[Khona et al.(2026)]{khona2026soap}
+M.~Khona et al. SOAP, Muon, and beyond: Pushing LLM pretraining scales.
+\newblock \emph{arXiv:2607.20548}, 2026.
+
+\bibitem[Li et al.(2025)]{li2025normuon}
+Z.~Li et al. NorMuon: Making Muon more efficient and scalable.
+\newblock \emph{arXiv:2510.05491}, 2025.
+
+\bibitem[Liang et al.(2024)]{liang2024cautious}
+K.~Liang et al. Cautious optimizers: Improving training with one line of code.
+\newblock \emph{arXiv:2411.16085}, 2024.
+
+\bibitem[Qu et al.(2026)]{qu2026muon}
+X.~Qu et al. Can Muon fine-tune Adam-pretrained models?
+\newblock \emph{ICML}, 2026. arXiv:2605.10468.
+
+\bibitem[Vyas et al.(2024)]{vyas2024soap}
+N.~Vyas et al. SOAP: Improving and stabilizing Shampoo using Adam.
+\newblock \emph{arXiv:2409.11321}, 2024.
+
+\bibitem[Wen et al.(2025)]{wen2025fantastic}
+K.~Wen, D.~Hall, T.~Ma, and P.~Liang. Fantastic pretraining optimizers and where
+to find them.
+\newblock \emph{arXiv:2509.02046}, 2025.
+\end{thebibliography}
+
+\end{document}

@@ -32,8 +32,8 @@ Everything above 124M, and every horizon past 300 steps, is **unmeasured**. See
 ### What the work produced besides the optimizer
 
 - **the leverage identity** — the squared row norms of a Muon update are exactly the leverage
-  scores of the momentum's row space. Two corollaries follow: row normalisation is provably inert
-  on wide matrices, and a *fused* QKV projection hands ~85% of its update to `V` while
+  scores of the momentum's row space. Two corollaries follow: row normalisation is provably
+  inert on wide matrices, and a *fused* QKV projection hands ~85% of its update to `V` while
   passing every orthogonality check. Measured on 8 pretrained checkpoints, 124M–1.4B: it is an
   **initialisation-time** defect that decays (V's share 0.65 at init → 0.50 trained → 0.333 uniform);
 - **Muon's quintic cannot converge** — its fixed points solve `2.4445 − 4.7750s² + 2.0315s⁴ = 0`

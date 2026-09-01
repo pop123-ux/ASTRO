@@ -1,0 +1,624 @@
+{
+  "_provenance": {
+    "note": "Numbers transcribed from the runs named in each block's 'source' field. Anything not measured is absent rather than estimated; figures skip what is absent instead of drawing a placeholder.",
+    "noise_floor": {
+      "value": 0.0021,
+      "how": "Two identical seeds re-run at 124M in a fresh Colab session: 6.606521 -> 6.607234 and 6.631669 -> 6.629529. GPU training is not bit-reproducible given a seed (cuDNN autotuning, non-deterministic backward reductions).",
+      "consequence": "A cross-session gap below ~0.005 is a tie."
+    }
+  },
+  "gpt2_124m_fineweb": {
+    "source": "colab_bench.py on a T4; GPT-2 124M, FineWeb-Edu, 300 steps, batch 8, sequence 512",
+    "steps": 300,
+    "batch": 8,
+    "seq": 512,
+    "seeds": [
+      100,
+      101,
+      102
+    ],
+    "tuned": [
+      "muon",
+      "normuon",
+      "adamw"
+    ],
+    "untuned": [
+      "astro",
+      "astro_cautious"
+    ],
+    "untuned_note": "astro ran at the learning rate selected for another variant with a guessed weight decay of 0.02; its tuned configuration was lost with a reclaimed session. This handicaps the winner.",
+    "losses": {
+      "astro": [
+        6.6065,
+        6.6317,
+        6.615
+      ],
+      "normuon": [
+        6.6422,
+        6.6576,
+        6.6572
+      ],
+      "muon": [
+        6.6475,
+        6.6661,
+        6.6584
+      ],
+      "astro_cautious": [
+        6.7424,
+        6.7593,
+        6.7539
+      ],
+      "adamw": [
+        6.9532,
+        6.9575,
+        6.9863
+      ]
+    },
+    "seconds_per_run": {
+      "astro": 323,
+      "normuon": 327,
+      "muon": 323,
+      "astro_cautious": 333,
+      "adamw": 155
+    }
+  },
+  "gpt2_124m_shared_config": {
+    "source": "astro_lab.py --config lr=0.0144 weight_decay=0.02 scalar_lr_mult=0.1 beta2=0.95, one T4, overnight run of 2026-08-17",
+    "what_is_different": "Every optimizer runs at ONE shared fixed configuration. The gpt2_124m_fineweb block above instead had muon/normuon/adamw tuned by sweep and astro at a guessed configuration. Neither is an equal-budget tuned comparison, and they disagree in opposite directions.",
+    "seeds": [
+      100,
+      101
+    ],
+    "losses": {
+      "300": {
+        "muon": [
+          6.5893,
+          6.5846
+        ],
+        "astro": [
+          6.6708,
+          6.6836
+        ]
+      },
+      "900": {
+        "muon": [
+          6.0859,
+          6.084
+        ],
+        "astro": [
+          6.2133,
+          6.1979
+        ]
+      }
+    },
+    "seconds_per_run": {
+      "300": {
+        "muon": 276.5,
+        "astro": 314.0
+      },
+      "900": {
+        "muon": 831.5,
+        "astro": 936.5
+      }
+    },
+    "paired_delta_astro_minus_muon": {
+      "300": 0.0903,
+      "900": 0.1207
+    },
+    "seeds_won_by_astro": {
+      "300": 0,
+      "900": 0
+    },
+    "finding": "ASTRO LOSES to Muon at this configuration, on 0 of 2 seeds at both budgets, and the gap WIDENS with longer training (+0.0903 at 300 steps, +0.1207 at 900). It is also 12-15% slower per run. This is the opposite sign from the gpt2_124m_fineweb block.",
+    "why_they_disagree": "The two runs put each optimizer at a different learning rate. Muon here reaches 6.5870 at 300 steps against 6.6573 for its 'tuned' configuration in the earlier sweep, so lr=0.0144 is better for Muon than what that sweep selected; ASTRO reaches 6.6772 here against 6.6177 earlier, so the same rate is worse for ASTRO. Each comparison flattered whichever optimizer happened to sit nearer its own optimum.",
+    "conclusion": "There is no valid 124M comparison yet. An equal-budget tuned sweep for both optimizers is the only thing that settles it, and until it is run the 124M optimizer claim is withdrawn rather than merely uncertain."
+  },
+  "gpt2_124m_horizon": {
+    "source": "astro_lab.py --config lr=0.0144 weight_decay=0.02 --steps 300 900 2700 --seeds 2, one T4, 2026-08-17, ~4h",
+    "what_is_different": "Same shared configuration as gpt2_124m_shared_config, extended to 2700 steps. This answers the horizon question and NOTHING ELSE: it re-ran the identical code and configuration, so it does not test post_normalize or the trust scale, both of which landed after it started.",
+    "reproduction_check": {
+      "note": "Every 300- and 900-step cell reproduces the previous session to within 0.0024, against a recorded noise floor of 0.0021. Same code, same config, confirmed rather than assumed.",
+      "worst_drift": 0.0024
+    },
+    "seeds": [
+      100,
+      101
+    ],
+    "losses": {
+      "300": {
+        "muon": [
+          6.5899,
+          6.5822
+        ],
+        "astro": [
+          6.6692,
+          6.6836
+        ]
+      },
+      "900": {
+        "muon": [
+          6.0848,
+          6.0826
+        ],
+        "astro": [
+          6.2109,
+          6.1977
+        ]
+      },
+      "2700": {
+        "muon": [
+          5.5271,
+          5.5231
+        ],
+        "astro": [
+          5.7224,
+          5.7178
+        ]
+      }
+    },
+    "seconds_per_run": {
+      "300": {
+        "muon": 269.5,
+        "astro": 307.0
+      },
+      "900": {
+        "muon": 804.0,
+        "astro": 914.5
+      },
+      "2700": {
+        "muon": 2407.0,
+        "astro": 2737.0
+      }
+    },
+    "paired_delta_astro_minus_muon": {
+      "300": 0.0903,
+      "900": 0.1206,
+      "2700": 0.195
+    },
+    "seeds_won_by_astro": {
+      "300": 0,
+      "900": 0,
+      "2700": 0
+    },
+    "finding": "The gap does not decay with training length -- it WIDENS monotonically, roughly doubling as the budget goes 300 -> 2700 (a 9x increase). ASTRO is also 12-14% slower per run at every budget. This is the opposite of the shrinking-advantage pattern Wen et al. describe for optimizer gains, and it is much larger than the 0.0021 noise floor.",
+    "conclusion": "At this configuration the optimizer claim is dead in the direction of longer training, not merely unproven. A tuned sweep could still change the 300-step picture, but it would have to overcome 0.197 nats at 2700 steps, and a pure step-size offset would not be expected to compound this way. The widening points at something structural rather than at a mis-set learning rate.",
+    "worst_seed_delta": {
+      "300": 0.1014,
+      "900": 0.1261,
+      "2700": 0.1953
+    }
+  },
+  "scale_inversion": {
+    "source": "cautious masking measured against the same reference at two scales under one tokeniser and one protocol",
+    "component": "cautious",
+    "points": [
+      {
+        "params": 1170000,
+        "label": "1.17M",
+        "delta_vs_muon": -0.0291,
+        "seeds_won": 8,
+        "seeds": 8,
+        "exact_p": 0.0078,
+        "task": "gpt_bpe, 2816-token BPE trained on the corpus",
+        "elementwise_fraction": 0.322
+      },
+      {
+        "params": 124000000,
+        "label": "124M",
+        "delta_vs_muon": 0.1341,
+        "seeds_won": 0,
+        "seeds": 3,
+        "exact_p": 0.25,
+        "task": "GPT-2 124M, FineWeb-Edu, GPT-2 BPE",
+        "elementwise_fraction": 0.317
+      }
+    ],
+    "note": "The small benchmark was built to match the target's elementwise/spectral parameter split (32.2% against 31.7%) on the hypothesis that the split explained earlier disagreements. It matched and the inversion survived, which removes that explanation."
+  },
+  "tinyshakespeare": {
+    "source": "806K-parameter GPT-2, character level, 25 seeds, paired exact Wilcoxon",
+    "seeds": 25,
+    "deltas_vs_adamw": {
+      "equal_steps_constant_lr": -0.4069,
+      "equal_steps_cosine": -0.3162,
+      "equal_wall_clock": -0.0986
+    },
+    "seeds_won": {
+      "equal_steps_constant_lr": 25,
+      "equal_steps_cosine": 25,
+      "equal_wall_clock": 25
+    }
+  },
+  "horizon": {
+    "source": "806K-parameter GPT-2 on tinyshakespeare; the ASTRO-AdamW gap as the step budget grows",
+    "steps": [
+      400,
+      800,
+      1600
+    ],
+    "delta_vs_adamw": [
+      -0.3274,
+      -0.1956,
+      -0.1447
+    ],
+    "note": "The gap decays and decelerates. ASTRO at 800 steps still beats AdamW at 1600 on both loss and wall-clock."
+  },
+  "qkv_defect": {
+    "source": "colab_probe.py Part A, 8 pretrained checkpoints from 124M to 1.4B across two fusion layouts",
+    "v_share": {
+      "random_init": 0.651,
+      "random_init_gpt2_family": 0.76,
+      "trained": 0.502,
+      "uniform": 0.3333
+    },
+    "note": "The defect is an initialisation-time phenomenon that attenuates with training, which is why the repair belongs on a schedule rather than applied forever."
+  },
+  "split_cost": {
+    "source": "T4 timing against the operation count",
+    "predicted_ratio": 1.29,
+    "measured_ratio": 1.33,
+    "note": "RETRACTED earlier claim that splitting is cheaper. Newton-Schulz transposes to the smaller dimension, so a fused (3d, d) already runs as (d, 3d) at 7d^3 per iteration against 9d^3 split."
+  },
+  "polar_convergence": {
+    "source": "scripts/figures/fig_quintic.py, reproducible on CPU in seconds",
+    "muon_fixed_points": [
+      0.868026,
+      1.263729
+    ],
+    "norm_ratio_vs_condition": {
+      "conditions": [
+        1,
+        10,
+        100,
+        1000
+      ],
+      "muon5": [
+        0.6881,
+        0.9024,
+        0.9212,
+        0.8641
+      ],
+      "polar5": [
+        0.894,
+        1.0017,
+        0.999,
+        0.9664
+      ],
+      "polar6": [
+        0.9997,
+        1.0001,
+        1.0001,
+        0.9883
+      ],
+      "polar7": [
+        1.0,
+        1.0,
+        1.0,
+        0.9985
+      ]
+    },
+    "polar_express_asymptote": [
+      1.875,
+      -1.25,
+      0.375
+    ],
+    "solved_tail": [
+      1.777582,
+      -1.055164,
+      0.277581
+    ],
+    "note": "The solved tail reproduces the published Polar Express asymptote, which was not fitted to."
+  },
+  "cautious_weight_decay_confound": {
+    "source": "scripts/diagnose_weight_decay.py, CPU, seconds",
+    "finding": "The cautious weight-decay mask DELETES decay rather than redistributing it. Measured on a real transformer the condition update*param > 0 holds for only 0.3795 of coordinates, so at one nominal weight_decay a masked optimizer receives about 38% of the decay an unmasked one does.",
+    "masked_fraction": 0.3795,
+    "why_it_compounds": "Decay is multiplicative, so the log weight-norm difference grows linearly in the step count. Predicted inflation of ASTRO's weights against plain decay: 1.055x at 300 steps, 1.174x at 900, 1.620x at 2700, 4.25x at 8100.",
+    "validation": "At 60 steps on a small GPT-2, predicted 1.011x and measured 1.0087x (30.5943 against 30.3296 total spectral Frobenius norm).",
+    "why_it_matters": "Muon decays every coordinate; ASTRO with cautious_wd=True decays 38% of them. Every fixed-configuration comparison so far shared one nominal weight_decay, so the two were never at matched regularisation, and the mismatch grows with training length -- which is the shape of the measured gap (+0.0904, +0.1206, +0.1950 at 300/900/2700).",
+    "inconsistency_in_our_own_code": "cautious_mask rescales survivors by numel/count precisely so masking changes direction without changing step size. The same convention was never applied to the decay mask. cautious_wd_rescale=True applies it; default False pending measurement.",
+    "status": "hypothesis with a mechanism and a quantitative prediction, NOT yet confirmed to explain the loss gap. The confirming run is astro_plain_wd and astro_wd_rescaled at 900 and 2700 steps.",
+    "note": "A tuned weight_decay absorbs this on its own, so it only bites in a shared-configuration comparison -- which is what every 124M run has been."
+  },
+  "session_a_ablation": {
+    "source": "astro_lab.py --steps 900 --config lr=0.0144 weight_decay=0.02, one T4, 1 seed, all seven runs in ONE session on ONE corpus slice",
+    "why_within_run_only": "Cross-run comparison with the earlier 900-step numbers is INVALID: the corpus loader sized the stream from max(--steps), so a 900-step run and a 2700-step run validated on different text. Muon moved 0.0555 between the two, 26x the noise floor, with identical code and configuration. Fixed: validation is now the first 400,000 tokens of the stream in every run.",
+    "also_changed": "This run used the corrected vendored defaults (cautious=False). The previous 900-step astro ran with the cautious update mask, which costs +0.1341 at 124M. So both the data and the code differed across sessions.",
+    "seed": 100,
+    "steps": 900,
+    "losses": {
+      "astro_muon_betas": 6.02414,
+      "astro_unpinned": 6.059874,
+      "astro_plain_wd": 6.065574,
+      "astro_gamma0": 6.078898,
+      "astro": 6.082108,
+      "astro_nosplit": 6.128069,
+      "muon": 6.139227
+    },
+    "seconds_per_run": {
+      "astro_muon_betas": 960,
+      "astro_unpinned": 957,
+      "astro_plain_wd": 932,
+      "astro_gamma0": 961,
+      "astro": 956,
+      "astro_nosplit": 936,
+      "muon": 881
+    },
+    "headline": "ASTRO beats Muon by -0.0571, and every one of the six variants beats Muon.",
+    "attribution_effect_of_removing_each_change": {
+      "betas_asymmetry_A2": -0.058,
+      "post_normalize_C3": -0.0222,
+      "cautious_weight_decay_A1": -0.0165,
+      "post_variance_gamma_C2": -0.0032,
+      "qkv_split_C1": 0.046
+    },
+    "reading": {
+      "A2": "Removing the Adam beta1 asymmetry on the elementwise path is the single largest gain, 0.0580. It was never a design choice.",
+      "C3": "post_normalize COSTS 0.0222. It was defaulted on two turns ago from a step-size argument with no loss measurement. Reverted.",
+      "A1": "The cautious decay mask costs 0.0165 -- real, and an order of magnitude smaller than the 2700-step weight-inflation model predicted.",
+      "C2": "The NorMuon-style post-variance is worth 0.0032, inside the noise. Carried as a knob, not claimed as a component.",
+      "C1": "Removing the QKV split COSTS 0.0460, so the split earns its place. The hypothesis that splitting destroys relative Q/K/V gradient magnitude and is therefore harmful is REFUTED."
+    },
+    "caveats": "One seed. Effects from 0.0032 to 0.0580 against a 0.0021 cross-session noise floor, so everything except the gamma term is 8x-28x the floor. Additivity is an assumption: astro_v2 exists to test the combination rather than sum it. Nothing here is tuned.",
+    "predicted_if_additive": {
+      "loss": 5.9854,
+      "delta_vs_muon": -0.1539,
+      "status": "PREDICTION, not measured"
+    }
+  },
+  "session_b_tuning": {
+    "source": "astro_lab.py --steps 900 --trials 5, one T4, 165 min, tuning at the evaluation budget",
+    "what_completed": "muon tuned + evaluated at seed 100; normuon tuned. Budget expired before any further evaluation.",
+    "muon_trials_at_900_steps": [
+      {
+        "trial": 5,
+        "lr": 0.01742,
+        "scalar_lr_mult": 0.4369,
+        "weight_decay": 0.00757,
+        "loss": 6.0206
+      },
+      {
+        "trial": 4,
+        "lr": 0.01088,
+        "scalar_lr_mult": 0.0351,
+        "weight_decay": 0.02468,
+        "loss": 6.0443
+      },
+      {
+        "trial": 1,
+        "lr": 0.01021,
+        "scalar_lr_mult": 0.2849,
+        "weight_decay": 0.00106,
+        "loss": 6.0487
+      },
+      {
+        "trial": 3,
+        "lr": 0.01831,
+        "scalar_lr_mult": 0.0298,
+        "weight_decay": 0.00251,
+        "loss": 6.0946
+      },
+      {
+        "trial": 2,
+        "lr": 0.00643,
+        "scalar_lr_mult": 0.0373,
+        "weight_decay": 0.00818,
+        "loss": 6.1195
+      }
+    ],
+    "muon_tuned_eval_seed100": 6.020785,
+    "normuon_tuned_seed0": 5.9966,
+    "finding_1_tuning_is_worth_more_than_our_margin": {
+      "muon_fixed_config": 6.1392,
+      "muon_tuned": 6.0208,
+      "gain": 0.1184,
+      "consequence": "Tuning is worth 0.1184 to Muon -- more than TWICE ASTRO's entire Session A margin of 0.0571. Session A's win was over an UNTUNED baseline. Tuned Muon at 6.0208 already beats every Session A ASTRO variant, the best of which was astro_muon_betas at 6.0241. ASTRO is also untuned, so this is not yet a verdict -- but the bar moved by more than the effect we were measuring."
+    },
+    "finding_2_the_dominant_hyperparameter_is_not_the_learning_rate": {
+      "observation": "The two best trials are the two with the largest scalar_lr_mult (0.4369, 0.2849); the three worst all sit near 0.03. Learning rate does not order them -- the highest-lr trial ranks fourth.",
+      "consequence": "scalar_lr_mult -- the multiplier on the elementwise path carrying embeddings and the tied head, 31.7% of GPT-2 124M -- is the binding variable, and every fixed-config run in this project used 0.1, near the bottom of the useful region."
+    },
+    "finding_3_edge_of_grid": {
+      "selected": 0.4368648366496585,
+      "old_range": [
+        0.02,
+        0.5
+      ],
+      "position_in_log_space": 0.96,
+      "action": "Range widened to (0.02, 1.5). A tuner whose answer is pinned against the top of its range has found a wall, not an optimum.",
+      "note": "muon and normuon selected the IDENTICAL configuration, because all optimizers draw the same 5 candidates and one candidate dominated for both. Five draws in three dimensions is 1.7 points per dimension -- sampling, not tuning."
+    }
+  },
+  "session_c_tune_transfer": {
+    "source": "astro_lab.py --steps 900 --tune-steps 300 --trials 8 --seeds 1, one T4, ~165 min",
+    "design": "tune every optimizer at 300 steps, evaluate the selected configuration at 900. This was my recommendation and it is unsafe; the entry records why.",
+    "what_completed": {
+      "muon": {
+        "tuned_at_300": 6.5216,
+        "selected_trial": 5,
+        "config": {
+          "lr": 0.01742,
+          "scalar_lr_mult": 0.4369,
+          "weight_decay": 0.00757
+        },
+        "eval_at_900_seed100": 6.0157
+      },
+      "normuon": {
+        "tuned_at_300": 6.5241,
+        "selected_trial": 3,
+        "config": {
+          "lr": 0.01831,
+          "scalar_lr_mult": 0.0298,
+          "weight_decay": 0.00251
+        },
+        "eval_at_900_seed100": 6.1301
+      },
+      "adamuon": "output truncated mid trial 7/8; best so far 6.4903 at trial 5",
+      "astro_v2": "not reached"
+    },
+    "finding_short_horizon_tuning_selects_the_wrong_configuration": {
+      "claim": "NorMuon's 300-step tuning ranked trial 3 above trial 5. At 900 steps that ranking is inverted, and the inversion is worth 0.1335.",
+      "evidence": {
+        "normuon_trial3_config_at_900": {
+          "loss": 6.1301,
+          "seed": 100,
+          "session": "C"
+        },
+        "normuon_trial5_config_at_900": {
+          "loss": 5.9966,
+          "seed": 0,
+          "session": "B"
+        },
+        "cost_of_the_inversion": 0.1335
+      },
+      "why_it_is_not_a_seed_effect": "Muon ran the trial-5 configuration at 900 three times across two sessions and two seeds: 6.0206, 6.0208, 6.0157. Total spread 0.0051, against an inversion cost of 0.1335 -- 26x larger.",
+      "consequence": "The reported result 'NorMuon loses to Muon by 0.1144 at 900 steps' is an artifact of the tuning horizon, not a property of NorMuon. At the shared trial-5 configuration NorMuon BEATS Muon at 900 by 0.024 (5.9966 vs 6.0206, same seed, same session).",
+      "status": "--tune-steps 300 withdrawn as a protocol. Tuning must run at the evaluation horizon, or the comparison must not depend on which configuration the tuner selected.",
+      "not_yet_pinned": "NorMuon's trial-5 loss AT 300 steps, which would give the exact margin the misselection was made on. It is in astro_lab_report.md from that session and is not in hand."
+    },
+    "finding_the_selection_is_made_on_a_noise_level_difference": {
+      "observation": "The eight 300-step trials cluster: the top five fall within about 0.03 of each other, and the best two optimizers' bests differ by 0.0025.",
+      "consequence": "At 300 steps the tuner is ordering configurations on differences of the same size as the run-to-run noise, and the horizon then amplifies whichever way it fell."
+    },
+    "provenance_gap": {
+      "observation": "All eight drawn scalar_lr_mult values (0.2849, 0.0373, 0.02984, 0.03506, 0.4369, 0.07536, 0.2023, 0.02157) fall inside the OLD (0.02, 0.5) range after it was widened to (0.02, 1.5). Under the widened range the chance of that is about 10%.",
+      "conclusion": "Suggestive but not decisive; the running file's version could not be determined from its output at all, which is the real defect.",
+      "fix": "astro_lab.py now prints a sha256 of its own source and the ranges in effect as its first line."
+    }
+  },
+  "session_d_shared_grid": {
+    "source": "astro_lab.py 413ce5cb7bdf --steps 900 --trials 2 --seeds 0 --pin scalar_lr_mult=0.4369, Tesla T4, seed 0",
+    "design": "every optimizer offered the identical drawn configurations; no tuner selection in the comparison",
+    "status": "INCOMPLETE. The Colab runtime was reclaimed during astro_muon_betas trial 1, and the working directory was /content, so the state file did not survive. These numbers are transcribed from the session log, not from a state file.",
+    "config_1": {
+      "lr": 0.010206,
+      "weight_decay": 0.0010597,
+      "scalar_lr_mult": 0.4369,
+      "losses": {
+        "astro_v2": 5.9218,
+        "muon": 6.0026,
+        "adamuon": 6.004,
+        "normuon": 6.0146
+      },
+      "astro_v2_minus_muon": -0.0808
+    },
+    "config_2": {
+      "lr": 0.05047,
+      "weight_decay": 0.005492,
+      "scalar_lr_mult": 0.4369,
+      "losses": {
+        "astro_v2": 5.9389,
+        "adamuon": 6.2589,
+        "normuon": 6.4239,
+        "muon": 6.4344
+      },
+      "astro_v2_minus_muon": -0.4955
+    },
+    "finding_learning_rate_robustness": {
+      "claim": "Going from lr=0.0102 to lr=0.0505 -- a 4.9x increase -- costs Muon 0.4318, NorMuon 0.4093 and AdaMuon 0.2549. It costs astro_v2 0.0171.",
+      "degradation": {
+        "muon": 0.4318,
+        "normuon": 0.4093,
+        "adamuon": 0.2549,
+        "astro_v2": 0.0171
+      },
+      "ratio_muon_over_astro_v2": 25.2,
+      "why_it_matters": "The measured gap is no longer a single number at one setting. astro_v2 wins at the configuration good for Muon (-0.0808, 16x the 0.005 noise floor) and wins by half a nat at the configuration bad for Muon. That is the pointwise-dominance result the design was built to detect, at 2 of a planned 6 configurations.",
+      "caveat": "Two configurations is not six. The sign test cannot go below 0.5 at n=2. The second configuration is also a mediocre learning rate for every optimizer, so the half-nat margin is a robustness claim, not a peak-performance claim.",
+      "what_would_falsify": "A configuration where astro_v2 loses. Four more are drawn and unrun."
+    },
+    "reproducibility_note": "muon at config 1 gives 6.0026 here. Session B's tuned muon at a different configuration gave 6.0206/6.0208/6.0157. Different configurations, so these are not repeats of each other.",
+    "cost": "~15.5 min per 900-step run measured on the T4 at ~1.00 it/s, all five optimizers within 3% of each other. The earlier 13.4/15.2 estimates were optimistic."
+  },
+  "session_e_shared_grid": {
+    "source": "astro_lab.py --steps 900 --trials 2 --seeds 0 --pin scalar_lr_mult=0.4369 --stop-after 6, Tesla T4, seed 0",
+    "design": "shared-configuration grid; every optimizer offered the identical drawn configurations",
+    "what_completed": "muon, normuon and adamuon at both configurations. Six runs, which is exactly what --stop-after 6 permitted -- and the sweep walked optimizers in the outer loop, so it stopped immediately before astro_v2. Both ASTRO columns are absent from that report.",
+    "my_error": "I sized --stop-after 6 assuming the recovered state file was in place, which would have made the first cell two runs. It was not, so the cap truncated the sweep at the exact point where the ASTRO columns begin. The ordering is now configuration-major so no stopping point can be lopsided.",
+    "paired_vs_muon": {
+      "normuon": {
+        "mean": 0.0018,
+        "worst_config": 0.0094,
+        "configs_won": "1/2"
+      },
+      "adamuon": {
+        "mean": -0.0818,
+        "worst_config": -0.0013,
+        "configs_won": "2/2"
+      }
+    },
+    "finding_1_adamuon_beats_muon_and_it_is_a_robustness_effect": {
+      "claim": "AdaMuon wins both configurations, but the margin is -0.0013 at the good learning rate and about -0.16 at the 4.9x one. The advantage is almost entirely robustness, not peak performance.",
+      "consequence": "Reported as a single tuned number, AdaMuon and Muon are indistinguishable at 124M/900. The shared grid is what separates them."
+    },
+    "finding_2_normuon_is_indistinguishable_from_muon": {
+      "mean_delta": 0.0018,
+      "worst_config": 0.0094,
+      "consequence": "NorMuon's row-wise second moment buys nothing measurable at these two configurations, in either session."
+    },
+    "finding_3_variance_adaptation_placement_is_what_matters": {
+      "claim": "NorMuon applies a row-wise second moment; AdaMuon applies an elementwise one to the orthogonalized update; ASTRO applies a post-orthogonalization variance term. Ordered by learning-rate robustness the result is astro_v2 >> adamuon > normuon ~ muon, which is the same order as how elementwise the adaptation is.",
+      "status": "hypothesis consistent with two sessions; astro_v2 has only one session and only two configurations."
+    },
+    "finding_4_cross_session_reproduction": {
+      "claim": "Sessions D and E ran the same two configurations for muon, normuon and adamuon in different sessions on different runtimes.",
+      "paired_delta_movement": {
+        "normuon_mean": 0.0011,
+        "normuon_worst": 0.0026,
+        "adamuon_mean": 0.0053,
+        "adamuon_worst": 0.0027
+      },
+      "consequence": "Paired deltas reproduce to within 0.005 across sessions. That is the noise floor for this design, and it is 16x smaller than astro_v2's margin at the good configuration and 100x smaller than its margin at the bad one."
+    }
+  },
+  "session_f_shared_grid": {
+    "source": "astro_lab 7b321ff7fda3, --steps 900 --trials 2 --seeds 0 --pin scalar_lr_mult=0.4369 --stop-after 6, Tesla T4, seed 0, /content/drive/MyDrive/astro",
+    "config_0": {
+      "lr": 0.010205978810672643,
+      "weight_decay": 0.001059717889298923,
+      "scalar_lr_mult": 0.4369,
+      "losses": {
+        "astro_v2": 5.920768666267395,
+        "astro_muon_betas": 5.9226219177246096,
+        "adamuon": 6.002795934677124,
+        "muon": 6.0034747838974,
+        "normuon": 6.015528678894043
+      },
+      "delta_vs_muon": {
+        "astro_v2": -0.0827,
+        "astro_muon_betas": -0.0809,
+        "adamuon": -0.0007,
+        "normuon": 0.0121
+      }
+    },
+    "config_1_partial": {
+      "lr": 0.050469744048982225,
+      "muon": 6.416883516311645
+    },
+    "finding_1_the_whole_astro_margin_is_the_betas_fix": {
+      "claim": "astro_muon_betas (5.9226) and astro_v2 (5.9208) differ by 0.0019, at the noise floor. They differ only in cautious_wd. So the entire ASTRO margin at this configuration comes from the scalar-path beta1 asymmetry (A2); turning off cautious weight decay contributes nothing here.",
+      "contrast_with_session_a": "Session A measured removing cautious weight decay at -0.0165, against an unpinned scalar_lr_mult of 0.1. With scalar_lr_mult pinned at 0.4369 the effect is 0.0019. The component's value depends on the elementwise path's rate, which is itself the variable the pin removed.",
+      "consequence": "One named change accounts for the result, which is a far cleaner claim than a six-component bundle. It also means astro_muon_betas is an independent replication of astro_v2 at every configuration, for the cost of one column."
+    },
+    "finding_2_the_noise_floor_is_0.001_not_0.005": {
+      "claim": "Four optimizers ran configuration 0 twice, in different sessions on different runtimes.",
+      "movement": {
+        "muon": 0.0009,
+        "normuon": 0.0009,
+        "adamuon": 0.0012,
+        "astro_v2": 0.001
+      },
+      "consequence": "Same-configuration reproduction at 124M/900 on a T4 is about 0.001. astro_v2's margin of 0.0827 is 80x that. The earlier 0.005 estimate came from comparing means over two configurations, one of which was only partly matched.",
+      "caveat": "muon at configuration 1 (lr=0.0505) moved 0.0175 between the same two sessions -- 17x the configuration-0 figure. Reproducibility itself degrades at a bad learning rate, which is consistent with the robustness result rather than independent of it."
+    },
+    "finding_3_normuon_loses_at_the_pinned_scalar": {
+      "delta": 0.0121,
+      "note": "12x the noise floor, and the same sign and size as Session D's +0.0120 and Session E's +0.0094. NorMuon is measurably behind Muon at this configuration, not merely level with it."
+    },
+    "protocol_contamination_found": {
+      "what": "The state file carried muon and normuon evaluation runs (seed 100) from the withdrawn tune-at-300 protocol, at configurations that design selected: muon scalar_lr_mult 0.4369, normuon 0.0298.",
+      "risk": "The resume check keyed on (size, steps, optimizer, seed) alone, so the seed-axis table would have reused those and compared them against optimizers evaluated under the shared-grid protocol.",
+      "fix": "A recorded evaluation run whose stored config differs from the selected one is now re-run, with a printed reason."
+    }
+  }
+}
