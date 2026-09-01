@@ -1,0 +1,38 @@
+name: Import ASTRO optimizer project
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Import source ASTRO tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch claude/ai-optimization-algorithm-eb2jh9 \
+            https://github.com/pop123-ux/knsa-knee-normality-kaggle.git /tmp/knsa
+          rm -rf src docs scripts tests artifacts pyproject.toml astro
+          cp -a /tmp/knsa/astro/. .
+          rm -rf /tmp/knsa
+
+      - name: Commit imported project
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git rm -f .github/workflows/import-astro.yml
+          git commit -m "Import complete ASTRO optimizer project" || exit 0
+          git push origin HEAD:main
