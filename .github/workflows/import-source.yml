@@ -1,29 +1,33 @@
 name: import-source
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [main]
 
 permissions:
   contents: write
 
 jobs:
   import:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Import complete source astro tree
+      - name: Import complete source astro tree verbatim
         run: |
           set -euo pipefail
           git clone --depth 1 --branch claude/ai-optimization-algorithm-eb2jh9 https://github.com/pop123-ux/knsa-knee-normality-kaggle.git /tmp/src
           find . -mindepth 1 -maxdepth 1 ! -name .git ! -name .github -exec rm -rf {} +
           cp -a /tmp/src/astro/. .
           rm -rf /tmp/src
+      - name: Commit imported project and remove workflow
+        run: |
+          set -euo pipefail
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          rm -f .github/workflows/import-source.yml
           git add -A
-          git commit -m 'Import complete ASTRO project from source' || exit 0
-          git rm .github/workflows/import-source.yml || true
-          git commit -m 'Remove temporary import workflow' || true
+          git commit -m 'Import complete ASTRO optimizer project' || exit 0
           git push origin HEAD:main
