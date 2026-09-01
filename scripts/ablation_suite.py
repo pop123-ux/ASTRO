@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """Orchestrate a broad, auditable ASTRO ablation campaign.
 
-This launcher builds a pre-specified matrix and delegates every actual training
-run to the tested ``scripts/astro_lab.py`` engine. It deliberately contains no
-optimizer implementation. That keeps the benchmark logic single-sourced.
+The repository already contains the tested optimizer implementations and the
+resumable benchmark engine in ``scripts/astro_lab.py``. This file only defines
+an experimental matrix and launches one benchmark cell at a time.
 
 Suites
 ------
 primary    : dense LR/WD/scalar sensitivity at 124M + 12-trial tuning controls
-mechanisms : ASTRO variants across 300/900/2700 steps and 3 fresh seeds
+mechanisms : every baseline/ASTRO variant across 300/900/2700 and 3 seeds
 robustness : 45M/124M/355M/774M x 300/900/2700 x 7 optimizers
 stability  : long-horizon LR/WD stress envelope
 
-Run ``--dry-run`` first. Shard with ``--shard PART/TOTAL`` across Colab
-sessions. Each job is isolated to its own work directory and the audit log is
-append-only, so failed sessions can be resumed without redoing completed jobs.
+Use ``--dry-run`` before GPU execution. Shard with ``--shard PART/TOTAL``
+across Colab sessions. Each job is isolated to its own work directory and the
+audit log is append-only, so interrupted sessions resume cleanly.
 """
 
 from __future__ import annotations
@@ -30,7 +30,12 @@ import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-BASELINES = ("muon", "normuon", "adamuon", "soap")
+# Match the optimizer names currently exposed by astro_lab.py. Keep AdamW as the
+# universal scalar baseline; the matrix-oriented comparison is Muon/NorMuon/
+# AdaMuon versus ASTRO. SOAP is covered by the repository's other benchmark
+# harnesses and is intentionally not invoked here unless it is explicitly wired
+# into astro_lab's registry.
+BASELINES = ("adamw", "muon", "normuon", "adamuon")
 ASTRO = (
     "astro", "astro_pinned", "astro_trust", "astro_cautious",
     "astro_converging", "astro_gamma25", "astro_gamma50", "astro_gamma0",
@@ -60,12 +65,10 @@ class Job:
     steps: int
     seed: int
     trials: int
-    pins: tuple[str, ...]
+    config: tuple[str, ...]
     purpose: str
 
     def command(self, astro_lab: Path, work_dir: Path) -> list[str]:
-        # astro_lab's --seeds option is a seed selector, not a seed-count
-        # argument. One launcher job therefore passes exactly one explicit id.
         cmd = [
             sys.executable, str(astro_lab),
             "--mode", "scaling",
@@ -77,8 +80,9 @@ class Job:
         ]
         if self.trials:
             cmd.extend(["--trials", str(self.trials)])
-        for pin in self.pins:
-            cmd.extend(["--pin", pin])
+        if self.config:
+            cmd.append("--config")
+            cmd.extend(self.config)
         return cmd
 
 
@@ -87,15 +91,13 @@ def jid(*parts: object) -> str:
 
 
 def make(suite: str, opt: str, size: str, steps: int, seed: int,
-         trials: int, pins: tuple[str, ...], purpose: str) -> Job:
-    return Job(jid(suite, opt, size, steps, seed, trials, pins), suite, opt,
-               size, steps, seed, trials, pins, purpose)
+         trials: int, config: tuple[str, ...], purpose: str) -> Job:
+    return Job(jid(suite, opt, size, steps, seed, trials, config), suite, opt,
+               size, steps, seed, trials, config, purpose)
 
 
 def build_primary() -> list[Job]:
     jobs: list[Job] = []
-    # Dense shared configuration surface. 150 explicit points/optimizer make
-    # it difficult for the final claim to depend on one narrow LR/WD choice.
     for opt in BASELINES + DEEP_ASTRO:
         for lr in LR:
             for wd in WD:
@@ -106,10 +108,7 @@ def build_primary() -> list[Job]:
                          f"scalar_lr_mult={scalar}"),
                         "dense shared LR/WD/scalar sensitivity",
                     ))
-    # Independent continuous tuning controls for the strongest direct
-    # comparisons. astro_lab owns the actual random search and state file.
-    for opt in ("muon", "normuon", "adamuon", "astro",
-                "astro_muon_betas", "astro_v2", "astro_trust"):
+    for opt in BASELINES + ("astro", "astro_muon_betas", "astro_v2", "astro_trust"):
         jobs.append(make("primary", opt, "124M", 900, 0, 12, tuple(),
                           "12-trial optimizer-specific tuning control"))
     return jobs
@@ -117,13 +116,11 @@ def build_primary() -> list[Job]:
 
 def build_mechanisms() -> list[Job]:
     jobs: list[Job] = []
-    variants = BASELINES + ASTRO
     for steps in (300, 900, 2700):
         for seed in (100, 101, 102):
-            for opt in variants:
+            for opt in BASELINES + ASTRO:
                 jobs.append(make("mechanisms", opt, "124M", steps, seed, 0,
                                   CORE, "component attribution across horizon"))
-    # LR sensitivity around the current 124M reference recipe.
     for opt in ("muon", "normuon", "adamuon", "astro_v2", "astro_muon_betas"):
         for factor in (0.25, 0.5, 0.75, 1.0, 1.33, 2.0, 4.0):
             for seed in (100, 101, 102):
@@ -138,8 +135,7 @@ def build_mechanisms() -> list[Job]:
 
 def build_robustness() -> list[Job]:
     jobs: list[Job] = []
-    opts = ("muon", "normuon", "adamuon", "soap", "astro",
-            "astro_muon_betas", "astro_v2")
+    opts = BASELINES + ("astro", "astro_muon_betas", "astro_v2")
     for size in SIZES:
         for steps in (300, 900, 2700):
             for seed in (100, 101, 102):
@@ -151,15 +147,16 @@ def build_robustness() -> list[Job]:
 
 def build_stability() -> list[Job]:
     jobs: list[Job] = []
-    opts = ("muon", "normuon", "adamuon", "astro",
-            "astro_muon_betas", "astro_v2")
+    opts = BASELINES + ("astro", "astro_muon_betas", "astro_v2")
     for opt in opts:
         for lr in (0.0015, 0.003, 0.006, 0.012, 0.024, 0.048, 0.096, 0.192):
             for wd in (0.0, 0.01, 0.1, 0.3):
-                jobs.append(make("stability", opt, "124M", 2700, 100, 0,
-                                  (f"lr={lr}", f"weight_decay={wd}",
-                                   "scalar_lr_mult=0.4369"),
-                                  "long-horizon stability envelope"))
+                jobs.append(make(
+                    "stability", opt, "124M", 2700, 100, 0,
+                    (f"lr={lr}", f"weight_decay={wd}",
+                     "scalar_lr_mult=0.4369"),
+                    "long-horizon stability envelope",
+                ))
     return jobs
 
 
@@ -207,9 +204,8 @@ def log(path: Path, record: dict) -> None:
         fh.write(json.dumps(record, sort_keys=True) + "\n")
 
 
-def estimate(jobs: list[Job]) -> float:
-    # Planning-only estimate. The real T4 cost varies by size and optimizer.
-    return sum(job.steps * 1.2 for job in jobs) / 3600.0
+def estimate(jobs: list[Job], sec_per_step: float = 1.2) -> float:
+    return sum(job.steps * sec_per_step for job in jobs) / 3600.0
 
 
 def run(args: argparse.Namespace) -> int:
@@ -239,9 +235,9 @@ def run(args: argparse.Namespace) -> int:
         if job.job_id in done:
             print(f"[{index}/{len(jobs)}] SKIP {job.job_id}")
             continue
-        # Include seed in the directory so three explicit seeds cannot race
-        # against the same astro_lab state file.
-        work = root / job.suite / f"{job.size}_{job.optimizer}_{job.steps}_s{job.seed}_{job.job_id}"
+        work = root / job.suite / (
+            f"{job.size}_{job.optimizer}_{job.steps}_s{job.seed}_{job.job_id}"
+        )
         work.mkdir(parents=True, exist_ok=True)
         cmd = job.command(astro_lab, work)
         start = time.time()
@@ -250,7 +246,7 @@ def run(args: argparse.Namespace) -> int:
         print("\n" + "=" * 92)
         print(f"[{index}/{len(jobs)}] {job.purpose}")
         print(f"optimizer={job.optimizer} size={job.size} steps={job.steps} seed={job.seed}")
-        print(f"pins={job.pins or '(astro_lab tuning space)'}")
+        print(f"config={job.config or '(astro_lab tuner)'}")
         print(shlex.join(cmd))
         print("=" * 92)
         try:
@@ -258,7 +254,8 @@ def run(args: argparse.Namespace) -> int:
                 cmd, check=False, timeout=args.timeout_minutes * 60,
                 env={**os.environ, "PYTHONUNBUFFERED": "1"},
             )
-            status, code = ("completed", proc.returncode) if proc.returncode == 0 else ("failed", proc.returncode)
+            status = "completed" if proc.returncode == 0 else "failed"
+            code = proc.returncode
         except subprocess.TimeoutExpired:
             status, code = "timeout", 124
         end = time.time()
@@ -292,7 +289,7 @@ def main() -> int:
         for i, job in enumerate(jobs, 1):
             print(f"{i:4d} {job.job_id} {job.optimizer:20s} {job.size:5s} "
                   f"{job.steps:4d} seed={job.seed:3d} trials={job.trials:2d} "
-                  + " ".join(job.pins))
+                  + " ".join(job.config))
         return 0
     return run(args)
 
