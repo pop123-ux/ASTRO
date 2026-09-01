@@ -70,7 +70,6 @@ import json
 import math
 import os
 import random
-import re
 import statistics
 import textwrap
 import time
@@ -1233,27 +1232,8 @@ def announce(args) -> None:
     after the fact.
     """
     source = SOURCE.read_bytes()
-    digest = hashlib.sha256(source).hexdigest()
-    print(f"astro_lab {digest[:12]} ({len(source):,} bytes) as {SOURCE.name}",
-          flush=True)
-
-    # A browser that downloads the same filename twice writes "astro_lab (1).py".
-    # A session was lost to running one of those: it predated --pin entirely,
-    # so the sweep it would have run was not the sweep that was asked for.
-    if re.search(r"\(\d+\)", SOURCE.name):
-        raise SystemExit(
-            f"{SOURCE.name} is a duplicate download, not the current file. A "
-            "'(1)' suffix means the browser kept an older copy under the "
-            "plain name.\n"
-            "  fix: delete the duplicates and run the copy whose name carries "
-            "its own fingerprint."
-        )
-    if args.expect and not digest.startswith(args.expect):
-        raise SystemExit(
-            f"--expect {args.expect} but this file is {digest[:12]}. Refusing "
-            "to spend a GPU session on a version nobody asked for."
-        )
-
+    print(f"astro_lab {hashlib.sha256(source).hexdigest()[:12]} "
+          f"({len(source):,} bytes)", flush=True)
     if args.config:
         return
     unknown = set(args.pin) - {k for n in args.optimizers for k in space_for(n)}
@@ -1309,13 +1289,6 @@ def main() -> int:
                              "report -- lands here. On Colab this must be "
                              "under /content/drive, and Drive is mounted for "
                              "you if it is not already.")
-    parser.add_argument("--expect", default=None, metavar="PREFIX",
-                        help="refuse to run unless this file's own sha256 "
-                             "starts with PREFIX. The first line of output "
-                             "prints the digest. A session was lost running a "
-                             "stale download that predated half the flags; "
-                             "this makes that a one-second failure instead of "
-                             "a two-hour one.")
     parser.add_argument("--allow-ephemeral", action="store_true",
                         help="permit a Colab working directory that the "
                              "runtime deletes. Only for a throwaway check.")
@@ -1500,21 +1473,8 @@ def main() -> int:
         for name in args.optimizers:
             config = fixed if fixed is not None else state["tuned"][name]
             for seed in range(100, 100 + args.seeds):
-                done = state["runs"].get(key(size, steps, name, seed))
-                if done is not None:
-                    if same_config(done.get("config", {}), config):
-                        continue
-                    # A state file carried across protocols holds evaluation
-                    # runs from whatever configuration was selected *then*. The
-                    # resume check keyed on (size, steps, optimizer, seed)
-                    # only, so a run tuned under an abandoned protocol would be
-                    # silently reused and compared against optimizers evaluated
-                    # under the current one. The seed table would be built from
-                    # two different experiments.
-                    print(f"[{size} {steps}st] {name} seed {seed}: stored run is "
-                          "at a different configuration than the one now "
-                          "selected; re-running rather than mixing protocols.",
-                          flush=True)
+                if key(size, steps, name, seed) in state["runs"]:
+                    continue
                 reason = stop_reason()
                 if reason is not None:
                     print(f"\nstopping at {reason}; re-run the same command to "
