@@ -7,7 +7,13 @@ derivation, the pseudocode, and a precise account of what has and has not been m
 
 Self-contained: depends only on `torch`. Nothing here imports from the surrounding repository.
 
-## Read this first
+## Research status
+
+ASTRO is being developed as a compute-constrained research project. The objective is not to claim universal optimizer superiority from a single small run. The current program is to identify and falsify mechanisms, freeze the smallest recipe supported by the evidence, and validate it on a real Transformer training task with reproducible comparisons.
+
+**Current priority:** finish the shared-configuration study in [`scripts/astro_lab.py`](scripts/astro_lab.py), then perform multi-seed end-task validation on a 124M Transformer derived from modded-nanoGPT. See [`docs/RESEARCH_RELEASE_PLAN.md`](docs/RESEARCH_RELEASE_PLAN.md) and [`docs/MODDED_NANOGPT_VALIDATION.md`](docs/MODDED_NANOGPT_VALIDATION.md).
+
+### Existing directional result
 
 At GPT-2 **124M** on FineWeb-Edu, 300 steps, ASTRO beats Muon, NorMuon and AdamW on **3 of 3
 shared seeds** at Muon's wall-clock:
@@ -22,14 +28,12 @@ shared seeds** at Muon's wall-clock:
 **Read that as directional, not established.** Three seeds is the exact sign test's floor at
 `p = 0.25`, so no arrangement of these numbers yields a small *p*. ASTRO's row is also the only
 one that was never tuned — its tuned configuration was lost with a reclaimed Colab session, so
-it ran at a guessed weight decay while every baseline it beats came out of an equal-budget
-sweep. Both gaps bias *against* the margin, but neither substitutes for running the sweep. The
+it ran at a guessed weight decay while every baseline it beats came out of an equal-budget sweep. Both gaps bias *against* the margin, but neither substitutes for running the sweep. The
 measured cross-session noise floor is **0.0021**, so the margin over Muon is 18× noise.
 
-Everything above 124M, and every horizon past 300 steps, is **unmeasured**. See
-[`scripts/astro_lab.py`](scripts/astro_lab.py), which specifies that study.
+The newer `astro_lab.py` study is the authoritative path for resolving this limitation. Everything above 124M, and every horizon past 300 steps, is **unmeasured** until that study is complete.
 
-### What the work produced besides the optimizer
+## What the work produced besides the optimizer
 
 - **the leverage identity** — the squared row norms of a Muon update are exactly the leverage
   scores of the momentum's row space. Two corollaries follow: row normalisation is provably
@@ -71,6 +75,9 @@ Components **off by default**, because they did not earn being on:
 | `src/astro/bench/` | equal-tuning-budget protocol, seven tasks, runner |
 | `src/astro/bench/gpt.py` | nanoGPT's GPT-2, vendored faithfully, for the language-model tasks |
 | `src/astro/bench/corpora.py` | WikiText-2 and tinyshakespeare loading and tokenisation |
+| `scripts/astro_lab.py` | self-contained Colab/T4 lab for shared configurations, ablations, and scale/horizon checks |
+| `docs/MODDED_NANOGPT_VALIDATION.md` | controlled 124M modded-nanoGPT-derived end-task validation protocol |
+| `docs/RESEARCH_RELEASE_PLAN.md` | seven-day, compute-constrained research release plan |
 | `docs/paper/paper.md` | the paper source; `build_paper.py` renders it to PDF |
 
 The benchmark tasks, in the order they answer questions:
@@ -149,6 +156,16 @@ The protocol enforces equal tuning budgets in code: `astro.bench.protocol.tune` 
 optimizers under comparison do not all tune the same number of hyperparameters. That is the
 single most common way optimizer results are inflated, so it is a hard error rather than a
 convention.
+
+## Focused research validation
+
+The next-stage experimental instructions are deliberately separated from the general benchmark:
+
+- [`docs/RESEARCH_RELEASE_PLAN.md`](docs/RESEARCH_RELEASE_PLAN.md) — the seven-day release plan and decision gates;
+- [`docs/MODDED_NANOGPT_VALIDATION.md`](docs/MODDED_NANOGPT_VALIDATION.md) — the T4-safe 124M Transformer validation protocol;
+- [`scripts/astro_lab.py`](scripts/astro_lab.py) — shared-configuration and ablation harness.
+
+The modded-nanoGPT validation is derived from the public optimization track, but T4 experiments are reported as controlled research validation rather than official speedrun submissions unless they satisfy that benchmark's published rules. citeturn362378search0turn362378search4
 
 ## Rebuild the paper
 
