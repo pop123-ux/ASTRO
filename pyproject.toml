@@ -5,16 +5,24 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "astro-optimizer"
 version = "0.1.0"
-description = "ASTRO: Anchored Spectral Trust-Region Optimizer, with a fair-comparison benchmark harness"
+description = "ASTRO: matrix-structured optimizer research and fair-comparison benchmark harness"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["torch>=2.2"]
 
 [project.optional-dependencies]
-# Only needed to re-fit the dead-zone spectral filter coefficients.
+# Only needed to re-fit experimental spectral-filter coefficients.
 design = ["numpy>=1.26", "scipy>=1.11"]
-# Only needed to rebuild docs/paper/paper.pdf.
-paper = ["markdown>=3.5"]
+# Rebuild every committed paper figure. A TeX distribution is still a system
+# dependency for compiling docs/paper/paper.tex itself.
+paper = [
+  "markdown>=3.5",
+  "matplotlib>=3.8",
+  "numpy>=1.26",
+]
+# Optional experiment browser. The paper never depends on W&B to reproduce a
+# figure; committed JSON + Matplotlib are the source of record.
+tracking = ["wandb>=0.18"]
 dev = ["pytest>=8.0", "ruff>=0.4"]
 
 [tool.setuptools.packages.find]
