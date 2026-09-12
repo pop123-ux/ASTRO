@@ -1,188 +1,357 @@
-# ASTRO — Anchored Spectral Trust-Region Optimizer
+# ASTRO
 
-A matrix-structured optimizer in the Muon/SOAP family, plus the benchmark harness used to
-evaluate it. **Start with [`docs/paper/paper.tex`](docs/paper/paper.tex)** — it carries the
-derivation, the pseudocode, and a precise account of what has and has not been measured.
-(`paper.pdf` is built from the superseded `paper.md` draft and is one round behind.)
+**ASTRO is a matrix-structured optimizer research project built around a simple question:**
+which apparent improvements over Muon survive fair tuning, longer training, independent seeds,
+larger models, and wall-clock accounting?
 
-Self-contained: depends only on `torch`. Nothing here imports from the surrounding repository.
+The repository contains the current ASTRO implementation used in experiments, Muon-family
+baselines, a resumable Colab/T4 benchmark harness, the complete experiment ledger, and a
+reproducible paper/figure pipeline.
 
-## Research status
+> **Research status — September 2026:** ASTRO-v2 is promising at GPT-2 124M / 900 steps, but the
+> headline is not frozen. Horizon, independent-seed replication, and the first 355M scale check
+> are in progress. The manuscript deliberately marks unfinished cells as unfinished.
 
-ASTRO is being developed as a compute-constrained research project. The objective is not to claim universal optimizer superiority from a single small run. The current program is to identify and falsify mechanisms, freeze the smallest recipe supported by the evidence, and validate it on a real Transformer training task with reproducible comparisons.
+Start here:
 
-**Current priority:** finish the shared-configuration study in [`scripts/astro_lab.py`](scripts/astro_lab.py), then perform multi-seed end-task validation on a 124M Transformer derived from modded-nanoGPT. See [`docs/RESEARCH_RELEASE_PLAN.md`](docs/RESEARCH_RELEASE_PLAN.md) and [`docs/MODDED_NANOGPT_VALIDATION.md`](docs/MODDED_NANOGPT_VALIDATION.md).
+- [`docs/paper/paper.md`](docs/paper/paper.md) — readable living manuscript;
+- [`docs/paper/paper.tex`](docs/paper/paper.tex) — two-column LaTeX source;
+- [`docs/PAPER_WORKFLOW.md`](docs/PAPER_WORKFLOW.md) — experiment → figure → paper workflow;
+- [`docs/FIGURES.md`](docs/FIGURES.md) — visual conventions and figure inventory;
+- [`scripts/astro_lab.py`](scripts/astro_lab.py) — current self-contained optimizer/benchmark lab.
 
-### Existing directional result
+---
 
-At GPT-2 **124M** on FineWeb-Edu, 300 steps, ASTRO beats Muon, NorMuon and AdamW on **3 of 3
-shared seeds** at Muon's wall-clock:
+## Current empirical picture
 
-| optimizer | val loss | paired Δ | worst seed | s/run |
-|---|---|---|---|---|
-| **astro** | **6.6177** | — | — | 323 |
-| normuon | 6.6523 | −0.0346 | −0.0259 | 327 |
-| muon | 6.6573 | −0.0396 | −0.0344 | 323 |
-| adamw | 6.9657 | −0.3479 | −0.3258 | 155 |
+### Targeted 124M / 900-step mechanism run
 
-**Read that as directional, not established.** Three seeds is the exact sign test's floor at
-`p = 0.25`, so no arrangement of these numbers yields a small *p*. ASTRO's row is also the only
-one that was never tuned — its tuned configuration was lost with a reclaimed Colab session, so
-it ran at a guessed weight decay while every baseline it beats came out of an equal-budget sweep. Both gaps bias *against* the margin, but neither substitutes for running the sweep. The
-measured cross-session noise floor is **0.0021**, so the margin over Muon is 18× noise.
+Three shared hyperparameter configurations, one training seed per configuration:
 
-The newer `astro_lab.py` study is the authoritative path for resolving this limitation. Everything above 124M, and every horizon past 300 steps, is **unmeasured** until that study is complete.
+| variant | mean paired Δ vs Muon | configurations won |
+|---|---:|---:|
+| **ASTRO-v2** | **−0.2208** | **3/3** |
+| ASTRO-MB | −0.2137 | 3/3 |
+| ASTRO-v2 (`variance_power=0`) | −0.2047 | 3/3 |
 
-## What the work produced besides the optimizer
+This is encouraging, but the unit of replication is **configuration**, not seed. The result is
+best read as sensitivity/robustness evidence.
 
-- **the leverage identity** — the squared row norms of a Muon update are exactly the leverage
-  scores of the momentum's row space. Two corollaries follow: row normalisation is provably
-  inert on wide matrices, and a *fused* QKV projection hands ~85% of its update to `V` while
-  passing every orthogonality check. Measured on 8 pretrained checkpoints, 124M–1.4B: it is an
-  **initialisation-time** defect that decays (V's share 0.65 at init → 0.50 trained → 0.333 uniform);
-- **Muon's quintic cannot converge** — its fixed points solve `2.4445 − 4.7750s² + 2.0315s⁴ = 0`
-  at `s = 0.868` and `1.264`, so singular values never reach 1 at any step budget, and the
-  update's norm drifts 34% with the conditioning of what it was handed. A solved per-step
-  schedule removes the obstruction and is exact at 7 steps; its tail independently reproduces
-  the published Polar Express asymptote, which was not fitted to;
-- **a component whose sign inverts with scale** — cautious masking is worth −0.0291 on **8/8
-  seeds, exact p = 0.0078** at 1.17M parameters and costs **+0.1341** at 124M, same tokeniser
-  and protocol. It is now off by default. A clean small-scale sweep predicted the wrong sign;
-- **a routing bug** that GPT-2's weight tying exposes in *every* matrix optimizer using the
-  standard name-based policy — the tied token embedding and position embedding go onto the
-  spectral path while a genuine MLP projection is excluded, silently, in Muon and NorMuon alike;
-- **six retractions and three measurement bugs**, all recorded. The split-is-cheaper claim was
-  a one-line arithmetic error published without checking; splitting is 1.29× more expensive by
-  operation count and 1.33× measured.
+The largest separation occurs at the aggressive configuration `lr ≈ 0.0505`: Muon reaches
+`6.4527` validation loss while ASTRO-v2 remains at `5.9436`. That makes **hyperparameter
+robustness** a leading hypothesis for the current v2 signal.
 
-Components **off by default**, because they did not earn being on:
+ASTRO-v2 takes about **6.4% more wall-clock** than Muon in this targeted 900-step experiment, so
+a step-matched loss win is not yet a compute-efficiency win.
 
-| component | why it is off |
-|---|---|
-| `cautious` | −0.0291 at 1.17M (8/8 seeds) but **+0.1341** at 124M — sign inverts with scale |
-| `anchor` | failed at three scales in two formulations; with a free choice the tuner switched it off every time |
-| `dead_zone` | excellent spectral behaviour, independently verified; costs +1.9% on end-task loss |
-| `norm_control="hyperball"` | +4.5% against plain decoupled weight decay |
+### One shared configuration against modern Muon variants
 
-## What is here
+At `lr=0.0102059788`, `weight_decay=0.0010597179`, `scalar_lr_mult=0.4369`:
 
-| file | what it is |
-|---|---|
-| `src/astro/optimizer.py` | ASTRO itself |
-| `src/astro/polar.py` | spectral filters: Newton–Schulz, and the dead-zone filter with its minimax solver |
-| `src/astro/routing.py` | which tensors are genuine linear operators and which are not |
-| `src/astro/baselines/` | Muon, NorMuon, **SOAP**, Hyperball, AdEMAMix, Cautious AdamW — implemented in-repo so comparisons have no version skew |
-| `src/astro/bench/` | equal-tuning-budget protocol, seven tasks, runner |
-| `src/astro/bench/gpt.py` | nanoGPT's GPT-2, vendored faithfully, for the language-model tasks |
-| `src/astro/bench/corpora.py` | WikiText-2 and tinyshakespeare loading and tokenisation |
-| `scripts/astro_lab.py` | self-contained Colab/T4 lab for shared configurations, ablations, and scale/horizon checks |
-| `docs/MODDED_NANOGPT_VALIDATION.md` | controlled 124M modded-nanoGPT-derived end-task validation protocol |
-| `docs/RESEARCH_RELEASE_PLAN.md` | seven-day, compute-constrained research release plan |
-| `docs/paper/paper.md` | the paper source; `build_paper.py` renders it to PDF |
+| optimizer | validation loss | Δ vs Muon |
+|---|---:|---:|
+| **ASTRO-v2** | **5.9208** | **−0.0827** |
+| ASTRO-MB | 5.9226 | −0.0809 |
+| AdaMuon | 6.0028 | −0.0007 |
+| Muon | 6.0035 | 0.0000 |
+| NorMuon | 6.0155 | +0.0121 |
 
-The benchmark tasks, in the order they answer questions:
+This is a **pointwise shared-configuration comparison**, not a tuned global leaderboard.
 
-| task | what it asks |
-|---|---|
-| `quadratic` | how much does Muon's isotropic-input assumption cost, against a known optimum |
-| `mlp`, `convnet` | from-scratch training, with the shape zoo that makes routing matter |
-| `finetune` | AdamW-pretrained CNN, fully fine-tuned on a shifted distribution |
-| `transformer` | from-scratch attention on a procedurally generated language |
-| `gpt_scratch` | **GPT-2 from scratch on WikiText-2** — the regime the literature's claims come from |
-| `gpt_finetune` | **GPT-2 pretrained with AdamW, fully fine-tuned on Shakespeare** — the regime where matrix optimizers are documented to lose |
+### Negative evidence is kept
 
-## Use
+In the expanded tuned GPT-2 124M / 300-step benchmark, the earlier/plain ASTRO recipe is slightly
+*worse* than Muon:
+
+| optimizer | mean validation loss | Δ vs Muon |
+|---|---:|---:|
+| NorMuon | **6.6280** | **−0.0077** |
+| Muon | 6.6357 | 0.0000 |
+| earlier ASTRO | 6.6538 | +0.0180 |
+| AdamW | 6.8445 | +0.2087 |
+
+The repository does not rewrite this history to make v2 look inevitable.
+
+---
+
+## What ASTRO-v2 currently is
+
+The reference implementation used by the scale campaign lives directly in
+[`scripts/astro_lab.py`](scripts/astro_lab.py):
 
 ```python
-from astro import Astro
-
-optimizer = Astro.from_model(model, lr=3e-4)      # routing decided automatically
+class Astro(torch.optim.Optimizer):
+    ...
 ```
 
-`from_model` classifies every parameter and sends genuine linear operators (dense convs,
-attention projections, hidden linears) down the spectral path, while norms, biases, gains,
-depthwise kernels, the stem convolution and the output layer take an AdamW path. To see why
-each tensor was routed where:
+It subclasses `torch.optim.Optimizer` for PyTorch's parameter-group/state interface, but its
+actual update rule is implemented explicitly in this repository.
+
+The current spectral path includes:
+
+1. Nesterov-style momentum;
+2. optional Q/K/V block splitting for fused attention projections;
+3. a Newton–Schulz/polar transform;
+4. a neuron-wise second moment on the **post-polar** direction;
+5. norm-preserving adaptive redistribution;
+6. Muon-style aspect-ratio update scaling;
+7. a separate Adam-like scalar path for embeddings, tied heads, norms, biases, and other
+   non-operator parameters.
+
+ASTRO-v2 is a **recipe of the same `Astro` class**, not a separate class:
 
 ```python
-from astro.routing import classify_module
-
-for name, spec in classify_module(model).items():
-    print(f"{name:30s} {spec.kind.value:10s} {spec.reason}")
+"astro_v2": {
+    "betas": (0.9, 0.95),
+    "cautious_wd": False,
+}
 ```
 
-To enable the default-off components — none of which improved end-task loss in our
-measurements, so turn them on only to reproduce those measurements:
+The two changes matter because earlier ASTRO used `beta1=0.95` on the scalar path even though
+Muon's auxiliary Adam path uses `0.9`, and cautious weight decay changes the effective amount of
+decay by masking coordinates.
 
-```python
-Astro.from_model(model, lr=3e-4, anchor=True, anchor_mode="elastic", anchor_strength=1e-2)
-Astro.from_model(model, lr=3e-4, dead_zone=0.1, ns_steps=10)
+`astro_muon_betas` isolates the beta alignment. `astro_v2_gamma0` additionally removes the
+post-polar variance-power effect. Their near-tie with v2 is why the paper does **not** currently
+claim that variance adaptation is the main mechanism.
+
+---
+
+## Research questions now being tested
+
+```text
+HORIZON
+Does the v2 effect survive 300 → 600 → 900 → 2700 steps?
+
+REPLICATION
+Does a frozen 124M/900 result survive independent random seeds?
+
+SCALE
+Does the result survive 124M → 355M before we spend money on larger GPUs?
+
+COMPUTE
+Does the lower step-matched loss compensate for ASTRO-v2's extra per-step cost?
+
+MECHANISM
+Which part of v2 actually causes the result?
 ```
 
-## Reproduce
+The current horizon state is complete at 300 and 600 steps, partial at 900, and not yet measured
+at 2700 under the new v2 campaign. See `artifacts/paper_results.json` for the current paper-facing
+snapshot.
+
+**CLI seed semantics:** in `astro_lab.py`, `--seeds` is a **count** beginning at seed 100.
+Therefore `--seeds 3` evaluates seeds 100, 101, and 102. `--seeds 100` means one hundred seeds.
+
+---
+
+## Mechanistic evidence: fused QKV allocation
+
+The project also studies what the spectral transform does inside fused attention projections.
+Examples from checkpoint probes:
+
+| checkpoint | fused Q/K/V | split Q/K/V |
+|---|---|---|
+| GPT-2 | 0.244 / 0.226 / **0.530** | 0.318 / 0.347 / 0.336 |
+| GPT-2 Medium | 0.245 / 0.266 / **0.489** | 0.308 / 0.369 / 0.323 |
+| Pythia-410M | 0.218 / 0.248 / **0.534** | 0.356 / 0.300 / 0.344 |
+
+Splitting Q, K, and V before the polar transform substantially balances the allocation. Random
+initialization controls also show V-skew, so the claim is **not** that training creates the entire
+effect. The defensible finding is that fused treatment can produce strongly imbalanced allocation
+and block-wise treatment repairs much of it.
+
+Splitting costs extra compute at width, which is why scheduled splitting remains an open
+experiment rather than a free default.
+
+---
+
+## Repository layout
+
+```text
+ASTRO/
+├── README.md
+├── Makefile
+├── pyproject.toml
+├── artifacts/
+│   ├── measured.json          # historical experiment ledger; never erase
+│   └── paper_results.json     # current paper-facing evidence snapshot
+├── docs/
+│   ├── FIGURES.md
+│   ├── PAPER_WORKFLOW.md
+│   ├── RESEARCH_RELEASE_PLAN.md
+│   ├── MODDED_NANOGPT_VALIDATION.md
+│   └── paper/
+│       ├── paper.md
+│       ├── paper.tex
+│       └── paper.pdf          # regenerated when a TeX build is available
+├── scripts/
+│   ├── astro_lab.py           # current self-contained ASTRO + baselines + T4 harness
+│   ├── figures/               # publication Matplotlib scripts
+│   └── paper/
+│       ├── run_trajectory.py  # periodic validation for learning-curve figures
+│       ├── wandb_sync.py      # optional W&B bridge
+│       └── build.py           # figures + LaTeX build
+├── src/astro/
+│   ├── baselines/
+│   └── bench/
+└── tests/
+```
+
+**Important packaging note:** the current research implementation is vendored/self-contained in
+`scripts/astro_lab.py`. A clean reusable `src/astro/optimizer.py` API is a release task, not
+something this README claims already exists.
+
+---
+
+## Run the T4 research harness
+
+A fixed shared configuration:
 
 ```bash
-pip install -e ".[dev]"
-pytest                                                       # 220 tests
-
-python -m astro.bench.run --task all --trials 16 --seeds 5   # CPU comparison
-python -m astro.bench.run --task finetune --ablation         # component ablation
+python scripts/astro_lab.py \
+  --mode scaling \
+  --sizes 124M \
+  --steps 900 \
+  --optimizers muon normuon adamuon astro_muon_betas astro_v2 \
+  --config lr=0.010205978810672643 \
+           weight_decay=0.001059717889298923 \
+           scalar_lr_mult=0.4369 \
+  --seeds 3 \
+  --work-dir /content/drive/MyDrive/astro/frozen_124m_900
 ```
 
-Every table in the paper is generated from the JSON those commands write, so after a re-run:
+A shared-configuration grid with no seed evaluation:
 
 ```bash
-python scripts/make_results.py --inject   # replaces the <!--RESULTS--> marker in paper.md
-python scripts/build_paper.py
+python scripts/astro_lab.py \
+  --mode scaling \
+  --sizes 124M \
+  --steps 900 \
+  --optimizers muon normuon adamuon astro_muon_betas astro_v2 \
+  --trials 5 \
+  --seeds 0 \
+  --pin scalar_lr_mult=0.4369 \
+  --work-dir /content/drive/MyDrive/astro/shared_grid
 ```
 
-The two language-model tasks need their corpora fetched once (12 MB, from
-`raw.githubusercontent.com`; nothing is downloaded at run time, because a task that touches the
-network cannot be trusted to be reproducible):
+Completed runs are written immediately to `astro_lab_state.json`, so a reclaimed Colab session
+can resume against the same persistent work directory.
+
+---
+
+## Paper figures
+
+The source of record is **committed JSON + Matplotlib**, not a manually edited chart and not a
+W&B screenshot.
+
+Install figure dependencies:
 
 ```bash
-python scripts/fetch_llm_data.py
-python -m astro.bench.run --task gpt_finetune --trials 16 --seeds 5
+pip install -e '.[paper]'
 ```
 
-On a GPU, the same protocol at sizes where the comparison is worth making:
+Build all figures:
 
 ```bash
-python scripts/bench_gpu.py     --task finetune-convnext --data DIR   # real backbone
-python scripts/bench_gpu_llm.py --task gpt_finetune --size gpt2-small # real GPT-2, real BPE
+python scripts/figures/make_all.py
 ```
 
-The protocol enforces equal tuning budgets in code: `astro.bench.protocol.tune` raises if the
-optimizers under comparison do not all tune the same number of hyperparameters. That is the
-single most common way optimizer results are inflated, so it is a hard error rather than a
-convention.
-
-## Focused research validation
-
-The next-stage experimental instructions are deliberately separated from the general benchmark:
-
-- [`docs/RESEARCH_RELEASE_PLAN.md`](docs/RESEARCH_RELEASE_PLAN.md) — the seven-day release plan and decision gates;
-- [`docs/MODDED_NANOGPT_VALIDATION.md`](docs/MODDED_NANOGPT_VALIDATION.md) — the T4-safe 124M Transformer validation protocol;
-- [`scripts/astro_lab.py`](scripts/astro_lab.py) — shared-configuration and ablation harness.
-
-The modded-nanoGPT validation is derived from the public optimization track, but T4 experiments are reported as controlled research validation rather than official speedrun submissions unless they satisfy that benchmark's published rules.
-
-## Rebuild the paper
+Build only the current empirical spine:
 
 ```bash
-pip install -e ".[paper]"      # needs Node for KaTeX, and a Chromium binary
-python scripts/build_paper.py
+python scripts/figures/make_all.py \
+  --only optimizer_journey horizon_v2 efficiency_v2 training_trajectories
 ```
 
-No TeX distribution required: markdown → KaTeX → MathML → headless Chromium print-to-PDF.
-Set `CHROMIUM_BINARY` if Chromium is not on the usual paths.
+Every figure writes:
 
-## Re-fit the dead-zone filter
+```text
+artifacts/figures/<figure>.png
+artifacts/figures/<figure>.pdf
+artifacts/figures/<figure>.json
+```
+
+The vector PDF is what LaTeX uses.
+
+### Validation-loss trajectories
+
+After configurations are frozen:
 
 ```bash
-pip install -e ".[design]"
-python -m astro.polar 0.1 10   # tau, steps -> coefficients + pass/stop-band diagnostics
+python scripts/paper/run_trajectory.py \
+  --size 124M --steps 900 --seed 100 --eval-every 75 \
+  --optimizers muon normuon adamuon astro_muon_betas astro_v2 \
+  --config lr=0.010205978810672643 \
+           weight_decay=0.001059717889298923 \
+           scalar_lr_mult=0.4369 \
+  --cache /content/drive/MyDrive/astro/paper_trajectory_cache.pt \
+  --out /content/drive/MyDrive/astro/trajectories.json
 ```
 
-Minutes, not seconds — it is a multi-start global optimisation. The shipped coefficients are
-cached in `polar.py`, so training never runs the solver.
+Then copy the JSON into `artifacts/trajectories.json` and regenerate
+`fig_training_trajectories`.
+
+### Optional W&B
+
+```bash
+pip install -e '.[tracking]'
+wandb login
+python scripts/paper/wandb_sync.py --project astro-paper \
+  --input artifacts/trajectories.json
+```
+
+W&B is for interactive inspection. A reviewer never needs it to rebuild the paper.
+
+---
+
+## Build the paper
+
+```bash
+make paper
+```
+
+or:
+
+```bash
+python scripts/paper/build.py
+```
+
+The builder regenerates the primary figures and then uses `latexmk` or `pdflatex`. If an optional
+measurement is missing, the living LaTeX draft renders a visible placeholder instead of silently
+reusing a stale plot.
+
+The visual style is defined once in `scripts/figures/style.py`: two-column paper sizing, serif
+text, vector output, restrained grids, stable optimizer colours, and direct quantitative labels.
+See [`docs/FIGURES.md`](docs/FIGURES.md) for the full convention.
+
+---
+
+## Test
+
+```bash
+pip install -e '.[paper,dev]'
+pytest
+python -m compileall scripts src
+python scripts/figures/make_all.py --only optimizer_journey horizon_v2 efficiency_v2
+```
+
+The paper-facing tests recompute deltas from the raw JSON, assert that incomplete horizon cells
+remain marked incomplete, and exercise the current figure builders under a non-interactive
+Matplotlib backend.
+
+---
+
+## Research policy
+
+ASTRO is intentionally developed under falsifiable rules:
+
+- a configuration sweep is not called a seed replication;
+- a short-horizon win is not extrapolated to longer training;
+- a 124M win is not extrapolated to 355M or frontier scale;
+- a step-matched win is not called an efficiency win when the step is more expensive;
+- a component is not credited merely because its mathematical story sounds attractive;
+- negative experiments and protocol errors stay in the repository.
+
+The goal is not to make ASTRO impossible to falsify. The goal is to make it obvious when it has
+been falsified — and equally obvious when an effect survives increasingly hard controls.
