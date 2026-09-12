@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "as_of": "2026-09-13",
+  "status": "living paper snapshot; horizon, independent-seed replication, and 355M scaling are still running",
+  "principle": "Only measured values belong here. Historical or superseded experiments remain in artifacts/measured.json.",
+  "noise_floor_note": "Cross-session movement is configuration-dependent; treat sub-0.005 gaps cautiously unless a same-configuration reproduction is available.",
+  "shared_config_124m_900": {
+    "source": "astro_lab shared configuration snapshot, Tesla T4, GPT-2 124M, FineWeb-Edu, 900 steps",
+    "config": {
+      "lr": 0.010205978810672643,
+      "weight_decay": 0.001059717889298923,
+      "scalar_lr_mult": 0.4369
+    },
+    "loss": {
+      "muon": 6.0034747838974,
+      "normuon": 6.015528678894043,
+      "adamuon": 6.002795934677124,
+      "astro_muon_betas": 5.9226219177246096,
+      "astro_v2": 5.920768666267395
+    },
+    "delta_vs_muon": {
+      "normuon": 0.012053894996643,
+      "adamuon": -0.000678849220276,
+      "astro_muon_betas": -0.080852866172790,
+      "astro_v2": -0.082706117630005
+    },
+    "interpretation": "At this shared configuration ASTRO-v2 and ASTRO-Muon-Betas are effectively tied and both are substantially below Muon; AdaMuon is effectively tied with Muon and NorMuon is worse. This is a pointwise result, not a universal ranking."
+  },
+  "targeted_mechanism_124m_900": {
+    "source": "astro_lab targeted mechanism run, Tesla T4, seed 0, three shared configurations",
+    "configs": [
+      {
+        "lr": 0.010205978810672643,
+        "weight_decay": 0.001059717889298923,
+        "scalar_lr_mult": 0.4369,
+        "loss": {
+          "muon": 6.0031859875,
+          "astro_muon_betas": 5.9277302265,
+          "astro_v2": 5.9242493391,
+          "astro_v2_gamma0": 5.9313260555
+        },
+        "seconds": {
+          "muon": 786.95,
+          "astro_muon_betas": 864.76,
+          "astro_v2": 837.90,
+          "astro_v2_gamma0": 837.83
+        }
+      },
+      {
+        "lr": 0.050469744048982225,
+        "weight_decay": 0.00549246290951811,
+        "scalar_lr_mult": 0.4369,
+        "loss": {
+          "muon": 6.4527020216,
+          "astro_muon_betas": 5.9555897713,
+          "astro_v2": 5.9436184645,
+          "astro_v2_gamma0": 5.9835297823
+        },
+        "seconds": {
+          "muon": 786.14,
+          "astro_muon_betas": 863.20,
+          "astro_v2": 837.30,
+          "astro_v2_gamma0": 836.77
+        }
+      },
+      {
+        "lr": 0.008451823232948396,
+        "weight_decay": 0.0030180236864310998,
+        "scalar_lr_mult": 0.4369,
+        "loss": {
+          "muon": 6.0183175802,
+          "astro_muon_betas": 5.9498858690,
+          "astro_v2": 5.9438174725,
+          "astro_v2_gamma0": 5.9452422619
+        },
+        "seconds": {
+          "muon": 788.40,
+          "astro_muon_betas": 864.78,
+          "astro_v2": 837.40,
+          "astro_v2_gamma0": 837.57
+        }
+      }
+    ],
+    "mean_delta_vs_muon": {
+      "astro_muon_betas": -0.2137,
+      "astro_v2": -0.2208,
+      "astro_v2_gamma0": -0.2047
+    },
+    "configs_won": {
+      "astro_muon_betas": "3/3",
+      "astro_v2": "3/3",
+      "astro_v2_gamma0": "3/3"
+    },
+    "runtime_overhead_vs_muon": {
+      "astro_v2": 0.064,
+      "astro_muon_betas": 0.098
+    },
+    "interpretation": "Most of the measured ASTRO-v2 advantage survives removal of variance_power/gamma and is already present in ASTRO-Muon-Betas. The aggressive-LR configuration produces the largest gap, making robustness a leading hypothesis. Three configurations are directional evidence only; they are not independent seeds."
+  },
+  "end_to_end_124m_300": {
+    "source": "colab_bench.py expanded tuning, GPT-2 124M, FineWeb-Edu, 300 steps, three evaluation seeds",
+    "seeds": [100, 101, 102],
+    "loss": {
+      "adamw": [6.8329045057, 6.8402873278, 6.8601644516],
+      "muon": [6.6261359930, 6.6417860508, 6.6392998219],
+      "normuon": [6.6174134731, 6.6364685535, 6.6300966501],
+      "astro": [6.6437765598, 6.6686398029, 6.6489260435]
+    },
+    "mean": {
+      "adamw": 6.8445,
+      "muon": 6.6357,
+      "normuon": 6.6280,
+      "astro": 6.6538
+    },
+    "paired_delta_vs_muon": {
+      "adamw": 0.2087,
+      "normuon": -0.0077,
+      "astro": 0.0180
+    },
+    "interpretation": "The earlier/plain ASTRO recipe does not beat Muon in this tuned 300-step benchmark. This is important negative evidence and should not be conflated with ASTRO-v2's 900-step shared-configuration results."
+  },
+  "horizon_124m_v2": {
+    "source": "astro_lab horizon run; five shared configurations planned per horizon; current snapshot incomplete at 900 and not yet measured at 2700",
+    "steps": {
+      "300": {
+        "complete": true,
+        "deltas_vs_muon": [-0.0923613072, 0.0670228481, 0.0028403997, 0.0384717703, -0.2657331705],
+        "mean_delta": -0.0500,
+        "wins": "2/5"
+      },
+      "600": {
+        "complete": true,
+        "deltas_vs_muon": [-0.0811432362, 0.0609926224, -0.0380244017, 0.0239965439, -0.2360900402],
+        "mean_delta": -0.0541,
+        "wins": "3/5"
+      },
+      "900": {
+        "complete": false,
+        "deltas_vs_muon": [-0.0906593799, 0.0669909000],
+        "mean_delta_current": -0.0118,
+        "wins_current": "1/2",
+        "missing_configs": 3
+      },
+      "2700": {
+        "complete": false,
+        "deltas_vs_muon": [],
+        "missing_configs": 5
+      }
+    },
+    "interpretation": "Do not claim a final horizon trend until 900 and 2700 are complete. Two configurations already show persistent behavior from 300 to 600, and one remains favorable through 900."
+  },
+  "mechanistic_qkv": {
+    "source": "colab_probe.py pretrained and random-init checkpoint probes",
+    "examples": {
+      "gpt2": {"fused_q": 0.2442, "fused_k": 0.2258, "fused_v": 0.5300, "split_q": 0.3176, "split_k": 0.3465, "split_v": 0.3359, "grad_v_over_q": 2.646},
+      "gpt2_medium": {"fused_q": 0.2454, "fused_k": 0.2662, "fused_v": 0.4885, "split_q": 0.3082, "split_k": 0.3689, "split_v": 0.3229, "grad_v_over_q": 3.265},
+      "pythia_410m": {"fused_q": 0.2178, "fused_k": 0.2484, "fused_v": 0.5337, "split_q": 0.3562, "split_k": 0.2996, "split_v": 0.3442, "grad_v_over_q": 3.276}
+    },
+    "important_control": "Random initialization also exhibits V skew, so the paper must not claim that training creates the entire effect. The defensible claim is that fused treatment produces allocation imbalance and splitting restores substantially more balanced Q/K/V allocation."
+  },
+  "pending_confirmatory_runs": {
+    "horizon": "124M, Muon vs ASTRO-v2, 300/600/900/2700, five shared configurations",
+    "replication_2a": "124M/900 frozen configuration, independent seed 100 first; seeds 101/102 should follow if useful",
+    "scale_355m": "355M/900, Muon vs ASTRO-v2, three shared configurations, seed 0"
+  }
+}
