@@ -1,4 +1,4 @@
-"""Build every figure that has data, and name the ones that do not.
+"""Build every paper figure that has data, and name the ones that do not.
 
 The point of running this is not only the PNGs. It prints a manifest of which
 claims currently have a figure behind them and which are waiting on a
@@ -6,7 +6,7 @@ measurement, so the gap between what the paper says and what it can show is
 visible in one command instead of being reconstructed from memory.
 
     python scripts/figures/make_all.py
-    python scripts/figures/make_all.py --only leverage quintic
+    python scripts/figures/make_all.py --only optimizer_journey horizon_v2 efficiency_v2
 """
 
 from __future__ import annotations
@@ -20,29 +20,56 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import fig_curvature  # noqa: E402
 import fig_drift  # noqa: E402
+import fig_efficiency_v2  # noqa: E402
 import fig_horizon  # noqa: E402
+import fig_horizon_v2  # noqa: E402
 import fig_inversion  # noqa: E402
 import fig_leverage  # noqa: E402
+import fig_optimizer_journey  # noqa: E402
 import fig_quintic  # noqa: E402
 import fig_results  # noqa: E402
+import fig_training_trajectories  # noqa: E402
 from style import OUT  # noqa: E402
 
 # name -> (builder, what it supports, whether it needs a measurement upload)
 FIGURES = {
+    # Current ASTRO-v2 paper spine -----------------------------------------
+    "optimizer_journey": (
+        fig_optimizer_journey.build,
+        "the progression from Muon/NorMuon/AdaMuon to ASTRO-MB and ASTRO-v2",
+        False,
+    ),
+    "horizon_v2": (
+        fig_horizon_v2.build,
+        "whether ASTRO-v2's paired margin survives longer training",
+        False,
+    ),
+    "efficiency_v2": (
+        fig_efficiency_v2.build,
+        "the validation-loss gain together with ASTRO-v2's measured runtime cost",
+        False,
+    ),
+    "training_trajectories": (
+        fig_training_trajectories.build,
+        "validation loss versus both training step and wall-clock",
+        True,
+    ),
+
+    # Mechanistic / historical figures retained as supporting evidence ----
     "leverage": (fig_leverage.build,
                  "row norms of a Muon update are leverage scores", False),
     "quintic": (fig_quintic.build,
-                "Muon's iteration cannot reach the polar factor", False),
+                "Muon's repeated quintic does not converge to the exact polar factor", False),
     "curvature": (fig_curvature.build,
-                  "the advantage is a direction effect, not a step-size effect", True),
-    "results": (fig_results.build,
-                "the 124M comparison, with its noise floor", False),
+                  "the advantage is a direction effect, not only a step-size effect", True),
+    "results_legacy": (fig_results.build,
+                       "the earlier 124M comparison, retained as research history", False),
     "inversion": (fig_inversion.build,
                   "a component whose sign inverts with scale", False),
-    "horizon": (fig_horizon.build,
-                "whether the margin survives longer training", False),
+    "horizon_legacy": (fig_horizon.build,
+                       "the superseded/earlier horizon study", False),
     "drift": (fig_drift.build,
-              "the non-convergence observed during real training", True),
+              "spectral update-norm drift observed during real training", True),
 }
 
 
@@ -62,12 +89,10 @@ def main() -> int:
     for name in wanted:
         builder, claim, needs_upload = FIGURES[name]
         print(f"\n{name}: {claim}")
-        # Modification times, not existence: a stale PNG left by an earlier run
-        # or by the test suite would otherwise be reported as freshly built.
         before = stamps()
         try:
             builder()
-        except Exception:  # a broken figure must not hide the working ones
+        except Exception:
             traceback.print_exc()
             failed.append(name)
             continue
@@ -80,10 +105,10 @@ def main() -> int:
     print("\n" + "=" * 70)
     print(f"built {len(built)}: {', '.join(built) or 'none'}")
     if skipped:
-        print("waiting on a measurement:")
+        print("waiting on a measurement or input:")
         for name, needs_upload in skipped:
-            where = "GPU run, then copy the JSON here" if needs_upload else "unknown"
-            print(f"  {name:10s} -- {where}")
+            where = "GPU run / trajectory file required" if needs_upload else "missing input"
+            print(f"  {name:22s} -- {where}")
     if failed:
         print(f"FAILED {len(failed)}: {', '.join(failed)}")
     print(f"output: {OUT}")
