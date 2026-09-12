@@ -1,9 +1,9 @@
-"""Build every paper figure that has data, and name the ones that do not.
+"""Build paper figures that have data, and name the ones that do not.
 
-The point of running this is not only the PNGs. It prints a manifest of which
-claims currently have a figure behind them and which are waiting on a
-measurement, so the gap between what the paper says and what it can show is
-visible in one command instead of being reconstructed from memory.
+Figure modules are imported lazily.  This matters because some mechanistic
+figures use PyTorch for exact matrix measurements, while the current ASTRO-v2
+empirical plots need only NumPy + Matplotlib.  Requesting one lightweight plot
+should not force every optional scientific dependency to be installed.
 
     python scripts/figures/make_all.py
     python scripts/figures/make_all.py --only optimizer_journey horizon_v2 efficiency_v2
@@ -12,65 +12,82 @@ visible in one command instead of being reconstructed from memory.
 from __future__ import annotations
 
 import argparse
+import importlib
 import sys
 import traceback
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
 
-import fig_curvature  # noqa: E402
-import fig_drift  # noqa: E402
-import fig_efficiency_v2  # noqa: E402
-import fig_horizon  # noqa: E402
-import fig_horizon_v2  # noqa: E402
-import fig_inversion  # noqa: E402
-import fig_leverage  # noqa: E402
-import fig_optimizer_journey  # noqa: E402
-import fig_quintic  # noqa: E402
-import fig_results  # noqa: E402
-import fig_training_trajectories  # noqa: E402
 from style import OUT  # noqa: E402
 
-# name -> (builder, what it supports, whether it needs a measurement upload)
+# name -> (module, what it supports, whether it needs a measurement upload)
 FIGURES = {
     # Current ASTRO-v2 paper spine -----------------------------------------
     "optimizer_journey": (
-        fig_optimizer_journey.build,
+        "fig_optimizer_journey",
         "the progression from Muon/NorMuon/AdaMuon to ASTRO-MB and ASTRO-v2",
         False,
     ),
     "horizon_v2": (
-        fig_horizon_v2.build,
+        "fig_horizon_v2",
         "whether ASTRO-v2's paired margin survives longer training",
         False,
     ),
     "efficiency_v2": (
-        fig_efficiency_v2.build,
+        "fig_efficiency_v2",
         "the validation-loss gain together with ASTRO-v2's measured runtime cost",
         False,
     ),
     "training_trajectories": (
-        fig_training_trajectories.build,
+        "fig_training_trajectories",
         "validation loss versus both training step and wall-clock",
         True,
     ),
 
     # Mechanistic / historical figures retained as supporting evidence ----
-    "leverage": (fig_leverage.build,
-                 "row norms of a Muon update are leverage scores", False),
-    "quintic": (fig_quintic.build,
-                "Muon's repeated quintic does not converge to the exact polar factor", False),
-    "curvature": (fig_curvature.build,
-                  "the advantage is a direction effect, not only a step-size effect", True),
-    "results_legacy": (fig_results.build,
-                       "the earlier 124M comparison, retained as research history", False),
-    "inversion": (fig_inversion.build,
-                  "a component whose sign inverts with scale", False),
-    "horizon_legacy": (fig_horizon.build,
-                       "the superseded/earlier horizon study", False),
-    "drift": (fig_drift.build,
-              "spectral update-norm drift observed during real training", True),
+    "leverage": (
+        "fig_leverage",
+        "row norms of a Muon update are leverage scores",
+        False,
+    ),
+    "quintic": (
+        "fig_quintic",
+        "Muon's repeated quintic does not converge to the exact polar factor",
+        False,
+    ),
+    "curvature": (
+        "fig_curvature",
+        "the advantage is a direction effect, not only a step-size effect",
+        True,
+    ),
+    "results_legacy": (
+        "fig_results",
+        "the earlier 124M comparison, retained as research history",
+        False,
+    ),
+    "inversion": (
+        "fig_inversion",
+        "a component whose sign inverts with scale",
+        False,
+    ),
+    "horizon_legacy": (
+        "fig_horizon",
+        "the superseded/earlier horizon study",
+        False,
+    ),
+    "drift": (
+        "fig_drift",
+        "spectral update-norm drift observed during real training",
+        True,
+    ),
 }
+
+
+def load_builder(module_name: str):
+    module = importlib.import_module(module_name)
+    return module.build
 
 
 def main() -> int:
@@ -87,11 +104,18 @@ def main() -> int:
 
     built, skipped, failed = [], [], []
     for name in wanted:
-        builder, claim, needs_upload = FIGURES[name]
+        module_name, claim, needs_upload = FIGURES[name]
         print(f"\n{name}: {claim}")
         before = stamps()
         try:
+            builder = load_builder(module_name)
             builder()
+        except ModuleNotFoundError as exc:
+            # Optional scientific dependencies should fail the requested figure,
+            # not every unrelated figure in the suite.
+            print(f"  FAILED {name}: missing dependency {exc.name!r}")
+            failed.append(name)
+            continue
         except Exception:
             traceback.print_exc()
             failed.append(name)
