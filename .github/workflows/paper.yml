@@ -31,8 +31,8 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - name: Install paper and test dependencies
-        run: pip install -e '.[paper,dev]'
+      - name: Install lightweight paper test dependencies
+        run: pip install pytest matplotlib numpy
       - name: Syntax check
         run: python -m compileall -q scripts tests
       - name: Paper-facing tests
