@@ -59,7 +59,7 @@ Components **off by default**, because they did not earn being on:
 
 | component | why it is off |
 |---|---|
-| `cautious` | −0.0291 at 1.17M (8/8 seeds) but **+0.1341 at 124M** — sign inverts with scale |
+| `cautious` | −0.0291 at 1.17M (8/8 seeds) but **+0.1341** at 124M — sign inverts with scale |
 | `anchor` | failed at three scales in two formulations; with a free choice the tuner switched it off every time |
 | `dead_zone` | excellent spectral behaviour, independently verified; costs +1.9% on end-task loss |
 | `norm_control="hyperball"` | +4.5% against plain decoupled weight decay |
@@ -165,7 +165,7 @@ The next-stage experimental instructions are deliberately separated from the gen
 - [`docs/MODDED_NANOGPT_VALIDATION.md`](docs/MODDED_NANOGPT_VALIDATION.md) — the T4-safe 124M Transformer validation protocol;
 - [`scripts/astro_lab.py`](scripts/astro_lab.py) — shared-configuration and ablation harness.
 
-The modded-nanoGPT validation is derived from the public optimization track, but T4 experiments are reported as controlled research validation rather than official speedrun submissions unless they satisfy that benchmark's published rules. citeturn362378search0turn362378search4
+The modded-nanoGPT validation is derived from the public optimization track, but T4 experiments are reported as controlled research validation rather than official speedrun submissions unless they satisfy that benchmark's published rules.
 
 ## Rebuild the paper
 
