@@ -48,3 +48,29 @@ jobs:
             artifacts/figures/*.pdf
             artifacts/figures/*.json
           if-no-files-found: error
+
+  latex:
+    needs: figures
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download generated paper figures
+        uses: actions/download-artifact@v4
+        with:
+          name: paper-figures
+          path: artifacts/figures
+      - name: Install LaTeX
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            latexmk texlive-latex-base texlive-latex-recommended \
+            texlive-latex-extra texlive-fonts-recommended
+      - name: Compile manuscript
+        working-directory: docs/paper
+        run: latexmk -pdf -interaction=nonstopmode -halt-on-error paper.tex
+      - name: Upload compiled paper
+        uses: actions/upload-artifact@v4
+        with:
+          name: astro-paper-pdf
+          path: docs/paper/paper.pdf
+          if-no-files-found: error
