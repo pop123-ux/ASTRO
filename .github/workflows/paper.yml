@@ -3,6 +3,7 @@ name: Paper checks
 on:
   push:
     paths:
+      - ".github/workflows/paper.yml"
       - "artifacts/**"
       - "docs/paper/**"
       - "docs/FIGURES.md"
@@ -13,6 +14,7 @@ on:
       - "pyproject.toml"
   pull_request:
     paths:
+      - ".github/workflows/paper.yml"
       - "artifacts/**"
       - "docs/paper/**"
       - "scripts/figures/**"
