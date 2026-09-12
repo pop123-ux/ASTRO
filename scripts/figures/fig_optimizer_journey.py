@@ -76,9 +76,6 @@ def build(source: str = "paper_results.json") -> None:
     right.legend(loc="lower left", fontsize=6.1, handlelength=1.35)
     grid(right, axis="y")
     panel_header(right, "(b)  Shared-setting robustness")
-    right.annotate("aggressive LR", (2, min(plotted["astro_v2"])),
-                   textcoords="offset points", xytext=(0, -13), ha="center",
-                   fontsize=5.9, color="#666666")
 
     fig.tight_layout(pad=0.5, w_pad=1.45)
     saved = save(fig, "fig_optimizer_journey")
