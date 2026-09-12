@@ -1,0 +1,50 @@
+name: Paper checks
+
+on:
+  push:
+    paths:
+      - "artifacts/**"
+      - "docs/paper/**"
+      - "docs/FIGURES.md"
+      - "docs/PAPER_WORKFLOW.md"
+      - "scripts/figures/**"
+      - "scripts/paper/**"
+      - "tests/test_paper_figures.py"
+      - "pyproject.toml"
+  pull_request:
+    paths:
+      - "artifacts/**"
+      - "docs/paper/**"
+      - "scripts/figures/**"
+      - "scripts/paper/**"
+      - "tests/test_paper_figures.py"
+      - "pyproject.toml"
+
+jobs:
+  figures:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install paper and test dependencies
+        run: pip install -e '.[paper,dev]'
+      - name: Syntax check
+        run: python -m compileall -q scripts tests
+      - name: Paper-facing tests
+        run: pytest tests/test_paper_figures.py
+      - name: Render current paper figures
+        run: >-
+          python scripts/figures/make_all.py --only
+          optimizer_journey horizon_v2 efficiency_v2 leverage quintic
+      - name: Upload rendered previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-figures
+          path: |
+            artifacts/figures/*.png
+            artifacts/figures/*.pdf
+            artifacts/figures/*.json
+          if-no-files-found: error
