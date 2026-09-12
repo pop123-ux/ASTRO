@@ -75,9 +75,6 @@ def build(source: str = "paper_results.json") -> None:
 
     ymin, ymax = ax.get_ylim()
     span = ymax - ymin
-    ax.text(0.02, 0.975, "124M · shared configurations",
-            transform=ax.transAxes, ha="left", va="top",
-            fontsize=6.2, fontweight="bold", color="#333333")
     ax.annotate("Muon tie", (2700, 0.0), textcoords="offset points",
                 xytext=(-4, 5), ha="right", fontsize=5.9, color="#555555")
     if not block["2700"].get("deltas_vs_muon"):
