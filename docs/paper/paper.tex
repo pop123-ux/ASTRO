@@ -1,753 +1,590 @@
-% arXiv-ready source. Compiles with pdflatex; standard packages only.
-% Not compiled locally: this machine has no TeX distribution and its egress
-% proxy blocks the Debian repositories. Please compile before submitting.
-\documentclass[11pt]{article}
+% ASTRO living research paper.  arXiv-friendly: standard packages, no shell escape.
+\documentclass[10pt,twocolumn]{article}
 
-\usepackage[margin=1in]{geometry}
-\usepackage{amsmath,amssymb,amsthm}
+\usepackage[margin=0.72in]{geometry}
+\usepackage{amsmath,amssymb,mathtools}
 \usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
 \usepackage{microtype}
+\usepackage{enumitem}
 \usepackage[numbers,sort&compress]{natbib}
 \usepackage[hidelinks]{hyperref}
 \usepackage{url}
+\usepackage{caption}
 
-\newtheorem{proposition}{Proposition}
-\newtheorem{lemma}{Lemma}
-\theoremstyle{definition}
-\newtheorem{remark}{Remark}
+\definecolor{astropurple}{HTML}{7A3E9D}
+\definecolor{lightpurple}{HTML}{F5EFF8}
+\definecolor{muted}{HTML}{666666}
+\setlength{\columnsep}{0.24in}
+\setlength{\parindent}{1em}
+\setlength{\parskip}{0pt}
+\captionsetup{font=small,labelfont=bf,skip=4pt}
+\setlist{nosep,leftmargin=*}
+\emergencystretch=1em
 
-\DeclareMathOperator{\msgn}{msgn}
-\newcommand{\R}{\mathbb{R}}
+\newcommand{\ASTRO}{\textsc{Astro}}
+\newcommand{\ASTROv}{\textsc{Astro-v2}}
+\newcommand{\Muon}{\textsc{Muon}}
+\newcommand{\NorMuon}{\textsc{NorMuon}}
+\newcommand{\AdaMuon}{\textsc{AdaMuon}}
 \newcommand{\norm}[1]{\lVert #1 \rVert}
+\newcommand{\obs}[1]{%
+  \medskip\noindent\fcolorbox{astropurple!40}{lightpurple}{%
+  \parbox{\dimexpr\columnwidth-2\fboxsep-2\fboxrule}{%
+  \textbf{Observation.} #1}}\medskip}
+\newcommand{\pendingfig}[2]{%
+  \fbox{\parbox[c][1.55in][c]{0.95\linewidth}{\centering\small\color{muted}%
+  \textbf{#1}\\[3pt]#2}}}
+\newcommand{\maybegraphic}[3][\linewidth]{%
+  \IfFileExists{../../artifacts/figures/#2.pdf}%
+    {\includegraphics[width=#1]{../../artifacts/figures/#2.pdf}}%
+    {\pendingfig{Figure pending}{#3}}}
 
-\title{What Actually Matters in Matrix-Structured Optimizers,\\
-and a Silent Failure in All of Them}
-
-\author{%
-  Pop Alexandru\\
-  \texttt{blackwolf260609@gmail.com}
-}
-
-\date{August 2026}
+\title{\vspace{-1.2em}\textbf{ASTRO: Auditing and Improving Matrix-Structured\\Optimizers for Language Model Training}}
+\author{Pop Alexandru\\\small Independent Researcher\\\small \url{https://github.com/pop123-ux/ASTRO}}
+\date{September 2026 \;---\; living research draft}
 
 \begin{document}
 \maketitle
+\vspace{-1.1em}
 
 \begin{abstract}
-Matrix-structured optimizers---Muon, Shampoo, SOAP, NorMuon---improve on AdamW by
-treating a weight matrix as a linear operator rather than a bag of coordinates.
-We report a controlled study of what in these methods is responsible for the
-gain, under a protocol with equal tuning budgets, multiple seeds, exact paired
-rank tests, Holm correction, and wall-clock matching.
+Matrix-structured optimizers such as \Muon, \NorMuon, and \AdaMuon improve
+language-model training by transforming matrix-valued updates rather than
+treating every parameter independently. We document the development of \ASTRO,
+a Muon-family optimizer and an experimental framework for asking which apparent
+optimizer improvements survive fair tuning, longer horizons, larger models,
+independent seeds, and wall-clock accounting.
 
-Two findings are structural rather than statistical.
+The current \ASTROv recipe keeps Muon-style spectral updates, splits fused Q/K/V
+blocks, applies a norm-preserving neuron-wise second moment after the polar step,
+and routes non-operator parameters through an Adam-like scalar path. It also
+removes two choices that ablation showed were harmful or accidental: the scalar
+path no longer inherits spectral-path $\beta_1=0.95$, and cautious weight decay
+is disabled. At GPT-2 124M and 900 steps, a targeted three-configuration study
+gives mean paired validation-loss differences versus Muon of \textbf{-0.2208}
+for \ASTROv, \textbf{-0.2137} for the beta-aligned ASTRO-MB variant, and
+\textbf{-0.2047} when post-polar variance power is removed. All three variants
+win all three shared configurations, but configurations are not independent
+seeds. \ASTROv costs about \textbf{6.4\%} more wall-clock per 900-step run.
 
-\textbf{Leverage.} For a momentum matrix $M = U\Sigma V^{\top}$ with $m > n$, the
-squared row norms of Muon's update are exactly the leverage scores of $M$'s row
-space, summing to $n$. Two consequences follow that appear unremarked. For wide
-matrices the polar factor has orthonormal rows, so any row-normalisation scheme
-is provably inert there---a statement about NorMuon's domain of applicability
-that NorMuon does not make. And on a \emph{fused} query/key/value projection the
-leverage localises onto whichever stacked operator has the largest gradient,
-because $Q$ and $K$ reach the loss through the softmax Jacobian while $V$ enters
-linearly. The tensor passes every orthogonality check one would apply while two
-of the three operators inside it barely move.
-
-We measure this on eight pretrained checkpoints from 124M to 1.4B across two
-fusion layouts. It is an \emph{initialisation-time} phenomenon that attenuates:
-$V$'s share of the update is $0.65$ at random initialisation ($0.76$ on the GPT-2
-family) against $0.50$ on the trained weights, where uniform is $0.333$. This
-independently explains a stage dependence reported in the literature, that
-head-wise splitting helps early and is overtaken by full-matrix Muon later.
-
-\textbf{Non-convergence.} Muon's quintic is one polynomial applied $k$ times, and
-it cannot reach the polar factor at any budget: its fixed points solve
-$2.4445 - 4.7750s^2 + 2.0315s^4 = 0$, at $s = 0.868$ and $s = 1.264$. Singular
-values land in a band around them, and \emph{where} in that band depends on the
-conditioning of the matrix handed over, so the update's Frobenius norm moves
-between $0.688$ and $0.921$ of its theoretical value as the condition number goes
-$1$ to $1000$---an uncontrolled drift in effective step size tracking a quantity
-nobody monitors. Solving one polynomial per step greedily removes the
-obstruction; at equal cost the drift halves and centres on $1$, and two steps
-further it is exact.
-
-We report six claims this work made and withdrew and three bugs in our own
-measurement code, all of which produced publishable-looking numbers. Most were
-caught by a control disagreeing with a headline, one by an arithmetic check, one
-by re-running a seed we had assumed was reproducible, and none by reading the
-code. We argue this is the more transferable contribution:
-the standard fairness recipe of equal tuning budgets is necessary and
-demonstrably not sufficient---we violated its spirit three times while
-satisfying its letter, twice by pairing an update scale with the wrong
-learning-rate range and once by counting a fixed value as a tuned dimension.
+The evidence is promising but mixed. In an independently tuned 300-step 124M
+benchmark, the earlier/plain ASTRO recipe is \textbf{+0.0180} validation loss
+worse than Muon. The current horizon study is complete only at 300 and 600
+steps, while independent-seed replication and the first 355M test are in
+progress. A second line of evidence shows that fused spectral treatment can
+allocate update mass strongly toward V, whereas splitting Q/K/V substantially
+balances it. We therefore frame the current hypothesis narrowly: \ASTROv may
+primarily improve \emph{robustness to hyperparameter choice}, rather than
+uniformly shifting the best achievable loss. The paper preserves negative runs
+and withdrawn explanations as first-class evidence rather than hiding the path
+to the current recipe.
 \end{abstract}
 
 \section{Introduction}
 
-\citet{wen2025fantastic} benchmarked ten optimizers against a properly tuned
-AdamW and found the real speedups near $1.1\times$ rather than the $2\times$
-commonly claimed. The gap was methodological: unequal tuning budgets and
-single-seed reporting. Any new optimizer result therefore inherits an obligation
-to make its comparison hard to rig and to publish the protocol alongside the
-numbers.
+Muon made a simple idea operational: hidden weight matrices should be optimized
+as matrices, not merely as bags of coordinates \citep{jordan2024muon}. Later
+methods add adaptivity after orthogonalization, notably \NorMuon
+\citep{li2025normuon} and \AdaMuon \citep{si2025adamuon}. At the same time,
+large comparative studies show that optimizer rankings depend strongly on
+hyperparameter tuning, model scale, data budget, and the training horizon at
+which performance is read out \citep{wen2025fantastic}.
 
-This paper is an attempt to meet that obligation, and a report of what happened
-when we did. We set out to build an optimizer that beats the state of the art in
-the regime where matrix methods are documented to lose---fully fine-tuning
-Adam-pretrained weights \citep{qu2026muon}---and that attempt failed. What the
-work produced instead is a set of findings about \emph{why} these methods work,
-one structural defect present in all of them, and a case study in how a
-carefully-designed protocol still admitted two errors.
+These facts make new optimizer results easy to overstate. A method can appear
+better because its search range is better centered, because an auxiliary
+Adam-like path was tuned differently, because training ended at a favorable
+intermediate point, or because the method simply performs more computation per
+step. ASTRO began as an attempt to add additional control to Muon-family
+updates. The project changed direction as experiments invalidated parts of the
+original explanation.
+
+This paper therefore makes two contributions. First, we study the current
+\ASTROv recipe against modern Muon-family baselines. Second, we treat the
+\emph{research process itself} as part of the artifact: shared configurations
+are distinguished from shared seeds, wall-clock cost accompanies step-matched
+loss, negative experiments remain visible, and incomplete cells stay visibly
+incomplete in both plots and prose.
 
 \paragraph{Contributions.}
 \begin{enumerate}
-\item \textbf{The leverage identity} (\S\ref{sec:leverage}): the row-norm profile
-of a Muon update is the leverage-score distribution of the momentum's row space.
-Elementary, but it implies row normalisation is inert on wide matrices and
-explains why a fused projection starves two of its three operators.
-\item \textbf{The stage dependence of the fused-projection defect}
-(\S\ref{sec:qkv}), measured on eight pretrained checkpoints with a random-init
-control. The split itself is \emph{not} ours---production Muon implementations
-already split per slice, and head grouping is published. What is ours is the
-mechanism and the finding that the defect decays with training.
-\item \textbf{A converging polar iteration} (\S\ref{sec:polar}), solved rather
-than copied. Muon's quintic has fixed points at $0.868$ and $1.264$ and so
-cannot converge; per-step coefficients can. The solved tail reproduces the
-published Polar Express asymptote, which was not fitted to.
-\item \textbf{A weight-tying routing bug} (\S\ref{sec:routing}) that places the
-tied token embedding and the position embedding on the spectral path while
-excluding a genuine MLP projection, affecting every matrix optimizer using the
-standard name-based policy.
-\item \textbf{A component whose sign inverts with scale} (\S\ref{sec:inversion}).
-Cautious masking is worth $-0.0291$ against Muon on 8 of 8 seeds at 1.17M
-parameters, exact $p = 0.0078$, and costs $+0.1341$ at 124M under the same
-tokeniser and protocol. We built the small benchmark specifically to match the
-target's parameter split, which removed our own explanation for the inversion
-without removing the inversion.
-\item \textbf{Six retractions and three measurement bugs}
-(\S\ref{sec:corrections}), reported because the pattern is instructive and
-because one of them---that splitting is cheaper than not splitting---was a
-reasoning error we published before checking the arithmetic.
+  \item A PyTorch implementation of ASTRO that subclasses
+  \texttt{torch.optim.Optimizer} for state management while implementing the
+  matrix update explicitly.
+  \item A 124M comparison to Muon, NorMuon, and AdaMuon that documents both the
+  optimizer journey and the current ASTRO-v2 recipe.
+  \item An ablation showing that ASTRO-MB captures almost all of the current
+  ASTRO-v2 gain, while setting the post-polar variance power to zero preserves
+  most of it.
+  \item A QKV allocation analysis showing that fused spectral treatment can
+  produce strongly imbalanced update allocation, while block-wise treatment
+  restores substantially more balanced Q/K/V allocation.
+  \item A reproducible paper pipeline: committed JSON is the evidence layer,
+  Matplotlib generates publication figures, W\&B is optional, and the LaTeX
+  source renders visible placeholders for missing measurements.
 \end{enumerate}
 
 \section{Background}
 
-Let $W \in \R^{m\times n}$ be a parameter reshaped to the operator it represents,
-$G = \nabla_W \mathcal{L}$, and $M$ an exponential moving average of $G$. For
-$A = U\Sigma V^{\top}$ the \emph{matrix sign} or polar factor is
-$\msgn(A) = UV^{\top}$, the nearest orthogonal matrix to $A$. Steepest descent
-under a norm $\norm{\cdot}$ solves
-$\arg\min_Q \langle -G, Q\rangle + \tfrac{\lambda}{2}\norm{Q}^2$, and under the
-spectral norm the solution is proportional to $\msgn(G)$
-\citep{bernstein2024modular}. This is the sense in which Muon
-\citep{jordan2024muon} is a duality map rather than a heuristic: it replaces the
-update with one whose singular values are all one, so the step moves equally in
-every direction the gradient identifies.
+\subsection{Muon}
 
-\citet{frans2025whitening} decompose matrix whitening into \emph{spectral
-normalisation} and \emph{variance adaptation}, and identify the second as what
-explains SOAP's \citep{vyas2024soap} edge over Muon. NorMuon
-\citep{li2025normuon} adds a neuron-wise second moment \emph{after}
-orthogonalisation, reporting that ``Muon's updates exhibit highly non-uniform
-neuron norms, causing certain neurons to dominate.'' Section~\ref{sec:leverage}
-makes that statement exact and shows where it does and does not apply.
+For a matrix gradient $G_t$, Muon maintains momentum and applies a short
+Newton--Schulz-style iteration that approximates the polar factor of the
+momentum matrix. If $M=U\Sigma V^\top$, the idealized transform is $UV^\top$.
+Practical Muon uses this matrix path for hidden operators and an AdamW-like
+auxiliary path for embeddings, biases, norms, and other non-matrix parameters.
 
-\section{The leverage identity}\label{sec:leverage}
+The numerical subroutine is itself an active research topic. Polar Express
+shows that changing the polynomial across iterations can improve approximation
+quality while remaining GPU-friendly \citep{amsel2025polar}.
 
-\begin{proposition}[Row norms are leverage scores]\label{prop:leverage}
-Let $M = U\Sigma V^{\top}$ with $m > n$, so $U \in \R^{m\times n}$ has orthonormal
-columns, and let $P = \msgn(M) = UV^{\top}$. Then for every row $i$,
-\[
-\norm{p_i}^2 = \norm{u_i}^2, \qquad \sum_{i=1}^m \norm{u_i}^2 = n,
-\]
-where $p_i, u_i$ are the $i$th rows of $P$ and $U$. That is, the squared row norms
-of the update are the leverage scores of $M$'s row space, summing to $n$.
-\end{proposition}
+\subsection{NorMuon and AdaMuon}
 
-\begin{proof}
-$p_i = u_i V^{\top}$ and $V$ is orthogonal, so $\norm{p_i} = \norm{u_i}$. The sum
-is $\operatorname{tr}(U^{\top}U) = \operatorname{tr}(I_n) = n$.
-\end{proof}
+NorMuon adds one adaptive second-moment statistic per output neuron after
+orthogonalization and preserves the total update norm
+\citep{li2025normuon}. AdaMuon applies element-wise adaptivity to the
+orthogonalized update and aligns the RMS of the resulting direction
+\citep{si2025adamuon}. They are important baselines because they test whether
+post-spectral adaptation improves only peak loss or also the region of stable
+hyperparameters.
 
-Two corollaries follow immediately and are, to our knowledge, unremarked.
+\subsection{Why horizon and scale matter}
 
-\begin{remark}[Row normalisation is inert on wide matrices]
-For $m \le n$ the polar factor has orthonormal \emph{rows}, so every row norm is
-exactly $1$ and any row-normalisation scheme is the identity. NorMuon's
-mechanism therefore cannot act on wide matrices at all. On GPT-2's
-$128\times512$ MLP projection we measure a participation ratio of $0.995$
-(Table~\ref{tab:leverage}), confirming this empirically.
-\end{remark}
+Wen et al. compare optimizers across model sizes and data/model ratios and show
+that fair conclusions require optimizer-specific tuning and evaluation at the
+intended final budget; rankings can change at intermediate checkpoints and
+reported speedups shrink with scale \citep{wen2025fantastic}. We therefore treat
+124M/300, 124M/900, and 355M as separate empirical questions.
 
-\begin{remark}[Localisation is a signal, not a defect, except when it is]
-For a pure-noise matrix, leverage scores are delocalised, concentrating near
-$n/m$ by Marchenko--Pastur. Structured signal localises them. Row normalisation
-therefore pushes the update toward the profile that noise would produce, which is
-defensible early in training when leverage estimates are unreliable, and is what
-we believe underlies NorMuon's gain from scratch.
-\end{remark}
+Recent curvature work provides a complementary view: at matched validation
+loss, Muon's advantage over Adam is associated with lower normalized
+directional sharpness rather than simply smaller update norms
+\citep{wang2026curvature}. Our current paper does not yet claim a curvature
+explanation for ASTRO-v2; the repository contains instrumentation for such a
+follow-up.
+
+\section{Current ASTRO}
+
+\subsection{Routing}
+
+The current reference implementation is \texttt{class Astro(torch.optim.Optimizer)}
+in \texttt{scripts/astro\_lab.py}. Subclassing PyTorch's optimizer base supplies
+parameter groups, state, serialization, and interoperability; it does not supply
+the ASTRO update.
+
+Parameters are routed structurally. Genuine hidden 2-D operators take the
+spectral path. Embeddings, the tied output head, biases, normalization
+parameters, and other non-operators take an Adam-like scalar path. HuggingFace
+GPT-2 \texttt{Conv1D} weights are transposed into operator orientation. Fused
+attention projections can be split into Q, K, and V blocks before the spectral
+transform.
+
+\subsection{Spectral path}
+
+ASTRO maintains momentum
+\begin{equation}
+M_t = \beta_1 M_{t-1} + (1-\beta_1)G_t,
+\end{equation}
+forms a Nesterov-style lookahead, and applies the approximate polar transform
+block-by-block to obtain $Q_t$. It then tracks a row-wise second moment on the
+\emph{orthogonalized} direction,
+\begin{equation}
+v_t = \beta_2 v_{t-1} + (1-\beta_2)\operatorname{rowmean}(Q_t^2),
+\end{equation}
+and redistributes the direction according to
+\begin{equation}
+\widetilde Q_t = Q_t \oslash \widehat v_t^{\gamma/2}.
+\end{equation}
+The original Frobenius norm is restored,
+\begin{equation}
+D_t = \widetilde Q_t\frac{\norm{Q_t}_F}{\norm{\widetilde Q_t}_F},
+\end{equation}
+so this stage mainly redistributes update energy rather than changing the total
+step magnitude.
+
+\subsection{ASTRO-v2 is a recipe}
+
+ASTRO-v2 is not a second optimizer class. The harness instantiates the same
+\texttt{Astro} implementation with
+\begin{verbatim}
+"astro_v2": {
+  "betas": (0.9, 0.95),
+  "cautious_wd": False,
+}
+\end{verbatim}
+The earlier recipe used $\beta_1=0.95$ on both spectral and scalar groups, even
+though Muon's Adam-like auxiliary path uses $0.9$. This meant a substantial
+fraction of GPT-2 could differ before any matrix geometry was considered.
+ASTRO-v2 removes this asymmetry and disables cautious weight decay.
+
+ASTRO-MB isolates the beta alignment while retaining cautious weight decay.
+ASTRO-v2-$\gamma0$ additionally disables the post-polar variance-power effect.
+These variants are the main attribution controls in the current study.
+
+\section{Experimental protocol}
+
+\subsection{Model, data, and validation}
+
+The scale campaign trains GPT-2-style causal language models from scratch on
+FineWeb-Edu with GPT-2 BPE. The principal model has 12 layers, 12 heads, width
+768, and approximately 124M parameters. Sequence length is 512. The first scale
+check uses a 355M configuration.
+
+Validation is pinned to the same 400,000-token slice at every training horizon.
+This corrects an earlier protocol in which changing the maximum training budget
+could also change the validation text.
+
+\subsection{Two different kinds of pairing}
+
+We use two distinct experimental units:
+\begin{itemize}
+  \item \textbf{shared configurations}: both optimizers receive the same
+  learning rate, weight decay, and scalar-path multiplier; this measures
+  sensitivity and robustness;
+  \item \textbf{shared seeds}: frozen configurations are rerun with identical
+  stochastic seeds; this measures stochastic reproducibility.
+\end{itemize}
+Three configurations are not three seeds, and the paper never uses one as a
+surrogate for the other.
+
+\subsection{Compute accounting}
+
+A step-matched win is not automatically a compute win. We therefore report
+wall-clock per run and prepare frozen validation trajectories for both
+loss-vs-step and loss-vs-time comparisons. In the current targeted 124M/900
+experiment, ASTRO-v2 costs about 6.4\% more wall-clock than Muon.
+
+\section{Current results}
+
+\subsection{Negative evidence at 300 steps}
+
+The expanded tuned 124M/300 benchmark gives Table~\ref{tab:300}.
 
 \begin{table}[t]
 \centering
-\begin{tabular}{lrrrr}
+\caption{GPT-2 124M, 300 steps, three evaluation seeds. Lower is better. The
+ASTRO row is the earlier/plain recipe, not ASTRO-v2.}
+\label{tab:300}
+\small
+\begin{tabular}{lrr}
 \toprule
-tensor & shape & $m/n$ & CV & participation \\
+Optimizer & Mean val. loss & $\Delta$ vs Muon \\
 \midrule
-\texttt{c\_attn} (fused QKV) & $384\times128$ & 3.00 & \textbf{1.145} & \textbf{0.433} \\
-\texttt{c\_proj} (attention) & $128\times128$ & 1.00 & 0.185 & 0.967 \\
-\texttt{c\_fc} (MLP)         & $512\times128$ & 4.00 & 0.295 & 0.920 \\
-\texttt{c\_proj} (MLP)       & $128\times512$ & 0.25 & 0.070 & 0.995 \\
+NorMuon & \textbf{6.6280} & \textbf{-0.0077} \\
+Muon & 6.6357 & 0.0000 \\
+Earlier ASTRO & 6.6538 & +0.0180 \\
+AdamW & 6.8445 & +0.2087 \\
 \bottomrule
 \end{tabular}
-\caption{Leverage localisation of Muon's update, GPT-2 layer 0, step 1.
-CV is the coefficient of variation of squared row norms; participation is
-$(\sum r_i^2)^2 / (m \sum r_i^4)$, equal to $1$ when uniform. The wide projection
-is uniform as Proposition~\ref{prop:leverage} requires. \texttt{c\_attn} is far
-more localised than \texttt{c\_fc} despite a smaller aspect ratio, which aspect
-ratio cannot explain.}
-\label{tab:leverage}
 \end{table}
 
-\section{A polar iteration that converges}\label{sec:polar}
+\obs{The ASTRO-v2 story cannot be back-projected onto earlier ASTRO runs: at
+124M/300, the earlier recipe is worse than Muon under the expanded tuned
+benchmark.}
 
-Muon's quintic \(p(s) = 3.4445s - 4.7750s^3 + 2.0315s^5\) is applied \(k\) times.
-It cannot reach the polar factor at any \(k\): its fixed points solve
-\(2.4445 - 4.7750s^2 + 2.0315s^4 = 0\), giving \(s = 0.868\) and \(s = 1.264\),
-and iterating lands in a band around them. We measure singular values in
-\([0.68, 1.13]\) after five steps and unchanged after twelve.
+\subsection{The optimizer journey at 124M/900}
 
-The cost is not cosmetic. Where in that band the spectrum lands depends on the
-conditioning of the matrix handed over, so the update's Frobenius norm moves
-between \(0.688\) and \(0.921\) of \(\sqrt{\min(m,n)}\) as the condition number
-goes \(1\) to \(1000\)---a drift in effective step size that tracks a quantity no
-implementation monitors and that moves as training reshapes the gradient
-spectrum.
-
-A different polynomial per step has no fixed-point obstruction. We solve for the
-coefficients greedily, each step minimising \(\max_s |P(s) - 1|\) over the
-interval the previous steps produced, rather than copying published constants.
-
-\begin{table}[h]
-\centering
-\begin{tabular}{lrrrrr}
-\toprule
-& $\max|P-1|$ & \multicolumn{4}{c}{update-norm ratio} \\
-\cmidrule(lr){3-6}
-filter & on $[10^{-3},1]$ & $\kappa{=}1$ & $10$ & $10^2$ & $10^3$ \\
-\midrule
-Muon, 5 steps  & ---    & 0.6881 & 0.9024 & 0.9212 & 0.8641 \\
-solved, 5      & 0.1167 & 0.8940 & 1.0017 & 0.9990 & 0.9664 \\
-solved, 6      & 0.0010 & 0.9997 & 1.0001 & 1.0001 & 0.9883 \\
-solved, 7      & 0.0000 & 1.0000 & 1.0000 & 1.0000 & 0.9985 \\
-\bottomrule
-\end{tabular}
-\caption{At equal cost the conditioning-dependent drift halves and centres on
-one; two steps further it is exact. The last two solved steps land near
-$(1.875, -1.25, 0.375)$, reproducing the asymptote the Polar Express publishes
-\citep{amsel2025polar}---an agreement that was not fitted to.}
-\label{tab:polar}
-\end{table}
-
-Table~\ref{tab:polar} states the result. Whether exactness \emph{helps}
-training is a separate question: Muon's under-convergence may act as damping,
-and seven steps costs $40\%$ more than five.
-
-\section{The fused-projection defect}\label{sec:qkv}
-
-Table~\ref{tab:leverage} shows \texttt{c\_attn} at participation $0.433$, worse
-than \texttt{c\_fc} despite being less tall. \texttt{c\_attn} is the fused QKV
-projection: three separate operators stacked in one $3d \times d$ tensor. A
-participation ratio near $1/3$ suggests one of the three dominates. It does,
-and Table~\ref{tab:qkv} measures by how much.
+At one shared configuration, the modern Muon-family comparison is shown in
+Table~\ref{tab:shared} and Figure~\ref{fig:journey}.
 
 \begin{table}[t]
 \centering
-\begin{tabular}{lrrrrrr}
+\caption{One shared GPT-2 124M/900 configuration:
+$\eta=0.010206$, weight decay $0.001060$, scalar multiplier $0.4369$. This is a
+pointwise comparison, not a tuned global ranking.}
+\label{tab:shared}
+\small
+\begin{tabular}{lrr}
 \toprule
-& \multicolumn{3}{c}{update mass share} & \multicolumn{3}{c}{gradient norm} \\
-\cmidrule(lr){2-4}\cmidrule(lr){5-7}
-step & $Q$ & $K$ & $V$ & $\norm{\nabla Q}$ & $\norm{\nabla K}$ & $\norm{\nabla V}$ \\
+Optimizer & Val. loss & $\Delta$ vs Muon \\
 \midrule
-1  & 0.057 & 0.088 & \textbf{0.855} & 0.0012 & 0.0012 & 0.0831 \\
-10 & 0.104 & 0.135 & \textbf{0.761} & 0.0036 & 0.0034 & 0.0256 \\
+\textbf{ASTRO-v2} & \textbf{5.9208} & \textbf{-0.0827} \\
+ASTRO-MB & 5.9226 & -0.0809 \\
+AdaMuon & 6.0028 & -0.0007 \\
+Muon & 6.0035 & 0.0000 \\
+NorMuon & 6.0155 & +0.0121 \\
 \bottomrule
 \end{tabular}
-\caption{Fraction of the polar factor's squared row mass falling in each of $Q$,
-$K$, $V$ for GPT-2 layer 0. Balanced would be $0.333$ each. $Q$ and $K$ reach the
-loss through the softmax Jacobian while $V$ enters linearly, so their gradients
-are roughly $70\times$ smaller, and the joint polar factor inherits the imbalance.}
-\label{tab:qkv}
 \end{table}
 
-This defeats the property Muon exists to provide. The tensor is perfectly
-orthogonalised---its singular values are all one---while two of the three
-operators inside it receive almost no update. No orthogonality diagnostic
-detects this, because nothing is wrong with the orthogonalisation; what is wrong
-is that the object being orthogonalised is not a single operator.
-
-\paragraph{The fix.} Split the tensor into its blocks and orthogonalise each
-separately. On a planted-gradient test with $Q,K$ scaled to $2\%$ of $V$, the
-update mass moves from $(0.019, 0.018, 0.963)$ to $(0.336, 0.334, 0.330)$ at
-unchanged overall update norm.
-
-\paragraph{The fix costs more, not less.} We first reported that splitting is
-\emph{cheaper} than not splitting, on the reasoning that three $128\times128$
-Newton--Schulz iterations must cost less than one $384\times128$. That is wrong,
-and the error is instructive because the arithmetic is one line. Newton--Schulz
-transposes to operate on the smaller dimension, so a fused $(3d, d)$ tensor
-already runs as $(d, 3d)$ at $7d^3$ per iteration, against $9d^3$ for three
-separate $d\times d$ blocks. Splitting is $1.29\times$ more expensive by
-operation count; we measure $1.33\times$ on a T4. The end-to-end step timings we
-published ($91.0$\,ms against NorMuon's $92.2$) were real, but they measure our
-step being cheaper than NorMuon's for unrelated reasons, and we attributed them
-to a saving that does not exist.
-
-Because the defect is an initialisation-time phenomenon that attenuates, the
-right shape for the repair is a schedule rather than a permanent change: we
-therefore relax to a single block after a configurable step count, which is also
-the cheaper branch.
-
-\citet{khona2026soap} mention QKV splitting as an implementation option and
-explicitly disable it to keep their Muon/SOAP comparison free of structural
-differences. The cost of not splitting appears unmeasured.
-
-\section{A routing bug under weight tying}\label{sec:routing}
-
-GPT-2 ties \texttt{lm\_head.weight} to \texttt{transformer.wte.weight}: they are
-one tensor, so \texttt{named\_parameters()} reports it once, under the \texttt{wte}
-name. A router keyed on names therefore never sees \texttt{lm\_head.weight}, and
-the tied token embedding stays on the spectral path---orthogonalising a table
-whose rows are indexed by token, which Muon's own guidance forbids. The position
-embedding follows, being shape-indistinguishable from a dense matrix. The usual
-fallback (``the last 2-D parameter is the head'') then selects the final block's
-MLP projection, a genuine operator, and excludes it.
-
-Three tensors misrouted in both directions, on the most widely used architecture
-in the field, affecting Muon and NorMuon identically since they share the policy.
-The fix is to resolve parameters by identity and to detect embeddings and the
-output head structurally from the module graph.
-
-\section{Protocol}\label{sec:protocol}
-
-Enforced in code rather than by convention: identical tuning budgets (16
-log-uniform trials, same RNG stream per optimizer, with a hard error if
-competitors do not tune the same \emph{number} of hyperparameters); tuning on
-seed 0 with evaluation on disjoint seeds; paired exact Wilcoxon signed-rank tests
-with the null distribution enumerated over the observed midranks; Holm correction
-across each family; and wall-clock matching on an idle machine.
-
-The model is nanoGPT's GPT-2 at $n_{\text{layer}}=4$, $n_{\text{head}}=4$,
-$n_{\text{embd}}=128$, context $128$ (806K non-embedding parameters), trained on
-WikiText-2 and fine-tuned on tinyshakespeare at character level with a shared
-vocabulary. This is three orders of magnitude below the scale at which the
-literature makes its claims, and optimizer advantages are known to shrink with
-scale \citep{wen2025fantastic}; \S\ref{sec:limitations} states what that permits.
-
-\begin{remark}[Equal budgets are not sufficient]\label{rem:ranges}
-Our protocol enforces an equal \emph{number} of tuned hyperparameters. It does
-not, and the standard recipe does not, require the \emph{ranges} to be
-comparable. For matrix optimizers the update scale determines the correct
-learning-rate range: an RMS-matched update needs Adam's range, a Muon-scaled
-update needs Muon's, which is $10\times$ higher. We violated this without
-noticing, and it cost a candidate $0.034$ nats---see \S\ref{sec:corrections}.
-\end{remark}
-
-\begin{remark}[Equal treatment is not neutral treatment]\label{rem:schedule}
-The same failure has a second form, which we found by auditing a result that
-looked too good. Applying one learning-rate schedule to every optimizer is
-equal treatment, and it is not neutral: a constant rate penalises a method whose
-late-training stability depends on decay more than it penalises one that
-normalises its own update size. On tinyshakespeare, AdamW's tuned constant rate
-sits immediately below a cliff---validation loss $2.214$ at $\eta = 2.35 \times
-10^{-3}$ against $2.528$ at $3.5 \times 10^{-3}$---so its best available
-configuration is one it cannot survive on every seed, and $6$ of $25$ seeds
-land in a second mode near $2.45$. Granting nanoGPT's warmup-plus-cosine
-schedule to everyone lets AdamW triple its rate to $6.99 \times 10^{-3}$,
-removes all six outliers, cuts its seed-to-seed spread by $4.4\times$, and
-improves it by $0.157$ nats. Our advantage over it fell by the same amount.
-
-We therefore report under both settings rather than under the one we prefer. The
-general point is that a shared experimental condition is only fair when the
-optimizers are equally sensitive to it, which is not something equal budgets
-establish and not something we can check without varying the condition.
-\end{remark}
-
-\subsection{The tuner has more variance than the effect}\label{sec:tunervariance}
-
-The two remarks above are about making a tuned comparison fair. At 124M we
-found that a tuned comparison is the wrong instrument regardless of fairness,
-because the selection step moves the answer further than the optimizers do.
-
-Three measurements, each at GPT-2 124M for $900$ steps on FineWeb-Edu. First,
-tuning is worth $0.1184$ nats to Muon---more than twice the margin we were
-attempting to measure at the time. Second, tuning at $300$ steps and evaluating
-the selection at $900$ inverts NorMuon's ranking of two configurations: the one
-the short-horizon search selects reaches $6.1301$ at $900$ steps and the one it
-rejects reaches $5.9966$, a misselection worth $0.1335$. Third, the same
-configuration re-run on a later runtime moves by at most $0.0012$. The
-\emph{selection} therefore carries roughly a hundred times the variance of the
-\emph{evaluation}, and no number of seeds addresses it, because seeds resample
-the evaluation.
-
-We consequently report a design with no selection step in it. Every optimizer
-sharing a search space is offered the identical drawn configurations---common
-random numbers, seeded from a fixed constant---and we pair on the configuration
-rather than on the seed. The question becomes whether the advantage holds at
-\emph{every} drawn configuration, which is strictly stronger than a
-tuned-versus-tuned win: it cannot be a lucky draw, because nothing is drawn
-twice and nothing is chosen. It also implies the tuned comparison, since a
-maximum over a shared grid follows the pointwise order. Optimizers whose update
-scale demands a different range (Remark~\ref{rem:ranges}) contribute no pairs
-rather than mismatched ones; pairing is on the recorded configuration, never on
-the trial index.
-
-One further control makes the remaining budget informative. The multiplier on
-the elementwise path---covering embeddings and the tied head, $31.7\%$ of GPT-2
-124M---selects the learning rate for code that is \emph{identical} in Muon,
-NorMuon, AdaMuon and our optimizer. It is not part of what distinguishes them,
-and letting each search find its own value makes the comparison partly a lottery
-over a shared subsystem: that lottery is the mechanism behind the $0.1335$ above.
-We hold it fixed for all competitors at the value tuned for the \emph{baseline}
-at the evaluation horizon, which biases against us, and spend the search density
-on the matrix path instead.
-
-\begin{remark}[Reproducibility is not a single number]\label{rem:noisefloor}
-Re-running one configuration on a later runtime moved four optimizers by
-$0.0009$, $0.0009$, $0.0010$ and $0.0012$. The same procedure at a learning rate
-$4.9\times$ higher moved Muon by $0.0175$. A noise floor quoted without its
-configuration is therefore not a property of the setup; we quote the
-same-configuration figure of about $0.001$ and note that the floor degrades
-where the optimizer is already struggling.
-\end{remark}
-
-\section{Results}\label{sec:results}
-
-We report at two scales, and the disagreement between them is itself one of the
-findings. \S\ref{sec:results-124m} is GPT-2 124M on FineWeb-Edu, which is the
-scale the comparison is about. \S\ref{sec:results-small} is the 806K-parameter
-CPU study, which is where the components were selected and which we now know
-mispredicted the sign of one of them.
-
-\subsection{GPT-2 124M}\label{sec:results-124m}
-
-GPT-2 small (124M parameters, $31.7\%$ of them on the elementwise path),
-FineWeb-Edu, 300 steps, batch 8, sequence 512, on one T4. Learning rate and
-weight decay for Muon, NorMuon and AdamW were selected by the equal-budget sweep
-of \S\ref{sec:protocol}. Every seed is shared, so the columns are paired
-differences rather than differences of means.
-
-\begin{table}[h]
+\begin{figure*}[t]
 \centering
-\begin{tabular}{lrrrrr}
+\maybegraphic[0.96\textwidth]{fig_optimizer_journey}{Run
+\texttt{python scripts/figures/make\_all.py --only optimizer\_journey}.}
+\caption{\textbf{The optimizer journey.} Left: Muon, contemporary adaptive Muon
+variants, and the current ASTRO variants at one shared configuration. Right:
+paired deltas versus Muon across the three targeted mechanism settings. The
+aggressive-LR configuration creates the largest separation, motivating a
+robustness hypothesis rather than a universal-ranking claim.}
+\label{fig:journey}
+\end{figure*}
+
+\obs{At this shared 124M/900 setting, almost the entire separation from Muon is
+already present in ASTRO-MB; ASTRO-v2 improves on ASTRO-MB by only about 0.002
+validation loss.}
+
+\subsection{Targeted mechanism study}
+
+Across three shared settings, the mean paired deltas versus Muon are shown in
+Table~\ref{tab:mechanism}.
+
+\begin{table}[t]
+\centering
+\caption{Targeted 124M/900 mechanism experiment. Settings are shared
+hyperparameter configurations, not independent seeds.}
+\label{tab:mechanism}
+\small
+\begin{tabular}{lrr}
 \toprule
-optimizer & loss & $\Delta$ & worst seed & won & s/run \\
+Variant & Mean $\Delta$ vs Muon & Settings won \\
 \midrule
-proposed        & \textbf{6.6177} & ---      & ---      & --- & 323 \\
-NorMuon         & 6.6523 & $-0.0346$ & $-0.0259$ & 3/3 & 327 \\
-Muon            & 6.6573 & $-0.0396$ & $-0.0344$ & 3/3 & 323 \\
-\quad + cautious mask & 6.7519 & $-0.1341$ & $-0.1276$ & 3/3 & 333 \\
-AdamW           & 6.9657 & $-0.3479$ & $-0.3258$ & 3/3 & 155 \\
+\textbf{ASTRO-v2} & \textbf{-0.2208} & \textbf{3/3} \\
+ASTRO-MB & -0.2137 & 3/3 \\
+ASTRO-v2 ($\gamma=0$) & -0.2047 & 3/3 \\
 \bottomrule
 \end{tabular}
-\caption{Paired $\Delta$ against the proposed configuration over three shared
-seeds; negative favours it. The margin over Muon is not carried by one seed---the
-\emph{worst} of the three is $-0.0344$, larger than NorMuon's entire mean
-advantage over Muon ($-0.0051$)---and it is not bought with time.}
-\label{tab:124m}
 \end{table}
 
-Two caveats bound this table, and both point the same way. Three seeds is the
-exact sign test's floor at $p = 0.25$, so no arrangement of these numbers can
-produce a small $p$; the evidence is 3/3 with a worst-case margin seven times
-NorMuon's mean advantage, not significance. And the winning configuration is the
-only one here that was never tuned---it ran at the learning rate selected for a
-different variant with a guessed weight decay, because a Colab session was
-reclaimed with the tuned configuration in it. That handicaps the winner, so the
-margin is a lower bound of unknown tightness.
+The largest gap occurs at $\eta\approx0.0505$, where Muon reaches 6.4527 while
+ASTRO-v2 remains at 5.9436. At the milder settings, the gaps are substantially
+smaller.
 
-\paragraph{The noise floor.} Re-running two identical seeds in a fresh session
-reproduced $6.6065 \to 6.6072$ and $6.6317 \to 6.6295$: a worst-case spread of
-$0.0021$. GPU training here is not bit-reproducible given a seed---cuDNN
-autotuning and non-deterministic backward reductions---so we treat any
-cross-session gap below $\sim\!0.005$ as a tie. The margin over Muon is
-$18\times$ that floor and the cost of the mask is $63\times$ it.
+\obs{Current evidence points more strongly toward \textbf{hyperparameter
+robustness} than toward the post-polar variance-power term as the main source of
+ASTRO-v2's advantage.}
 
-\subsection{A component whose sign depends on scale}\label{sec:inversion}
+\subsection{Compute cost}
 
-The row we removed is cautious masking \citep{liang2024cautious}, and it is the
-most useful result in this section because of \emph{how} it failed.
-
-On the 1.17M-parameter subword benchmark---same tokeniser, same protocol, same
-parameter split as GPT-2 small to within $0.5$ percentage points---the mask is
-worth $-0.0291$ against Muon on 8 of 8 seeds, exact $p = 0.0078$. That is as
-clean as a small-scale result can be at any seed count we can afford. At 124M it
-costs $+0.1341$: four times the magnitude, in the opposite direction.
-
-We localised it before testing it. NorMuon's published advantage over Muon is
-$0.0051$, and our configuration trailed NorMuon by $0.1044$---twenty times a
-gap that ought to have been comparable---so the damage had to be in one of our
-three additions rather than in the shared spectral machinery. The mask was the
-prediction, and it was confirmed at three seeds. We note that we constructed the
-subword benchmark specifically to match the target's parameter split, on the
-hypothesis that the split was what the small benchmark was getting wrong. It
-matched, and the inversion survived, which kills our own explanation.
-
-The mechanism we can defend is narrower: the mask deletes coordinates whose sign
-disagrees with the \emph{current minibatch} gradient and rescales the survivors
-by $\text{numel}/\text{count}$. At larger width the momentum is the better of
-the two estimates, so most of what the mask removes is the minibatch being
-wrong rather than the update being wrong, and the rescale amplifies what
-survives.
-
-The transferable claim is not that small benchmarks are useless. This one
-selected the QKV split, the variance placement and the update scale, all of
-which held at $100\times$ the scale. It is that a component's \emph{sign} is not
-among the things a $100\times$-smaller benchmark establishes, however many seeds
-agree---and that an 8-of-8 sweep at $p = 0.0078$ is exactly what a wrong sign
-looks like when the effect is real at the scale you measured it.
-
-\subsection{The small-scale study}\label{sec:results-small}
-
-The remainder of this section is GPT-2 from-scratch on WikiText-2 at 806K
-non-embedding parameters, 10 seeds, paired exact Wilcoxon with Holm correction.
-It is reported as the component-selection study it was, and read subject to
-\S\ref{sec:inversion}.
-
-\subsubsection{Decomposition}
-
-\begin{table}[h]
+\begin{figure}[t]
 \centering
-\begin{tabular}{lrl}
-\toprule
-configuration & loss & adds \\
-\midrule
-Muon & 1.8396 & --- \\
-ASTRO defaults (no split) & 1.8399 & indistinguishable from Muon \\
-\quad + QKV split & 1.8158 & $-0.024$ \\
-NorMuon & 1.8127 & (row normalisation) \\
-NorMuon replica \emph{(control)} & 1.8148 & $+0.0021$, $d=0.19$, $p=0.77$ \\
-\quad + cautious mask & \textbf{1.7989} & $-0.016$ \\
-AdamW & 2.2286 & \\
-\bottomrule
-\end{tabular}
-\caption{The replica control reproduces NorMuon to within a negligible effect,
-which is what makes the delta above it attributable to the component added rather
-than to an implementation gap.}
-\label{tab:decomp}
-\end{table}
+\maybegraphic{fig_efficiency_v2}{Run
+\texttt{python scripts/figures/make\_all.py --only efficiency\_v2}.}
+\caption{Validation loss against measured wall-clock for the three targeted
+settings. Thin connectors join optimizers evaluated at the same hyperparameter
+configuration. Lower-left is better.}
+\label{fig:efficiency}
+\end{figure}
 
-Table~\ref{tab:decomp} attributes each delta to the component that produced
-it. The QKV split alone reaches NorMuon's level ($+0.0031$, $p=0.77$), as
-\S\ref{sec:leverage} predicts: splitting removes the cause of the row-mass
-collapse that row normalisation treats after the fact. The two are nonetheless
-complementary with the cautious mask \citep{liang2024cautious}.
+Muon takes about 787 seconds per 900-step run in the targeted study; ASTRO-v2
+about 838 seconds, a mean overhead of roughly 6.4\%.
 
-\subsubsection{Against the state of the art at 806K}
+\obs{ASTRO-v2's current result is a better-loss-at-equal-steps result. A full
+time-matched or time-to-target experiment is required before calling it a
+training-efficiency improvement.}
 
-\begin{table}[h]
+\subsection{Horizon: incomplete by design}
+
+\begin{table}[t]
 \centering
+\caption{Current ASTRO-v2 horizon state. The 900 and 2700 cells are incomplete
+and must not be interpreted as final averages.}
+\label{tab:horizon}
+\small
 \begin{tabular}{lrrr}
 \toprule
-budget & vs NorMuon & vs Muon & vs AdamW \\
+Steps & Completed & Mean $\Delta$ & Wins \\
 \midrule
-equal steps      & $-0.0138$ (0.0195) & $-0.0407$ (0.0117) & $-0.4297$ (0.0117) \\
-equal wall-clock & $-0.0163$ (0.0293) & $-0.0171$ (0.0117) & $-0.2649$ (0.0078) \\
+300 & 5/5 & -0.0500 & 2/5 \\
+600 & 5/5 & -0.0541 & 3/5 \\
+900 & \textbf{2/5} & -0.0118 so far & 1/2 \\
+2700 & \textbf{0/5} & pending & pending \\
 \bottomrule
 \end{tabular}
-\caption{Paired $\Delta$ (Holm-adjusted $p$). Negative favours the proposed
-configuration. At equal wall-clock it takes 405 steps to NorMuon's 400 and
-AdamW's 592.}
-\label{tab:headline}
 \end{table}
 
-Table~\ref{tab:headline} is the result that motivated scaling up. It survived at
-124M in ordering but not in composition: the configuration measured here
-includes the cautious mask, which \S\ref{sec:inversion} shows must be removed
-above roughly $10^8$ parameters. We report it as measured rather than re-running
-the small scale without the mask, because the point of the row is what the
-selection procedure produced, not what hindsight prefers.
+\begin{figure}[t]
+\centering
+\maybegraphic{fig_horizon_v2}{Finish the horizon state or render the current
+partial figure with \texttt{make\_all.py --only horizon\_v2}.}
+\caption{Paired ASTRO-v2 minus Muon validation-loss deltas through training.
+Filled diamonds denote complete cells; an open diamond denotes a partial cell.
+Individual points are shared configurations.}
+\label{fig:horizon}
+\end{figure}
 
-\subsubsection{Component ranking}
+One favorable configuration stays near $-0.09$ from 300 through 900 steps. A
+second configuration remains unfavorable, so the effect is not uniform across
+the search space.
 
-On the fine-tuning ablation, cost of removing each component: update-RMS matching
-$+5.3\%$; Hyperball norm control instead of weight decay $+4.5\%$; cautious
-masking $+3.2\%$; hard anchor instead of elastic $+2.2\%$; dead-zone filter
-enabled $+1.9\%$; variance adaptation $+1.1\%$; \textbf{the anchor $+0.0\%$}.
+\obs{The current horizon data are consistent with a persistent effect at some
+configurations, but they do not yet determine the final 900- or 2700-step
+average trend.}
 
-The largest single contributor is the component that exists for \emph{fairness}:
-making a learning rate transfer between the spectral and scalar paths. An
-evaluation that does not control for it credits step-size calibration to matrix
-structure.
+\subsection{Training trajectories}
 
-\subsubsection{Held-out validation}
+\begin{figure*}[t]
+\centering
+\maybegraphic[0.96\textwidth]{fig_training_trajectories}{Generate frozen
+validation trajectories with \texttt{scripts/paper/run\_trajectory.py}.}
+\caption{Planned final learning-dynamics figure. Left: validation loss versus
+training step. Right: the same trajectories versus measured training wall-clock
+with validation-probe time removed. These runs are generated only after
+configurations are frozen.}
+\label{fig:trajectories}
+\end{figure*}
 
-On fine-tuning, held out from the candidate search: the QKV split remains
-directionally better ($-0.0078$ vs AdamW, $d=-0.62$, $8/10$ seeds, Holm $0.42$),
-while the full recipe ties both baselines ($d \le 0.10$, $p=0.92$). The split
-transfers; the rest is regime-specific. Post-orthogonalisation placement wins from
-scratch and pre-orthogonalisation wins when fine-tuning, consistent across every
-comparison we ran.
+This figure is intentionally allowed to remain a visible placeholder in a living
+draft. The paper build must never reuse an old trajectory merely because a new
+one is absent.
 
-\section{Corrections}\label{sec:corrections}
+\section{Fused QKV allocation}
 
-We record six withdrawn claims and three bugs, because the pattern---almost every
-one caught by a control disagreeing with a headline, none by reading the code---is
-the most transferable thing here.
+A fused attention projection stores Q, K, and V in one matrix. A spectral
+transform can be mathematically valid for that fused matrix while distributing
+update energy unevenly among the three operators inside it.
 
-\paragraph{A five-seed win that did not replicate.} A candidate beat AdamW on
-fine-tuning by $-0.0111$ on $5/5$ seeds with a bootstrap interval below zero. At
-ten seeds: $-0.0079$, $8/10$, exact $p=0.084$, Holm $0.168$. With $n=5$ the
-smallest attainable two-sided $p$ is $2/2^5 = 0.0625$, so a perfect sweep is the
-only impressive-looking outcome available, and is not unlikely for a small real
-effect plus noise.
+\begin{table}[t]
+\centering
+\caption{Example Q/K/V update allocation. Splitting is applied before the
+spectral transform.}
+\label{tab:qkv}
+\small
+\begin{tabular}{lcc}
+\toprule
+Checkpoint & Fused Q/K/V & Split Q/K/V \\
+\midrule
+GPT-2 & .244/.226/\textbf{.530} & .318/.347/.336 \\
+GPT-2 Medium & .245/.266/\textbf{.489} & .308/.369/.323 \\
+Pythia-410M & .218/.248/\textbf{.534} & .356/.300/.344 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-\paragraph{That claim then inverted on time.} AdamW's step costs $89$\,ms against
-the candidate's $137$; in equal seconds it takes 120 steps to 78 and wins by
-$+0.0315$.
+The corresponding gradient V/Q ratios are approximately $2.65\times$,
+$3.27\times$, and $3.28\times$. Early GPT-2 layers can be more extreme. Random
+initialization also exhibits V-skew, so training is not claimed as the sole
+cause.
 
-\paragraph{``Muon beats NorMuon at equal wall-clock'' was wrong.} It rested on a
-single per-step cost calibration that measured $80.2$\,ms in one run and $84.1$ in
-the next, moving Muon's allocation from 457 steps to 438 and with it the entire
-conclusion. Corrected: $+0.0007$, $d=0.04$, $p=1.0$.
+\obs{Fused spectral treatment can produce strongly imbalanced Q/K/V allocation,
+while block-wise treatment restores substantially more balanced allocation. The
+imbalance is architecture- and stage-dependent rather than purely learned during
+training.}
 
-\paragraph{A raw mean read as a result.} We described the from-scratch winner as
-``worse than AdamW'' on held-out fine-tuning from a $0.0016$ difference. The
-paired test gives $d=0.07$, $p=0.92$: a tie.
+Splitting itself has a cost: earlier T4 timing in this repository shows that
+block-wise orthogonalization becomes materially more expensive at larger widths.
+This motivates testing a scheduled split instead of assuming that a permanent
+split is always optimal.
 
-\paragraph{``Splitting is cheaper than not splitting.''} Withdrawn in
-\S\ref{sec:qkv}. It is $1.29\times$ more expensive by operation count and
-$1.33\times$ measured. This is the only one of the six that a control could not
-have caught, because it was never a measurement---it was a one-line arithmetic
-claim asserted from a plausible mental picture and published without being
-checked. It is correspondingly the worst.
+\section{Research journey and corrections}
 
-\paragraph{``Runs are deterministic given a seed.''} Our GPU reports said so, and
-that claim is what licensed comparing a number from one session against a
-baseline recorded in another. Re-running two identical seeds in a fresh session
-moved them by up to $0.0021$. cuDNN autotuning and non-deterministic backward
-reductions are enough to break bit-reproducibility even with every seed fixed.
-The conclusions survive---the margin over Muon is $18\times$ this spread---but
-several comparisons we would have been willing to make at $0.003$ were never
-admissible.
+\subsection{A shared learning rate was not a fair comparison}
 
-\paragraph{Bug 1: ranges, not counts.} See Remark~\ref{rem:ranges}. Exposed by the
-NorMuon replica missing its target by $0.034$.
+Early runs forced Muon and ASTRO to share one learning rate even though their
+spectral and scalar update scales were not calibrated identically. Opposite
+conclusions appeared at different fixed rates. This motivated optimizer-specific
+tuning and the present shared-configuration design.
 
-\paragraph{Bug 2: configuration resolved by name, not recency.} The wall-clock
-harness globbed candidate artifacts alphabetically, selecting a superseded
-configuration and producing an apparent regression that was purely wrong
-hyperparameters. A $0.027$ swing from a $0.9\%$ per-step cost difference is not
-arithmetically possible, which is what prompted the check.
+\subsection{The scalar path mattered more than expected}
 
-\paragraph{Bug 3: a paired test across unpaired seeds.} The candidate harness
-evaluated a new configuration on seeds $200\ldots$ and compared it against a
-field evaluated on seeds $100\ldots$, then ran a paired signed-rank test on the
-two vectors. A paired test on unpaired samples is not a conservative
-approximation of anything; it is a different test with the wrong null. The fix
-derives the candidate's seeds from the reference's recorded seeds so pairing
-holds by construction, and refuses to run rather than silently unpairing---and
-the refusal happens before tuning, since the first version of the guard burned
-ten minutes of search before declining to report it.
+ASTRO originally used $\beta_1=0.95$ for both matrix and scalar groups. Muon's
+auxiliary Adam path uses $0.9$. Aligning that scalar behavior produced a larger
+improvement than several more elaborate spectral changes.
 
-\section{Limitations}\label{sec:limitations}
+\subsection{Cautious weight decay was not a free safety mechanism}
 
-The largest gap is seeds at scale. Table~\ref{tab:124m} rests on three, which is
-the exact sign test's floor at $p = 0.25$, so the 124M result cannot be certified
-however clean it looks; and the configuration that wins it was never tuned, while
-every baseline it beats was. Both gaps bias against the reported margin, which
-makes it a lower bound rather than an estimate, but neither is a substitute for
-running the sweep.
+A masked weight decay deletes decay where the mask fails. Unless survivors are
+rescaled, the method silently changes effective regularization. ASTRO-v2 disables
+this mechanism rather than treating it as a harmless default.
 
-The second gap is horizon and size. Every number here is 300 steps at 124M or
-below---far short of a Chinchilla-optimal budget---and optimizer advantages are
-documented to shrink with scale \citep{wen2025fantastic}. We have no evidence
-about 355M, 774M, or about whether a $0.04$-nat lead at 300 steps survives at
-2700. That study is specified and instrumented in the repository; it is not run.
+\subsection{Variance power is not yet the headline mechanism}
 
-The small-scale study carries its own limits: character-level tokenisation puts
-$96\%$ of the model on the spectral path against GPT-2's $68\%$, sixteen trials
-over three dimensions leaves every method somewhat under-tuned, and the
-from-scratch task is in-sample after three rounds of iteration on it. Per
-\S\ref{sec:inversion} we now hold that its component \emph{rankings} transferred
-and one component's \emph{sign} did not, and we cannot say in advance which kind
-of quantity a new component is.
+Setting $\gamma=0$ loses only about 0.016 validation loss on average relative to
+full ASTRO-v2 in the targeted run while retaining a large advantage versus Muon.
+The most mathematically distinctive component is therefore not automatically the
+component carrying the result.
 
-Finally, attribution. Cautious masking is \citeauthor{liang2024cautious}'s and we
-removed it; the QKV split is not ours either---production Muon implementations
-already split per slice. Our contributions are the leverage identity and the
-mechanism it explains, the solved converging iteration, the scale inversion, and
-the protocol.
+The repository retains \texttt{artifacts/measured.json} as a historical ledger
+and uses the smaller \texttt{artifacts/paper\_results.json} as the current
+paper-facing snapshot.
+
+\section{What must be completed before submission}
+
+\paragraph{Horizon.} Complete the remaining 900-step settings and all five
+2700-step settings.
+
+\paragraph{Independent seeds.} Freeze configurations first, then evaluate shared
+seeds. In the current CLI, \texttt{--seeds 3} means seeds 100, 101, and 102;
+\texttt{--seeds 100} means one hundred seeds.
+
+\paragraph{Scale.} The first 355M/900 shared-configuration comparison is the
+cheapest falsification of a small-model-only effect.
+
+\paragraph{Time matching.} Generate frozen validation trajectories and report
+both equal-step and equal-wall-clock results, preferably including time-to-target.
+
+\section{Limitations}
+
+The strongest current ASTRO-v2 result is a configuration-paired result, not yet
+an independent-seed result. The principal scale is only 124M. The current v2
+horizon is unfinished. ASTRO-v2 is measurably more expensive per step than Muon.
+Some historical experiments used superseded validation or tuning protocols and
+remain in the repository only as an audit trail. Finally, although ASTRO-MB's
+near-tie with ASTRO-v2 narrows the mechanism hypothesis, more isolation is needed
+before claiming that beta alignment alone is causal.
 
 \section{Conclusion}
 
-The row norms of a Muon update are leverage scores. That elementary identity
-implies row normalisation cannot act on wide matrices, and that a fused QKV
-projection hands $85\%$ of its update to $V$ while passing every orthogonality
-check. Splitting the projection fixes it, at a real cost of $1.33\times$ on the
-orthogonalisation, and the defect it repairs decays with training---so the
-repair belongs on a schedule.
+ASTRO-v2 is currently \textbf{promising, not proven}. At GPT-2 124M/900 it
+substantially improves on Muon across three shared configurations, with the
+largest separation in an aggressive-learning-rate regime. Yet the evidence also
+says what the result is not: the earlier ASTRO recipe loses in a tuned 300-step
+benchmark, post-polar variance power does not explain most of v2's current gain,
+and the step-matched improvement costs roughly 6\% additional wall-clock.
 
-The assembled optimizer beats Muon, NorMuon and AdamW at GPT-2 124M on three of
-three shared seeds, at Muon's wall-clock. We call that directional rather than
-established: three seeds floor the exact sign test at $p = 0.25$, and the
-winning configuration is the one row in the table that was never tuned.
+The emerging hypothesis is therefore narrower and more testable: ASTRO-v2 may
+improve the \emph{robustness} of matrix-structured optimization to hyperparameter
+choice, while a simpler subset of its recipe may carry most of the effect. The
+ongoing horizon, seed, scale, and time-matched experiments are designed to
+falsify that hypothesis quickly.
 
-We consider the methodological findings at least as important. Equal tuning
-budgets are necessary and not sufficient; ranges must match the update scale. A
-component's sign does not survive a $100\times$ change in scale even when 8 of 8
-seeds agree at $p = 0.0078$. And in a project explicitly designed to avoid
-manufacturing results, three measurement bugs and six wrong claims still
-occurred, almost every one caught by a control rather than by inspection.
-Controls that can fail are the load-bearing part of an optimizer comparison.
+The methodological commitment is simpler: the final paper will show the journey,
+not just the winner. Negative results, protocol corrections, and unfinished
+cells remain visible because optimizer research is most useful when the
+comparison can fail.
 
-\paragraph{Code.} All code, data-fetching scripts, and the exact commands
-reproducing every table:
-\url{https://github.com/pop123-ux/knsa-knee-normality-kaggle} (directory
-\texttt{astro/}).
+\paragraph{Reproducibility.}
+The complete manuscript, experiment ledger, current paper snapshot, plotting
+code, and build script are available at
+\url{https://github.com/pop123-ux/ASTRO}.
 
 \begin{thebibliography}{99}
-\bibitem[Amsel et al.(2025)]{amsel2025polar}
-N.~Amsel, D.~Persson, C.~Musco, and R.~Gower.
-\newblock The Polar Express: optimal matrix sign methods and their application
-  to the Muon algorithm.
-\newblock \emph{arXiv:2505.16932}, 2025.
-
-\bibitem[Bernstein and Newhouse(2024)]{bernstein2024modular}
-J.~Bernstein and L.~Newhouse. Modular duality in deep learning.
-\newblock \emph{arXiv:2410.21265}, 2024.
-
-\bibitem[Frans et al.(2025)]{frans2025whitening}
-K.~Frans et al. What really matters in matrix-whitening optimizers?
-\newblock \emph{arXiv:2510.25000}, 2025.
-
 \bibitem[Jordan et al.(2024)]{jordan2024muon}
-K.~Jordan, Y.~Jin, V.~Boza, Y.~Jiacheng, F.~Cesista, L.~Newhouse, and
-J.~Bernstein. Muon: An optimizer for hidden layers in neural networks, 2024.
-
-\bibitem[Khona et al.(2026)]{khona2026soap}
-M.~Khona et al. SOAP, Muon, and beyond: Pushing LLM pretraining scales.
-\newblock \emph{arXiv:2607.20548}, 2026.
+K.~Jordan, Y.~Jin, V.~Boza, J.~You, F.~Cesista, L.~Newhouse, and J.~Bernstein.
+\newblock Muon: An optimizer for hidden layers in neural networks.
+\newblock 2024. \url{https://kellerjordan.github.io/posts/muon/}.
 
 \bibitem[Li et al.(2025)]{li2025normuon}
-Z.~Li et al. NorMuon: Making Muon more efficient and scalable.
+Z.~Li et al.
+\newblock NorMuon: Making Muon more efficient and scalable.
 \newblock \emph{arXiv:2510.05491}, 2025.
 
-\bibitem[Liang et al.(2024)]{liang2024cautious}
-K.~Liang et al. Cautious optimizers: Improving training with one line of code.
-\newblock \emph{arXiv:2411.16085}, 2024.
-
-\bibitem[Qu et al.(2026)]{qu2026muon}
-X.~Qu et al. Can Muon fine-tune Adam-pretrained models?
-\newblock \emph{ICML}, 2026. arXiv:2605.10468.
-
-\bibitem[Vyas et al.(2024)]{vyas2024soap}
-N.~Vyas et al. SOAP: Improving and stabilizing Shampoo using Adam.
-\newblock \emph{arXiv:2409.11321}, 2024.
+\bibitem[Si et al.(2025)]{si2025adamuon}
+C.~Si, D.~Zhang, and W.~Shen.
+\newblock AdaMuon: Adaptive Muon Optimizer.
+\newblock \emph{arXiv:2507.11005}, 2025.
 
 \bibitem[Wen et al.(2025)]{wen2025fantastic}
-K.~Wen, D.~Hall, T.~Ma, and P.~Liang. Fantastic pretraining optimizers and where
-to find them.
+K.~Wen, D.~Hall, T.~Ma, and P.~Liang.
+\newblock Fantastic Pretraining Optimizers and Where to Find Them.
 \newblock \emph{arXiv:2509.02046}, 2025.
+
+\bibitem[Amsel et al.(2025)]{amsel2025polar}
+N.~Amsel, D.~Persson, C.~Musco, and R.~Gower.
+\newblock The Polar Express: Optimal Matrix Sign Methods and Their Application to
+  the Muon Algorithm.
+\newblock \emph{arXiv:2505.16932}, 2025.
+
+\bibitem[Wang et al.(2026)]{wang2026curvature}
+S.~Wang, F.~Zhang, J.~Li, D.~Bergemann, and Z.~Yang.
+\newblock Why Muon Outperforms Adam: A Curvature Perspective.
+\newblock \emph{arXiv:2606.04662}, 2026.
+
+\bibitem[Wen et al.(2026)]{wen2026hyperball}
+K.~Wen, X.~Dang, K.~Lyu, T.~Ma, and P.~Liang.
+\newblock Fantastic Pretraining Optimizers and Where to Find Them II: Hyperball
+  Optimization.
+\newblock \emph{arXiv:2606.16899}, 2026.
 \end{thebibliography}
 
 \end{document}
