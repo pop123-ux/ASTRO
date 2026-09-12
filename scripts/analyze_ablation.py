@@ -2,9 +2,9 @@
 """Aggregate distributed ASTRO ablation outputs into paper-ready summaries.
 
 The ablation launcher intentionally creates many small, isolated work
--directories so three or more Colab sessions can run independently. This tool
--turns that directory tree back into one machine-readable summary without
--touching the GPU.
+directories so three or more Colab sessions can run independently. This tool
+turns that directory tree back into one machine-readable summary without
+touching the GPU.
 
 It recursively discovers ``astro_lab_state.json`` files, extracts completed
 runs and tuning trials, groups them by optimizer/size/steps/configuration, and
@@ -129,11 +129,11 @@ def render_markdown(records: list[dict], aggs: dict, warnings: list[str]) -> str
     ]
     rows = sorted(aggs.values(), key=lambda x: (x["section"], x["size"], x["steps"], x["mean"]))
     for a in rows:
+        mean_seconds = "—" if a["mean_seconds"] is None else f"{a['mean_seconds']:.1f}"
         lines.append(
             f"| {a['section']} | {a['size']} | {a['steps']} | `{a['optimizer']}` | "
             f"{a['n']} | {a['mean']:.5f} | {a['median']:.5f} | {a['min']:.5f} | "
-            f"{a['max']:.5f} | {a['stdev']:.5f} | "
-            f"{'—' if a['mean_seconds'] is None else f'{a[\"mean_seconds\"]:.1f}'} |"
+            f"{a['max']:.5f} | {a['stdev']:.5f} | {mean_seconds} |"
         )
 
     lines += ["", "## Coverage", ""]
