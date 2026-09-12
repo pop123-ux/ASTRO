@@ -1,12 +1,12 @@
-"""Shared publication style for every figure in the paper.
+"""Shared publication style for every ASTRO paper figure.
 
-One module so that a reader flipping between figures sees one visual language:
-the same colour means the same optimizer everywhere, panel labels are placed
-identically, and the annotation helpers are the ones the figures actually need
-rather than whatever each script reinvented.
+The paper treats figures as evidence, not decoration.  This module gives every
+plot one visual language and keeps the aesthetics close to modern optimizer
+papers: restrained serif typography, light grids, thin axes, direct labels,
+consistent optimizer colours, and vector PDF output.
 
-Sizes assume a single-column article at 1in margins, so the usable text width
-is 6.5in. A three-panel row is ``figure(3)``; a single plot is ``figure(1)``.
+Use ``column_figure`` for a one-column figure and ``figure`` for a full-width
+row.  Never hand-style a paper plot outside this module.
 """
 
 from __future__ import annotations
@@ -23,124 +23,163 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent.parent.parent
 OUT = ROOT / "artifacts" / "figures"
 
-TEXT_WIDTH = 6.5  # inches, \textwidth at 1in margins on US letter
+# Approximate widths for the two-column paper template in docs/paper/paper.tex.
+TEXT_WIDTH = 7.05
+COLUMN_WIDTH = 3.38
 
-# One colour per optimizer, used in every figure. Adam blue and Muon orange
-# follow the convention of the curvature literature we compare against, so a
-# reader coming from those papers reads our panels without a key.
+# Colour-blind-friendly, print-safe palette.  A colour means the same optimizer
+# everywhere in the paper.  ASTRO-v2 is intentionally the strongest accent.
 COLORS = {
-    "adamw": "#1f77b4",
-    "adam": "#1f77b4",
-    "muon": "#ff7f0e",
-    "normuon": "#2ca02c",
-    "adamuon": "#17becf",
-    "astro": "#d62728",
-    "astro_cautious": "#9467bd",
-    "soap": "#8c564b",
-    "reference": "#444444",
+    "adamw": "#4C78A8",
+    "adam": "#4C78A8",
+    "muon": "#F58518",
+    "normuon": "#54A24B",
+    "adamuon": "#72B7B2",
+    "soap": "#B279A2",
+    "astro": "#E45756",
+    "astro_v1": "#E45756",
+    "astro_muon_betas": "#9D5CBB",
+    "astro_v2": "#7A3E9D",
+    "astro_v2_gamma0": "#C58AE6",
+    "astro_cautious": "#FF9DA6",
+    "reference": "#4D4D4D",
+    "pending": "#B8B8B8",
 }
 
 MARKERS = {
-    "adamw": "o", "adam": "o", "muon": "s", "normuon": "^",
-    "adamuon": "v", "astro": "D", "astro_cautious": "X", "soap": "P",
+    "adamw": "o",
+    "adam": "o",
+    "muon": "s",
+    "normuon": "^",
+    "adamuon": "v",
+    "soap": "P",
+    "astro": "D",
+    "astro_v1": "D",
+    "astro_muon_betas": "X",
+    "astro_v2": "D",
+    "astro_v2_gamma0": "h",
+    "astro_cautious": "X",
 }
 
 LABELS = {
-    "adamw": "AdamW", "adam": "Adam", "muon": "Muon", "normuon": "NorMuon",
-    "adamuon": "AdaMuon", "astro": "ASTRO", "astro_cautious": "ASTRO + mask",
+    "adamw": "AdamW",
+    "adam": "Adam",
+    "muon": "Muon",
+    "normuon": "NorMuon",
+    "adamuon": "AdaMuon",
     "soap": "SOAP",
+    "astro": "ASTRO (earlier recipe)",
+    "astro_v1": "ASTRO (earlier recipe)",
+    "astro_muon_betas": "ASTRO-MB",
+    "astro_v2": "ASTRO-v2",
+    "astro_v2_gamma0": r"ASTRO-v2 ($\gamma=0$)",
+    "astro_cautious": "ASTRO + mask",
 }
 
 
 def use_paper_style() -> None:
-    """Serif, thin spines, no top/right box -- the house style of the field."""
+    """Apply the global house style used by every paper plot."""
     mpl.rcParams.update({
         "figure.dpi": 160,
-        "savefig.dpi": 300,
+        "savefig.dpi": 350,
         "savefig.bbox": "tight",
-        "savefig.pad_inches": 0.02,
+        "savefig.pad_inches": 0.025,
+        "savefig.transparent": False,
         "font.family": "serif",
-        "font.serif": ["DejaVu Serif", "Times New Roman", "serif"],
+        "font.serif": ["DejaVu Serif", "Times New Roman", "Times", "serif"],
         "mathtext.fontset": "dejavuserif",
-        "font.size": 8,
-        "axes.labelsize": 8,
-        "axes.titlesize": 8,
-        "legend.fontsize": 7,
-        "xtick.labelsize": 7,
-        "ytick.labelsize": 7,
-        "axes.linewidth": 0.7,
+        "font.size": 8.2,
+        "axes.labelsize": 8.2,
+        "axes.titlesize": 8.5,
+        "legend.fontsize": 7.0,
+        "xtick.labelsize": 7.1,
+        "ytick.labelsize": 7.1,
+        "axes.linewidth": 0.65,
         "axes.spines.top": False,
         "axes.spines.right": False,
-        "grid.linewidth": 0.4,
-        "grid.alpha": 0.35,
-        "lines.linewidth": 1.4,
-        "lines.markersize": 3.5,
+        "axes.edgecolor": "#3C3C3C",
+        "axes.labelcolor": "#222222",
+        "text.color": "#222222",
+        "xtick.color": "#333333",
+        "ytick.color": "#333333",
+        "grid.color": "#D9D9D9",
+        "grid.linewidth": 0.45,
+        "grid.alpha": 0.75,
+        "lines.linewidth": 1.55,
+        "lines.markersize": 4.0,
         "legend.frameon": False,
-        "legend.handlelength": 1.6,
+        "legend.handlelength": 1.5,
+        "legend.handletextpad": 0.45,
+        "legend.columnspacing": 0.9,
         "xtick.direction": "out",
         "ytick.direction": "out",
+        "pdf.fonttype": 42,
+        "ps.fonttype": 42,
     })
 
 
-def figure(panels: int = 1, height: float = 2.1, width: float | None = None,
+def figure(panels: int = 1, height: float = 2.25, width: float | None = None,
            **kwargs: Any) -> tuple[plt.Figure, Any]:
-    """A row of ``panels`` axes spanning the text width."""
+    """Create a full-width row of paper axes."""
     use_paper_style()
     width = TEXT_WIDTH if width is None else width
     fig, axes = plt.subplots(1, panels, figsize=(width, height), **kwargs)
     return fig, axes
 
 
+def column_figure(height: float = 2.2, **kwargs: Any) -> tuple[plt.Figure, plt.Axes]:
+    """Create a single-column paper figure."""
+    use_paper_style()
+    fig, ax = plt.subplots(figsize=(COLUMN_WIDTH, height), **kwargs)
+    return fig, ax
+
+
 def label_panels(axes: Iterable[plt.Axes], start: str = "a") -> None:
-    """(a) (b) (c) beneath each panel, as the reference figures place them."""
+    """Place compact (a), (b), ... labels in the upper-left of each panel."""
     for index, ax in enumerate(axes):
-        ax.set_title(f"({chr(ord(start) + index)})", loc="left",
-                     fontsize=8, fontweight="bold", pad=4)
+        ax.text(0.0, 1.025, f"({chr(ord(start) + index)})",
+                transform=ax.transAxes, ha="left", va="bottom",
+                fontsize=8.2, fontweight="bold")
 
 
 def grid(ax: plt.Axes, axis: str = "both") -> None:
-    ax.grid(True, axis=axis, linestyle=":", zorder=0)
+    ax.grid(True, axis=axis, linestyle="-", zorder=0)
     ax.set_axisbelow(True)
 
 
 def annotate_value(ax: plt.Axes, x: float, y: float, text: str,
-                   dx: float = 0.0, dy: float = 8.0, **kwargs: Any) -> None:
-    """A number placed on the plot itself.
-
-    Every quantitative claim in a caption should be readable off the figure
-    without the caption, which is why the reference figures label their bars
-    and mark their averages inline.
-    """
+                   dx: float = 0.0, dy: float = 7.0, **kwargs: Any) -> None:
+    """Place a quantitative annotation without obscuring the data."""
     ax.annotate(text, (x, y), textcoords="offset points", xytext=(dx, dy),
-                ha=kwargs.pop("ha", "center"), fontsize=kwargs.pop("fontsize", 7),
+                ha=kwargs.pop("ha", "center"), fontsize=kwargs.pop("fontsize", 6.8),
                 **kwargs)
 
 
-def reference_line(ax: plt.Axes, value: float = 1.0, text: str | None = None,
+def reference_line(ax: plt.Axes, value: float = 0.0, text: str | None = None,
                    axis: str = "y") -> None:
-    """The 'no difference' line, drawn so a ratio panel reads at a glance."""
+    """Draw a quiet no-difference reference line."""
     draw = ax.axhline if axis == "y" else ax.axvline
     draw(value, color=COLORS["reference"], linestyle="--", linewidth=0.8, zorder=1)
     if text:
         if axis == "y":
             ax.annotate(text, (0.99, value), xycoords=("axes fraction", "data"),
-                        textcoords="offset points", xytext=(0, 3),
-                        ha="right", fontsize=6.5, color=COLORS["reference"])
+                        textcoords="offset points", xytext=(0, 3), ha="right",
+                        fontsize=6.4, color=COLORS["reference"])
         else:
             ax.annotate(text, (value, 0.98), xycoords=("data", "axes fraction"),
-                        textcoords="offset points", xytext=(3, 0),
-                        va="top", fontsize=6.5, color=COLORS["reference"],
-                        rotation=90)
+                        textcoords="offset points", xytext=(3, 0), va="top",
+                        fontsize=6.4, color=COLORS["reference"], rotation=90)
 
 
 def shade_between(ax: plt.Axes, x: Sequence[float], lower: Sequence[float],
-                  upper: Sequence[float], color: str, alpha: float = 0.15) -> None:
+                  upper: Sequence[float], color: str, alpha: float = 0.13) -> None:
     ax.fill_between(x, lower, upper, color=color, alpha=alpha, linewidth=0, zorder=1)
 
 
 def series(ax: plt.Axes, x, y, name: str, *, band=None, **kwargs: Any):
-    """Plot one optimizer with its assigned colour, marker and label."""
-    line = ax.plot(x, y, color=COLORS.get(name, "#333333"),
+    """Plot one optimizer with its globally assigned visual identity."""
+    line = ax.plot(x, y,
+                   color=COLORS.get(name, "#333333"),
                    marker=MARKERS.get(name, "o"),
                    label=kwargs.pop("label", LABELS.get(name, name)),
                    zorder=3, **kwargs)
@@ -149,13 +188,24 @@ def series(ax: plt.Axes, x, y, name: str, *, band=None, **kwargs: Any):
     return line
 
 
-def save(fig: plt.Figure, name: str, *, also_pdf: bool = True) -> Path:
-    """Write to artifacts/figures. PDF too, because that is what LaTeX wants."""
+def direct_label(ax: plt.Axes, x: float, y: float, name: str, *, dx: float = 5,
+                 dy: float = 0, **kwargs: Any) -> None:
+    """Direct-label a curve; preferred over legends when the panel has room."""
+    ax.annotate(LABELS.get(name, name), (x, y), textcoords="offset points",
+                xytext=(dx, dy), ha="left", va="center", fontsize=6.8,
+                color=COLORS.get(name, "#333333"), **kwargs)
+
+
+def save(fig: plt.Figure, name: str, *, also_pdf: bool = True,
+         also_svg: bool = False) -> Path:
+    """Write a high-resolution PNG and a vector PDF for LaTeX."""
     OUT.mkdir(parents=True, exist_ok=True)
     png = OUT / f"{name}.png"
-    fig.savefig(png)
+    fig.savefig(png, facecolor="white")
     if also_pdf:
-        fig.savefig(OUT / f"{name}.pdf")
+        fig.savefig(OUT / f"{name}.pdf", facecolor="white")
+    if also_svg:
+        fig.savefig(OUT / f"{name}.svg", facecolor="white")
     plt.close(fig)
     return png
 
@@ -166,12 +216,7 @@ def save(fig: plt.Figure, name: str, *, also_pdf: bool = True) -> Path:
 
 
 def write_data(name: str, payload: dict[str, Any]) -> Path:
-    """Every figure writes the numbers it drew.
-
-    A figure whose underlying numbers are not on disk cannot be checked by a
-    reader or regenerated after the plotting code changes, so this is not
-    optional bookkeeping -- it is what makes the figure evidence.
-    """
+    """Write the exact numbers behind a figure next to the image."""
     OUT.mkdir(parents=True, exist_ok=True)
     path = OUT / f"{name}.json"
     path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=_plain))
@@ -187,12 +232,7 @@ def _plain(value: Any) -> Any:
 
 
 def read_data(name: str, *, search: Sequence[Path] = ()) -> dict[str, Any] | None:
-    """Load a measurement JSON, searching the usual drop points.
-
-    Measurement happens on a GPU elsewhere and plotting happens here, so the
-    loader looks where an uploaded file plausibly landed rather than demanding
-    one path.
-    """
+    """Load a JSON measurement from the common paper/result locations."""
     candidates = [Path(name), OUT / name, OUT / f"{name}.json",
                   ROOT / name, ROOT / "artifacts" / name]
     candidates += [Path(directory) / name for directory in search]
@@ -203,7 +243,7 @@ def read_data(name: str, *, search: Sequence[Path] = ()) -> dict[str, Any] | Non
 
 
 def missing(name: str, produced_by: str) -> None:
-    """Say precisely what is absent and which command creates it."""
+    """Print an actionable message when a figure has no evidence yet."""
     print(f"  SKIP {name}: no measurement file found.")
     print(f"       produce it with: {produced_by}")
 
@@ -215,18 +255,7 @@ def missing(name: str, produced_by: str) -> None:
 
 def align_on_loss(reference_loss, reference_value, target_loss, target_value,
                   grid_points: int = 40):
-    """Interpolate two trajectories onto a shared validation-loss axis.
-
-    Comparing optimizers at matched *step* flatters whichever one is ahead: a
-    better optimizer is measured at a lower loss, where the landscape is
-    different. The curvature literature therefore compares at matched
-    validation loss, interpolating between checkpoints because two runs rarely
-    hit the same loss at a recorded step. We do the same, and this is the
-    function that does it.
-
-    Both trajectories are assumed to be monotonically decreasing in loss; the
-    returned grid covers only the overlap, so nothing is extrapolated.
-    """
+    """Interpolate two trajectories onto their shared validation-loss range."""
     reference_loss = np.asarray(reference_loss, dtype=float)
     target_loss = np.asarray(target_loss, dtype=float)
     reference_value = np.asarray(reference_value, dtype=float)
