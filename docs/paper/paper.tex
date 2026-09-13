@@ -1,7 +1,7 @@
-% ASTRO living research paper.  arXiv-friendly: standard packages, no shell escape.
+% ASTRO living research paper. arXiv-friendly: standard packages, no shell escape.
 \documentclass[10pt,twocolumn]{article}
 
-\usepackage[margin=0.72in]{geometry}
+\usepackage[margin=0.70in]{geometry}
 \usepackage{amsmath,amssymb,mathtools}
 \usepackage{booktabs}
 \usepackage{graphicx}
@@ -12,11 +12,14 @@
 \usepackage[hidelinks]{hyperref}
 \usepackage{url}
 \usepackage{caption}
+\usepackage{array}
 
 \definecolor{astropurple}{HTML}{7A3E9D}
-\definecolor{lightpurple}{HTML}{F5EFF8}
+\definecolor{astrolight}{HTML}{F6F1F9}
 \definecolor{muted}{HTML}{666666}
-\setlength{\columnsep}{0.24in}
+\definecolor{rulegray}{HTML}{D8D8D8}
+
+\setlength{\columnsep}{0.235in}
 \setlength{\parindent}{1em}
 \setlength{\parskip}{0pt}
 \captionsetup{font=small,labelfont=bf,skip=4pt}
@@ -29,242 +32,245 @@
 \newcommand{\NorMuon}{\textsc{NorMuon}}
 \newcommand{\AdaMuon}{\textsc{AdaMuon}}
 \newcommand{\norm}[1]{\lVert #1 \rVert}
+\newcommand{\good}[1]{\textcolor{astropurple}{\textbf{#1}}}
 \newcommand{\obs}[1]{%
-  \medskip\noindent\fcolorbox{astropurple!40}{lightpurple}{%
+  \medskip\noindent\fcolorbox{astropurple!38}{astrolight}{%
   \parbox{\dimexpr\columnwidth-2\fboxsep-2\fboxrule}{%
   \textbf{Observation.} #1}}\medskip}
 \newcommand{\pendingfig}[2]{%
-  \fbox{\parbox[c][1.55in][c]{0.95\linewidth}{\centering\small\color{muted}%
+  \fbox{\parbox[c][1.38in][c]{0.95\linewidth}{\centering\small\color{muted}%
   \textbf{#1}\\[3pt]#2}}}
 \newcommand{\maybegraphic}[3][\linewidth]{%
   \IfFileExists{../../artifacts/figures/#2.pdf}%
     {\includegraphics[width=#1]{../../artifacts/figures/#2.pdf}}%
     {\pendingfig{Figure pending}{#3}}}
 
-\title{\vspace{-1.2em}\textbf{ASTRO: Auditing and Improving Matrix-Structured\\Optimizers for Language Model Training}}
-\author{Pop Alexandru\\\small Independent Researcher\\\small \url{https://github.com/pop123-ux/ASTRO}}
-\date{September 2026 \;---\; living research draft}
-
 \begin{document}
-\maketitle
-\vspace{-1.1em}
 
-\begin{abstract}
-Matrix-structured optimizers such as \Muon, \NorMuon, and \AdaMuon improve
-language-model training by transforming matrix-valued updates rather than
-treating every parameter independently. We document the development of \ASTRO,
-a Muon-family optimizer and an experimental framework for asking which apparent
-optimizer improvements survive fair tuning, longer horizons, larger models,
-independent seeds, and wall-clock accounting.
+% ---------------------------------------------------------------------------
+% First-page full-width title, abstract, and headline figure.
+% ---------------------------------------------------------------------------
+\twocolumn[
+\begin{@twocolumnfalse}
+\hrule height 1.1pt
+\vspace{0.70em}
+\begin{center}
+{\Large\bfseries ASTRO: Auditing and Improving Matrix-Structured\\
+Optimizers for Language Model Training\par}
+\vspace{0.48em}
+{\small\scshape Technical Report · Living Research Draft\par}
+\vspace{0.65em}
+{\normalsize Pop Alexandru\par}
+{\small Independent Researcher · \url{https://github.com/pop123-ux/ASTRO}\par}
+{\small September 2026\par}
+\end{center}
+\vspace{0.42em}
+\hrule height 0.75pt
+\vspace{0.85em}
 
-The current \ASTROv recipe keeps Muon-style spectral updates, splits fused Q/K/V
-blocks, applies a norm-preserving neuron-wise second moment after the polar step,
-and routes non-operator parameters through an Adam-like scalar path. It also
-removes two choices that ablation showed were harmful or accidental: the scalar
-path no longer inherits spectral-path $\beta_1=0.95$, and cautious weight decay
-is disabled. At GPT-2 124M and 900 steps, a targeted three-configuration study
-gives mean paired validation-loss differences versus Muon of \textbf{-0.2208}
-for \ASTROv, \textbf{-0.2137} for the beta-aligned ASTRO-MB variant, and
-\textbf{-0.2047} when post-polar variance power is removed. All three variants
-win all three shared configurations, but configurations are not independent
-seeds. \ASTROv costs about \textbf{6.4\%} more wall-clock per 900-step run.
+\begin{minipage}{0.94\textwidth}
+\small
+\textbf{Abstract.}
+Matrix-structured optimizers such as \Muon, \NorMuon, and \AdaMuon transform
+matrix-valued updates rather than treating every parameter independently. We
+document the development of \ASTRO, a Muon-family optimizer, together with an
+experimental framework for testing whether an apparent optimizer improvement
+survives shared hyperparameters, longer horizons, independent seeds, model
+scale, and wall-clock accounting.
 
-The evidence is promising but mixed. In an independently tuned 300-step 124M
-benchmark, the earlier/plain ASTRO recipe is \textbf{+0.0180} validation loss
-worse than Muon. The current horizon study is complete only at 300 and 600
-steps, while independent-seed replication and the first 355M test are in
-progress. A second line of evidence shows that fused spectral treatment can
-allocate update mass strongly toward V, whereas splitting Q/K/V substantially
-balances it. We therefore frame the current hypothesis narrowly: \ASTROv may
-primarily improve \emph{robustness to hyperparameter choice}, rather than
-uniformly shifting the best achievable loss. The paper preserves negative runs
-and withdrawn explanations as first-class evidence rather than hiding the path
-to the current recipe.
-\end{abstract}
+The current \ASTROv recipe keeps Muon-style spectral updates, splits fused
+Q/K/V blocks before the polar transform, applies a norm-preserving row-wise
+second moment after that transform, and routes non-operator parameters through
+an Adam-like scalar path. At GPT-2 124M and 900 steps, the completed five-setting
+shared grid gives a mean paired validation-loss difference of
+\good{-0.0816} versus Muon, with ASTRO-v2 better in \good{3/5} settings. The
+best ASTRO-v2 setting in that grid reaches \good{5.8102} validation loss versus
+Muon's best \good{5.9286}, although those two minima occur at different
+hyperparameters and are therefore not a paired comparison. A separate targeted
+three-setting mechanism study gives mean paired deltas of \good{-0.2208} for
+ASTRO-v2, -0.2137 for ASTRO-MB, and -0.2047 with the post-polar variance power
+removed. The same study measures about \textbf{6.4\%} additional wall-clock per
+900-step ASTRO-v2 run.
+
+The evidence is promising but not yet a universal optimizer claim. The earlier
+ASTRO recipe loses to Muon in a tuned 300-step benchmark; the 2700-step horizon
+is unfinished; seven frozen-config Muon seeds are measured while matched
+ASTRO-v2 seeds remain pending; and a clean 355M comparison must be rerun under a
+matching code fingerprint. The emerging hypothesis is therefore narrower:
+ASTRO-v2 may improve \emph{robustness to hyperparameter choice}, while a simpler
+subset of its recipe carries most of the gain.
+\end{minipage}
+
+\vspace{0.8em}
+\begin{center}
+\maybegraphic[0.96\textwidth]{fig_optimizer_journey}{Render the optimizer journey.}
+\captionof{figure}{\textbf{ASTRO's current optimizer journey.} Left: one shared
+124M/900 configuration comparing Muon, NorMuon, AdaMuon, ASTRO-MB, and
+ASTRO-v2. Right: paired deltas versus Muon across the targeted mechanism study.
+The largest separation appears under the aggressive learning-rate setting,
+which motivates a robustness hypothesis rather than a universal-ranking claim.}
+\label{fig:hero}
+\end{center}
+\vspace{0.65em}
+\end{@twocolumnfalse}
+]
 
 \section{Introduction}
 
-Muon made a simple idea operational: hidden weight matrices should be optimized
-as matrices, not merely as bags of coordinates \citep{jordan2024muon}. Later
-methods add adaptivity after orthogonalization, notably \NorMuon
-\citep{li2025normuon} and \AdaMuon \citep{si2025adamuon}. At the same time,
-large comparative studies show that optimizer rankings depend strongly on
-hyperparameter tuning, model scale, data budget, and the training horizon at
-which performance is read out \citep{wen2025fantastic}.
+Muon made a simple idea practical: hidden weight matrices can be optimized as
+matrices rather than only as collections of scalar coordinates
+\citep{jordan2024muon}. Subsequent work has improved Muon's scaling and
+post-orthogonalization adaptivity, including large-scale Muon training
+\citep{liu2025scalable}, \NorMuon \citep{li2025normuon}, and \AdaMuon
+\citep{si2025adamuon}. At the same time, comparative studies show that optimizer
+rankings depend on search budget, model scale, data budget, and training horizon
+\citep{wen2025fantastic}.
 
-These facts make new optimizer results easy to overstate. A method can appear
-better because its search range is better centered, because an auxiliary
-Adam-like path was tuned differently, because training ended at a favorable
-intermediate point, or because the method simply performs more computation per
-step. ASTRO began as an attempt to add additional control to Muon-family
-updates. The project changed direction as experiments invalidated parts of the
-original explanation.
+That makes optimizer research unusually easy to overstate. A method can look
+better because its learning-rate range is better centered, because an auxiliary
+Adam-like path was tuned differently, because the comparison ends at a favorable
+intermediate point, or simply because the method performs more work per step.
+ASTRO began as an attempt to add additional control to Muon-family updates. The
+project changed direction as experiments invalidated parts of the original
+explanation.
 
-This paper therefore makes two contributions. First, we study the current
-\ASTROv recipe against modern Muon-family baselines. Second, we treat the
-\emph{research process itself} as part of the artifact: shared configurations
-are distinguished from shared seeds, wall-clock cost accompanies step-matched
-loss, negative experiments remain visible, and incomplete cells stay visibly
-incomplete in both plots and prose.
+This report therefore treats the \emph{research path} as part of the artifact.
+Negative runs are retained, shared configurations are distinguished from shared
+seeds, code fingerprints are recorded, missing measurements remain visibly
+missing, and step-matched loss is separated from compute-matched efficiency.
 
 \paragraph{Contributions.}
 \begin{enumerate}
   \item A PyTorch implementation of ASTRO that subclasses
-  \texttt{torch.optim.Optimizer} for state management while implementing the
-  matrix update explicitly.
-  \item A 124M comparison to Muon, NorMuon, and AdaMuon that documents both the
-  optimizer journey and the current ASTRO-v2 recipe.
-  \item An ablation showing that ASTRO-MB captures almost all of the current
-  ASTRO-v2 gain, while setting the post-polar variance power to zero preserves
-  most of it.
-  \item A QKV allocation analysis showing that fused spectral treatment can
-  produce strongly imbalanced update allocation, while block-wise treatment
-  restores substantially more balanced Q/K/V allocation.
+  \texttt{torch.optim.Optimizer} for state and parameter-group management while
+  implementing the matrix update explicitly.
+  \item A modern 124M comparison to Muon, NorMuon, and AdaMuon, including the
+  path from earlier ASTRO variants to ASTRO-MB and ASTRO-v2.
+  \item A completed 300/600/900-step shared-configuration horizon showing
+  negative mean paired deltas at all three measured horizons, while preserving
+  the fact that ASTRO-v2 does not win every setting.
+  \item A mechanism study showing that ASTRO-MB captures most of the current
+  ASTRO-v2 gain and that removing variance-power adaptation preserves most of it.
   \item A reproducible paper pipeline: committed JSON is the evidence layer,
-  Matplotlib generates publication figures, W\&B is optional, and the LaTeX
-  source renders visible placeholders for missing measurements.
+  Matplotlib emits vector figures, W\&B is optional, and CI compiles the paper.
 \end{enumerate}
 
 \section{Background}
 
 \subsection{Muon}
+For a matrix-valued gradient $G_t$, Muon maintains momentum and applies a short
+Newton--Schulz-style matrix iteration approximating the polar factor. If
+$M=U\Sigma V^\top$, the idealized direction is $UV^\top$. Practical Muon uses
+this path for hidden operators and an AdamW-like auxiliary path for embeddings,
+biases, norms, and other parameters \citep{jordan2024muon,liu2025scalable}.
 
-For a matrix gradient $G_t$, Muon maintains momentum and applies a short
-Newton--Schulz-style iteration that approximates the polar factor of the
-momentum matrix. If $M=U\Sigma V^\top$, the idealized transform is $UV^\top$.
-Practical Muon uses this matrix path for hidden operators and an AdamW-like
-auxiliary path for embeddings, biases, norms, and other non-matrix parameters.
-
-The numerical subroutine is itself an active research topic. Polar Express
-shows that changing the polynomial across iterations can improve approximation
-quality while remaining GPU-friendly \citep{amsel2025polar}.
+Large-scale Muon work shows that weight decay and update-RMS scaling matter for
+scalability, and reports substantial compute-efficiency gains over AdamW in its
+own scaling-law setting \citep{liu2025scalable}. Those results make Muon a
+stronger baseline than a small-scale prototype implementation.
 
 \subsection{NorMuon and AdaMuon}
-
-NorMuon adds one adaptive second-moment statistic per output neuron after
-orthogonalization and preserves the total update norm
-\citep{li2025normuon}. AdaMuon applies element-wise adaptivity to the
-orthogonalized update and aligns the RMS of the resulting direction
-\citep{si2025adamuon}. They are important baselines because they test whether
-post-spectral adaptation improves only peak loss or also the region of stable
+\NorMuon adds neuron-wise adaptivity after orthogonalization while preserving the
+total update norm \citep{li2025normuon}. \AdaMuon uses finer-grained adaptivity
+on the orthogonalized direction \citep{si2025adamuon}. They are useful ASTRO
+baselines because the present question is not merely whether adaptation exists,
+but where it is placed and whether it widens the region of stable
 hyperparameters.
 
-\subsection{Why horizon and scale matter}
+\subsection{Why horizon, scale, and compute matter}
+Optimizer rankings can change with training budget and scale
+\citep{wen2025fantastic}. A more expensive optimizer can also win at equal steps
+while losing at equal wall-clock. We therefore treat 124M/300, 124M/900,
+124M/2700, and 355M/900 as distinct empirical questions and report measured run
+time alongside loss.
 
-Wen et al. compare optimizers across model sizes and data/model ratios and show
-that fair conclusions require optimizer-specific tuning and evaluation at the
-intended final budget; rankings can change at intermediate checkpoints and
-reported speedups shrink with scale \citep{wen2025fantastic}. We therefore treat
-124M/300, 124M/900, and 355M as separate empirical questions.
+\section{ASTRO-v2}
 
-Recent curvature work provides a complementary view: at matched validation
-loss, Muon's advantage over Adam is associated with lower normalized
-directional sharpness rather than simply smaller update norms
-\citep{wang2026curvature}. Our current paper does not yet claim a curvature
-explanation for ASTRO-v2; the repository contains instrumentation for such a
-follow-up.
-
-\section{Current ASTRO}
-
-\subsection{Routing}
-
-The current reference implementation is \texttt{class Astro(torch.optim.Optimizer)}
-in \texttt{scripts/astro\_lab.py}. Subclassing PyTorch's optimizer base supplies
-parameter groups, state, serialization, and interoperability; it does not supply
-the ASTRO update.
-
-Parameters are routed structurally. Genuine hidden 2-D operators take the
+\subsection{Parameter routing}
+The reference implementation is \texttt{class Astro(torch.optim.Optimizer)} in
+\texttt{scripts/astro\_lab.py}. Hidden two-dimensional operators take the
 spectral path. Embeddings, the tied output head, biases, normalization
-parameters, and other non-operators take an Adam-like scalar path. HuggingFace
-GPT-2 \texttt{Conv1D} weights are transposed into operator orientation. Fused
+parameters, and other non-operators take an Adam-like scalar path. GPT-2
+\texttt{Conv1D} projections are interpreted in operator orientation, and fused
 attention projections can be split into Q, K, and V blocks before the spectral
 transform.
 
 \subsection{Spectral path}
-
 ASTRO maintains momentum
 \begin{equation}
 M_t = \beta_1 M_{t-1} + (1-\beta_1)G_t,
 \end{equation}
-forms a Nesterov-style lookahead, and applies the approximate polar transform
-block-by-block to obtain $Q_t$. It then tracks a row-wise second moment on the
-\emph{orthogonalized} direction,
+forms a Nesterov-style lookahead, and applies the approximate polar transform to
+obtain $Q_t$. A row-wise second moment is tracked on the orthogonalized
+direction,
 \begin{equation}
 v_t = \beta_2 v_{t-1} + (1-\beta_2)\operatorname{rowmean}(Q_t^2),
 \end{equation}
-and redistributes the direction according to
+then used to redistribute update energy,
 \begin{equation}
 \widetilde Q_t = Q_t \oslash \widehat v_t^{\gamma/2}.
 \end{equation}
-The original Frobenius norm is restored,
+The Frobenius norm is restored afterward,
 \begin{equation}
 D_t = \widetilde Q_t\frac{\norm{Q_t}_F}{\norm{\widetilde Q_t}_F},
 \end{equation}
-so this stage mainly redistributes update energy rather than changing the total
-step magnitude.
+so this stage primarily changes \emph{where} update energy is placed rather than
+simply enlarging the global step.
 
-\subsection{ASTRO-v2 is a recipe}
-
-ASTRO-v2 is not a second optimizer class. The harness instantiates the same
-\texttt{Astro} implementation with
+\subsection{V2 is a recipe, not a second optimizer class}
+ASTRO-v2 instantiates the same \texttt{Astro} class with
 \begin{verbatim}
 "astro_v2": {
   "betas": (0.9, 0.95),
   "cautious_wd": False,
 }
 \end{verbatim}
-The earlier recipe used $\beta_1=0.95$ on both spectral and scalar groups, even
-though Muon's Adam-like auxiliary path uses $0.9$. This meant a substantial
-fraction of GPT-2 could differ before any matrix geometry was considered.
-ASTRO-v2 removes this asymmetry and disables cautious weight decay.
-
-ASTRO-MB isolates the beta alignment while retaining cautious weight decay.
-ASTRO-v2-$\gamma0$ additionally disables the post-polar variance-power effect.
-These variants are the main attribution controls in the current study.
+The earlier recipe used $\beta_1=0.95$ on both spectral and scalar groups even
+though Muon's Adam-like auxiliary path uses $0.9$. ASTRO-v2 removes that
+asymmetry and disables cautious weight decay. \texttt{astro\_muon\_betas}
+(ASTRO-MB) isolates the beta alignment, while \texttt{astro\_v2\_gamma0}
+removes the variance-power effect.
 
 \section{Experimental protocol}
 
-\subsection{Model, data, and validation}
+\subsection{Model and data}
+The principal experiments train GPT-2-style causal language models from scratch
+on FineWeb-Edu with GPT-2 BPE. The main model is approximately 124M parameters,
+with 12 layers, 12 heads, width 768, and sequence length 512. Validation is
+pinned to the same first 400,000 tokens at every horizon so changing training
+budget cannot silently change the evaluation text.
 
-The scale campaign trains GPT-2-style causal language models from scratch on
-FineWeb-Edu with GPT-2 BPE. The principal model has 12 layers, 12 heads, width
-768, and approximately 124M parameters. Sequence length is 512. The first scale
-check uses a 355M configuration.
-
-Validation is pinned to the same 400,000-token slice at every training horizon.
-This corrects an earlier protocol in which changing the maximum training budget
-could also change the validation text.
-
-\subsection{Two different kinds of pairing}
-
-We use two distinct experimental units:
+\subsection{Pairing and provenance}
+We distinguish two experimental units:
 \begin{itemize}
-  \item \textbf{shared configurations}: both optimizers receive the same
-  learning rate, weight decay, and scalar-path multiplier; this measures
-  sensitivity and robustness;
-  \item \textbf{shared seeds}: frozen configurations are rerun with identical
-  stochastic seeds; this measures stochastic reproducibility.
+  \item \textbf{shared configurations}: optimizers see the same learning rate,
+  weight decay, and scalar-path multiplier; this probes sensitivity and
+  robustness;
+  \item \textbf{shared seeds}: frozen optimizer-specific configurations are
+  rerun under the same stochastic seeds; this probes reproducibility.
 \end{itemize}
-Three configurations are not three seeds, and the paper never uses one as a
-surrogate for the other.
+Three configurations are not three seeds.
 
-\subsection{Compute accounting}
+The current 124M horizon and seed-replication evidence were produced by
+\texttt{astro\_lab.py} fingerprint \texttt{7b321ff7fda3}. A partial 355M run used
+fingerprint \texttt{56581ade7398}; because that provenance differs, the partial
+355M numbers are excluded from paper-facing evidence and a clean rerun is
+required.
 
-A step-matched win is not automatically a compute win. We therefore report
-wall-clock per run and prepare frozen validation trajectories for both
-loss-vs-step and loss-vs-time comparisons. In the current targeted 124M/900
-experiment, ASTRO-v2 costs about 6.4\% more wall-clock than Muon.
+\subsection{Metrics}
+The primary metric is validation cross-entropy loss. We additionally record
+wall-clock seconds per run, paired deltas versus Muon, the number of settings won,
+and eventually time-to-target from frozen validation trajectories.
 
-\section{Current results}
+\section{Results}
 
-\subsection{Negative evidence at 300 steps}
-
-The expanded tuned 124M/300 benchmark gives Table~\ref{tab:300}.
+\subsection{Negative evidence: the earlier ASTRO recipe}
+An expanded tuned 124M/300 benchmark gives Table~\ref{tab:300}.
 
 \begin{table}[t]
 \centering
-\caption{GPT-2 124M, 300 steps, three evaluation seeds. Lower is better. The
-ASTRO row is the earlier/plain recipe, not ASTRO-v2.}
+\caption{GPT-2 124M, 300 steps, three evaluation seeds. The ASTRO row is the
+earlier recipe, not ASTRO-v2. Lower is better.}
 \label{tab:300}
 \small
 \begin{tabular}{lrr}
@@ -279,65 +285,62 @@ AdamW & 6.8445 & +0.2087 \\
 \end{tabular}
 \end{table}
 
-\obs{The ASTRO-v2 story cannot be back-projected onto earlier ASTRO runs: at
-124M/300, the earlier recipe is worse than Muon under the expanded tuned
+\obs{The current ASTRO-v2 story cannot be back-projected onto earlier ASTRO
+runs: at 124M/300 the earlier recipe is worse than Muon under the expanded tuned
 benchmark.}
 
-\subsection{The optimizer journey at 124M/900}
+\subsection{Complete five-setting 124M/900 comparison}
+The shared-grid 900-step cell is now complete. Figure~\ref{fig:paired900} shows
+all five pairings instead of only each optimizer's best draw.
 
-At one shared configuration, the modern Muon-family comparison is shown in
-Table~\ref{tab:shared} and Figure~\ref{fig:journey}.
+\begin{figure}[t]
+\centering
+\maybegraphic{fig_paired_900}{Render \texttt{paired\_900}.}
+\caption{\textbf{All five shared 124M/900 configurations.} Grey segments connect
+Muon and ASTRO-v2 under identical hyperparameters. Negative annotated deltas
+favor ASTRO-v2. The mean paired delta is -0.0816 and 3/5 settings favor
+ASTRO-v2.}
+\label{fig:paired900}
+\end{figure}
 
 \begin{table}[t]
 \centering
-\caption{One shared GPT-2 124M/900 configuration:
-$\eta=0.010206$, weight decay $0.001060$, scalar multiplier $0.4369$. This is a
-pointwise comparison, not a tuned global ranking.}
-\label{tab:shared}
+\caption{Completed 124M/900 shared-grid summary. ``Best'' values are selected
+within the same five-setting grid but need not come from the same setting.}
+\label{tab:900}
 \small
 \begin{tabular}{lrr}
 \toprule
-Optimizer & Val. loss & $\Delta$ vs Muon \\
+Quantity & Muon & ASTRO-v2 \\
 \midrule
-\textbf{ASTRO-v2} & \textbf{5.9208} & \textbf{-0.0827} \\
-ASTRO-MB & 5.9226 & -0.0809 \\
-AdaMuon & 6.0028 & -0.0007 \\
-Muon & 6.0035 & 0.0000 \\
-NorMuon & 6.0155 & +0.0121 \\
+Best val. loss in grid & 5.9286 & \textbf{5.8102} \\
+Settings won & 2/5 & \textbf{3/5} \\
+Mean paired $\Delta$ & \multicolumn{2}{c}{\textbf{-0.0816}} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\begin{figure*}[t]
-\centering
-\maybegraphic[0.96\textwidth]{fig_optimizer_journey}{Run
-\texttt{python scripts/figures/make\_all.py --only optimizer\_journey}.}
-\caption{\textbf{The optimizer journey.} Left: Muon, contemporary adaptive Muon
-variants, and the current ASTRO variants at one shared configuration. Right:
-paired deltas versus Muon across the three targeted mechanism settings. The
-aggressive-LR configuration creates the largest separation, motivating a
-robustness hypothesis rather than a universal-ranking claim.}
-\label{fig:journey}
-\end{figure*}
+The individual paired deltas are approximately $-0.091$, $+0.067$, $-0.108$,
+$+0.006$, and $-0.283$. The last setting produces a large separation, while two
+settings are neutral or unfavorable.
 
-\obs{At this shared 124M/900 setting, almost the entire separation from Muon is
-already present in ASTRO-MB; ASTRO-v2 improves on ASTRO-MB by only about 0.002
-validation loss.}
+\obs{ASTRO-v2 is not uniformly better across the search space. The current
+signal is consistent with a wider or more forgiving stable region rather than a
+simple constant downward shift in loss.}
 
 \subsection{Targeted mechanism study}
-
-Across three shared settings, the mean paired deltas versus Muon are shown in
-Table~\ref{tab:mechanism}.
+A separate three-setting experiment compares Muon, ASTRO-MB, ASTRO-v2, and
+ASTRO-v2 with $\gamma=0$.
 
 \begin{table}[t]
 \centering
-\caption{Targeted 124M/900 mechanism experiment. Settings are shared
-hyperparameter configurations, not independent seeds.}
+\caption{Targeted 124M/900 mechanism experiment. Rows report mean paired delta
+versus Muon across three shared hyperparameter settings.}
 \label{tab:mechanism}
 \small
 \begin{tabular}{lrr}
 \toprule
-Variant & Mean $\Delta$ vs Muon & Settings won \\
+Variant & Mean $\Delta$ & Settings won \\
 \midrule
 \textbf{ASTRO-v2} & \textbf{-0.2208} & \textbf{3/3} \\
 ASTRO-MB & -0.2137 & 3/3 \\
@@ -347,38 +350,20 @@ ASTRO-v2 ($\gamma=0$) & -0.2047 & 3/3 \\
 \end{table}
 
 The largest gap occurs at $\eta\approx0.0505$, where Muon reaches 6.4527 while
-ASTRO-v2 remains at 5.9436. At the milder settings, the gaps are substantially
-smaller.
+ASTRO-v2 remains at 5.9436. At milder settings the gaps are much smaller.
 
-\obs{Current evidence points more strongly toward \textbf{hyperparameter
-robustness} than toward the post-polar variance-power term as the main source of
-ASTRO-v2's advantage.}
+\obs{Most of the measured ASTRO-v2 advantage survives removal of the
+variance-power term and is already present in ASTRO-MB. The most distinctive
+mathematical component is therefore not automatically the component carrying the
+result.}
 
-\subsection{Compute cost}
-
-\begin{figure}[t]
-\centering
-\maybegraphic{fig_efficiency_v2}{Run
-\texttt{python scripts/figures/make\_all.py --only efficiency\_v2}.}
-\caption{Validation loss against measured wall-clock for the three targeted
-settings. Thin connectors join optimizers evaluated at the same hyperparameter
-configuration. Lower-left is better.}
-\label{fig:efficiency}
-\end{figure}
-
-Muon takes about 787 seconds per 900-step run in the targeted study; ASTRO-v2
-about 838 seconds, a mean overhead of roughly 6.4\%.
-
-\obs{ASTRO-v2's current result is a better-loss-at-equal-steps result. A full
-time-matched or time-to-target experiment is required before calling it a
-training-efficiency improvement.}
-
-\subsection{Horizon: incomplete by design}
+\subsection{Horizon through 900 steps}
+The 300, 600, and 900 cells are complete; 2700 remains pending.
 
 \begin{table}[t]
 \centering
-\caption{Current ASTRO-v2 horizon state. The 900 and 2700 cells are incomplete
-and must not be interpreted as final averages.}
+\caption{Current 124M horizon state. Mean deltas are ASTRO-v2 minus Muon across
+five shared configurations.}
 \label{tab:horizon}
 \small
 \begin{tabular}{lrrr}
@@ -387,52 +372,72 @@ Steps & Completed & Mean $\Delta$ & Wins \\
 \midrule
 300 & 5/5 & -0.0500 & 2/5 \\
 600 & 5/5 & -0.0541 & 3/5 \\
-900 & \textbf{2/5} & -0.0118 so far & 1/2 \\
-2700 & \textbf{0/5} & pending & pending \\
+900 & 5/5 & \textbf{-0.0816} & 3/5 \\
+2700 & 0/5 & pending & pending \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{figure}[t]
 \centering
-\maybegraphic{fig_horizon_v2}{Finish the horizon state or render the current
-partial figure with \texttt{make\_all.py --only horizon\_v2}.}
-\caption{Paired ASTRO-v2 minus Muon validation-loss deltas through training.
-Filled diamonds denote complete cells; an open diamond denotes a partial cell.
-Individual points are shared configurations.}
+\maybegraphic{fig_horizon_v2}{Render \texttt{horizon\_v2}.}
+\caption{\textbf{Horizon evidence.} Small points are paired deltas for shared
+configurations and diamonds are cell means. The 2700 marker is an experiment
+slot, not an estimate.}
 \label{fig:horizon}
 \end{figure}
 
-One favorable configuration stays near $-0.09$ from 300 through 900 steps. A
-second configuration remains unfavorable, so the effect is not uniform across
-the search space.
+\obs{The mean paired margin is negative at 300, 600, and 900 steps, but the
+current data do not establish whether the effect survives 2700 steps.}
 
-\obs{The current horizon data are consistent with a persistent effect at some
-configurations, but they do not yet determine the final 900- or 2700-step
-average trend.}
-
-\subsection{Training trajectories}
-
-\begin{figure*}[t]
+\subsection{Compute cost}
+\begin{figure}[t]
 \centering
-\maybegraphic[0.96\textwidth]{fig_training_trajectories}{Generate frozen
-validation trajectories with \texttt{scripts/paper/run\_trajectory.py}.}
-\caption{Planned final learning-dynamics figure. Left: validation loss versus
-training step. Right: the same trajectories versus measured training wall-clock
-with validation-probe time removed. These runs are generated only after
-configurations are frozen.}
-\label{fig:trajectories}
-\end{figure*}
+\maybegraphic{fig_efficiency_v2}{Render \texttt{efficiency\_v2}.}
+\caption{Validation loss against measured wall-clock in the targeted mechanism
+study. Thin connectors join identical hyperparameter settings. Lower-left is
+better.}
+\label{fig:efficiency}
+\end{figure}
 
-This figure is intentionally allowed to remain a visible placeholder in a living
-draft. The paper build must never reuse an old trajectory merely because a new
-one is absent.
+Muon takes roughly 787 seconds per 900-step run in the targeted study and
+ASTRO-v2 roughly 838 seconds, a mean overhead of about 6.4\%.
+
+\obs{The current claim is ``better loss at equal steps,'' not ``faster
+training.'' A time-matched trajectory or time-to-target study is required before
+making an efficiency claim.}
+
+\subsection{Independent-seed replication: partially measured}
+Seven Muon seeds have completed under a frozen selected configuration. Their
+mean validation loss is 5.9953 with sample standard deviation 0.0158. The
+corresponding ASTRO-v2 seeds have not yet been measured, so no paired seed claim
+is made.
+
+\begin{figure}[t]
+\centering
+\maybegraphic{fig_seed_replication}{Render \texttt{seed\_replication}.}
+\caption{\textbf{Replication status.} Seven Muon seeds are measured; the open
+ASTRO-v2 marker is explicitly pending. Once matched ASTRO-v2 seeds are added,
+the same script switches to paired seed connectors automatically.}
+\label{fig:seeds}
+\end{figure}
+
+\subsection{Scale: intentionally not inferred}
+A partial 355M run used a different source fingerprint from the 124M evidence.
+We therefore exclude it instead of mixing implementations in one scale curve.
+
+\begin{figure}[t]
+\centering
+\maybegraphic{fig_scale_status}{Render \texttt{scale\_status}.}
+\caption{\textbf{Scale-study status.} The 124M point is paper-eligible. Open
+355M and 774M markers are experiment slots, not extrapolations.}
+\label{fig:scale}
+\end{figure}
 
 \section{Fused QKV allocation}
-
 A fused attention projection stores Q, K, and V in one matrix. A spectral
 transform can be mathematically valid for that fused matrix while distributing
-update energy unevenly among the three operators inside it.
+update energy unevenly among the operators inside it.
 
 \begin{table}[t]
 \centering
@@ -451,108 +456,88 @@ Pythia-410M & .218/.248/\textbf{.534} & .356/.300/.344 \\
 \end{tabular}
 \end{table}
 
-The corresponding gradient V/Q ratios are approximately $2.65\times$,
-$3.27\times$, and $3.28\times$. Early GPT-2 layers can be more extreme. Random
-initialization also exhibits V-skew, so training is not claimed as the sole
-cause.
+Gradient V/Q ratios in these examples are approximately $2.65\times$,
+$3.27\times$, and $3.28\times$. Random-initialization controls also show V-skew,
+so training is not claimed as the sole cause.
 
 \obs{Fused spectral treatment can produce strongly imbalanced Q/K/V allocation,
 while block-wise treatment restores substantially more balanced allocation. The
 imbalance is architecture- and stage-dependent rather than purely learned during
 training.}
 
-Splitting itself has a cost: earlier T4 timing in this repository shows that
-block-wise orthogonalization becomes materially more expensive at larger widths.
-This motivates testing a scheduled split instead of assuming that a permanent
-split is always optimal.
-
 \section{Research journey and corrections}
 
-\subsection{A shared learning rate was not a fair comparison}
+\paragraph{Shared learning rate was not enough.}
+Early runs forced Muon and ASTRO to share one learning rate despite different
+spectral and scalar-path calibration. Opposite conclusions appeared at different
+fixed rates, motivating optimizer-specific tuning and shared-configuration
+robustness analysis.
 
-Early runs forced Muon and ASTRO to share one learning rate even though their
-spectral and scalar update scales were not calibrated identically. Opposite
-conclusions appeared at different fixed rates. This motivated optimizer-specific
-tuning and the present shared-configuration design.
+\paragraph{The scalar path mattered more than expected.}
+ASTRO originally used $\beta_1=0.95$ for both matrix and scalar groups, whereas
+Muon's auxiliary Adam path uses $0.9$. Aligning this behavior produced a larger
+change than several more elaborate spectral modifications.
 
-\subsection{The scalar path mattered more than expected}
+\paragraph{Cautious weight decay was not a free safety mechanism.}
+A masked decay rule changes effective regularization unless survivors are
+rescaled. ASTRO-v2 therefore disables cautious weight decay rather than treating
+it as a harmless default.
 
-ASTRO originally used $\beta_1=0.95$ for both matrix and scalar groups. Muon's
-auxiliary Adam path uses $0.9$. Aligning that scalar behavior produced a larger
-improvement than several more elaborate spectral changes.
-
-\subsection{Cautious weight decay was not a free safety mechanism}
-
-A masked weight decay deletes decay where the mask fails. Unless survivors are
-rescaled, the method silently changes effective regularization. ASTRO-v2 disables
-this mechanism rather than treating it as a harmless default.
-
-\subsection{Variance power is not yet the headline mechanism}
-
+\paragraph{Variance power is not yet the headline mechanism.}
 Setting $\gamma=0$ loses only about 0.016 validation loss on average relative to
-full ASTRO-v2 in the targeted run while retaining a large advantage versus Muon.
-The most mathematically distinctive component is therefore not automatically the
-component carrying the result.
+full ASTRO-v2 in the targeted run while preserving most of the advantage versus
+Muon.
 
-The repository retains \texttt{artifacts/measured.json} as a historical ledger
-and uses the smaller \texttt{artifacts/paper\_results.json} as the current
-paper-facing snapshot.
+\paragraph{Provenance is part of the experiment.}
+The repository records a source fingerprint at startup. The mismatched partial
+355M run is kept in the research log but excluded from the paper-facing scale
+figure. This is intentionally stricter than silently treating all runs as
+interchangeable.
 
-\section{What must be completed before submission}
+\section{Limitations and remaining experiments}
+The strongest current evidence remains at 124M. The complete 900-step grid is
+configuration-paired rather than seed-paired. The independent-seed experiment is
+only half complete. The 2700-step horizon is unmeasured, and the clean 355M
+rerun has not yet been completed. ASTRO-v2 is also measurably more expensive per
+step than Muon.
 
-\paragraph{Horizon.} Complete the remaining 900-step settings and all five
-2700-step settings.
-
-\paragraph{Independent seeds.} Freeze configurations first, then evaluate shared
-seeds. In the current CLI, \texttt{--seeds 3} means seeds 100, 101, and 102;
-\texttt{--seeds 100} means one hundred seeds.
-
-\paragraph{Scale.} The first 355M/900 shared-configuration comparison is the
-cheapest falsification of a small-model-only effect.
-
-\paragraph{Time matching.} Generate frozen validation trajectories and report
-both equal-step and equal-wall-clock results, preferably including time-to-target.
-
-\section{Limitations}
-
-The strongest current ASTRO-v2 result is a configuration-paired result, not yet
-an independent-seed result. The principal scale is only 124M. The current v2
-horizon is unfinished. ASTRO-v2 is measurably more expensive per step than Muon.
-Some historical experiments used superseded validation or tuning protocols and
-remain in the repository only as an audit trail. Finally, although ASTRO-MB's
-near-tie with ASTRO-v2 narrows the mechanism hypothesis, more isolation is needed
-before claiming that beta alignment alone is causal.
+Before a submission claim is frozen, the minimum remaining experiments are:
+\begin{enumerate}
+  \item finish all five 124M/2700 shared settings;
+  \item run ASTRO-v2 seeds 100--106 to pair with the existing seven Muon seeds;
+  \item complete a same-fingerprint 355M/900 paired scale study;
+  \item generate frozen validation trajectories for loss-vs-step and
+  loss-vs-wall-clock comparisons.
+\end{enumerate}
 
 \section{Conclusion}
-
-ASTRO-v2 is currently \textbf{promising, not proven}. At GPT-2 124M/900 it
-substantially improves on Muon across three shared configurations, with the
-largest separation in an aggressive-learning-rate regime. Yet the evidence also
-says what the result is not: the earlier ASTRO recipe loses in a tuned 300-step
-benchmark, post-polar variance power does not explain most of v2's current gain,
-and the step-matched improvement costs roughly 6\% additional wall-clock.
-
-The emerging hypothesis is therefore narrower and more testable: ASTRO-v2 may
-improve the \emph{robustness} of matrix-structured optimization to hyperparameter
-choice, while a simpler subset of its recipe may carry most of the effect. The
-ongoing horizon, seed, scale, and time-matched experiments are designed to
-falsify that hypothesis quickly.
+ASTRO-v2 is currently \textbf{promising, not proven}. The strongest new result
+is a completed 124M/900 shared grid with a mean paired delta of -0.0816 versus
+Muon and 3/5 settings favoring ASTRO-v2. A separate targeted study suggests that
+most of the gain is already present in a simpler beta-aligned variant and that
+the largest separation occurs in an aggressive learning-rate regime. Together,
+those observations support a testable robustness hypothesis more strongly than a
+claim of universal optimizer dominance.
 
 The methodological commitment is simpler: the final paper will show the journey,
-not just the winner. Negative results, protocol corrections, and unfinished
-cells remain visible because optimizer research is most useful when the
-comparison can fail.
+not only the winner. Negative results, protocol corrections, provenance
+mismatches, compute overhead, and unfinished cells remain visible because an
+optimizer comparison is most useful when it is allowed to fail.
 
 \paragraph{Reproducibility.}
-The complete manuscript, experiment ledger, current paper snapshot, plotting
-code, and build script are available at
-\url{https://github.com/pop123-ux/ASTRO}.
+The manuscript, experiment ledger, paper-facing snapshot, plotting code, and CI
+build are available at \url{https://github.com/pop123-ux/ASTRO}.
 
 \begin{thebibliography}{99}
 \bibitem[Jordan et al.(2024)]{jordan2024muon}
 K.~Jordan, Y.~Jin, V.~Boza, J.~You, F.~Cesista, L.~Newhouse, and J.~Bernstein.
 \newblock Muon: An optimizer for hidden layers in neural networks.
 \newblock 2024. \url{https://kellerjordan.github.io/posts/muon/}.
+
+\bibitem[Liu et al.(2025)]{liu2025scalable}
+J.~Liu, J.~Su, X.~Yao, et al.
+\newblock Muon is Scalable for LLM Training.
+\newblock Technical report, \emph{arXiv:2502.16982}, 2025.
 
 \bibitem[Li et al.(2025)]{li2025normuon}
 Z.~Li et al.
@@ -579,12 +564,6 @@ N.~Amsel, D.~Persson, C.~Musco, and R.~Gower.
 S.~Wang, F.~Zhang, J.~Li, D.~Bergemann, and Z.~Yang.
 \newblock Why Muon Outperforms Adam: A Curvature Perspective.
 \newblock \emph{arXiv:2606.04662}, 2026.
-
-\bibitem[Wen et al.(2026)]{wen2026hyperball}
-K.~Wen, X.~Dang, K.~Lyu, T.~Ma, and P.~Liang.
-\newblock Fantastic Pretraining Optimizers and Where to Find Them II: Hyperball
-  Optimization.
-\newblock \emph{arXiv:2606.16899}, 2026.
 \end{thebibliography}
 
 \end{document}
