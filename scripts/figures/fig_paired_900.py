@@ -53,8 +53,14 @@ def build(source: str = "paper_results.json") -> None:
     ax.set_ylim(0.55, 5.55)
     grid(ax, axis="x")
 
+    # Keep all explanatory text above the plotting region. This preserves the
+    # five data rows as a clean visual field and avoids dashboard-like clutter.
     ax.set_title("Five shared configurations · 124M / 900 steps",
-                 loc="left", pad=7, fontsize=7.7, fontweight="bold")
+                 loc="left", pad=17, fontsize=7.7, fontweight="bold")
+    ax.text(0.0, 1.018,
+            f"mean Δ {mean_delta:+.3f} · {wins}/5 favor ASTRO-v2 · paired settings, not seeds",
+            transform=ax.transAxes, ha="left", va="bottom", fontsize=5.8,
+            color="#666666")
 
     handles = [
         Line2D([0], [0], marker="s", linestyle="None", markersize=5.2,
@@ -62,16 +68,9 @@ def build(source: str = "paper_results.json") -> None:
         Line2D([0], [0], marker="D", linestyle="None", markersize=5.4,
                markerfacecolor=COLORS["astro_v2"], markeredgecolor="white", label="ASTRO-v2"),
     ]
-    ax.legend(handles=handles, loc="upper right", bbox_to_anchor=(0.995, 0.995),
-              ncol=1, fontsize=6.0, handlelength=0.8, borderaxespad=0.2)
-
-    ax.text(0.98, 0.055,
-            f"mean Δ {mean_delta:+.3f}   ·   {wins}/5 favor ASTRO-v2",
-            transform=ax.transAxes, ha="right", va="bottom", fontsize=5.9,
-            color=COLORS["astro_v2"])
-    ax.text(0.02, 0.055, "paired settings, not independent seeds",
-            transform=ax.transAxes, ha="left", va="bottom", fontsize=5.7,
-            color="#777777")
+    ax.legend(handles=handles, loc="lower right", bbox_to_anchor=(1.0, 1.015),
+              ncol=2, fontsize=5.9, handlelength=0.7, columnspacing=0.9,
+              borderaxespad=0.0)
 
     fig.tight_layout(pad=0.42)
     saved = save(fig, "fig_paired_900")
