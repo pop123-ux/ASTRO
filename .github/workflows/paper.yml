@@ -65,7 +65,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             latexmk texlive-latex-base texlive-latex-recommended \
-            texlive-latex-extra texlive-fonts-recommended
+            texlive-latex-extra texlive-fonts-recommended texlive-science
       - name: Compile living manuscript
         working-directory: docs/paper
         run: latexmk -pdf -interaction=nonstopmode -halt-on-error paper.tex
