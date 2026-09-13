@@ -40,24 +40,20 @@ def build(source: str = "paper_results.json") -> None:
     ax.set_xlabel("wall-clock seconds / 900-step run")
     ax.set_ylabel("validation loss ↓")
     grid(ax)
+    ax.set_title("124M · 900 steps · shared settings", loc="left", pad=7,
+                 fontsize=7.5, fontweight="bold", color="#333333")
     ax.legend(loc="upper right", fontsize=5.9, handlelength=1.15, labelspacing=0.35)
 
     muon_t = np.mean([cfg["seconds"]["muon"] for cfg in configs])
     v2_t = np.mean([cfg["seconds"]["astro_v2"] for cfg in configs])
     overhead = v2_t / muon_t - 1.0
 
-    ax.text(0.02, 0.975, "124M · 900 steps · shared settings",
-            transform=ax.transAxes, ha="left", va="top", fontsize=6.1,
-            fontweight="bold", color="#333333")
     ax.text(0.98, 0.56, f"ASTRO-v2: +{overhead*100:.1f}% mean runtime",
             transform=ax.transAxes, ha="right", va="center", fontsize=6.0,
             color=COLORS["astro_v2"])
     ax.text(0.02, 0.035, "lower-left is better",
             transform=ax.transAxes, fontsize=5.9, color="#666666")
 
-    # The second setting is the deliberately aggressive LR case and creates the
-    # visually dominant separation. Name the scientific fact instead of
-    # cluttering all three connectors with arbitrary 1/2/3 labels.
     aggressive = configs[1]
     ax.annotate("aggressive LR",
                 (aggressive["seconds"]["muon"], aggressive["loss"]["muon"]),
