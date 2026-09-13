@@ -18,6 +18,9 @@ sys.path.insert(0, str(ROOT / "scripts" / "figures"))
 import fig_efficiency_v2  # noqa: E402
 import fig_horizon_v2  # noqa: E402
 import fig_optimizer_journey  # noqa: E402
+import fig_paired_900  # noqa: E402
+import fig_scale_status  # noqa: E402
+import fig_seed_replication  # noqa: E402
 import fig_training_trajectories  # noqa: E402
 
 FIGURES = ROOT / "artifacts" / "figures"
@@ -41,10 +44,26 @@ def test_shared_config_deltas_match_losses() -> None:
         assert block["loss"][name] - muon == pytest.approx(delta, abs=1e-6)
 
 
+def test_complete_900_horizon_recomputes_from_rows() -> None:
+    block = paper_results()["horizon_124m_v2"]["steps"]["900"]
+    rows = block["loss_by_config"]
+    assert block["complete"] is True
+    assert len(rows) == 5
+    deltas = [row["astro_v2"] - row["muon"] for row in rows]
+    # Three rows are available only to the four decimals printed by the
+    # terminal report, so use a tolerance consistent with that provenance.
+    assert deltas == pytest.approx(block["deltas_vs_muon"], abs=1e-4)
+    assert float(np.mean(block["deltas_vs_muon"])) == pytest.approx(block["mean_delta"], abs=1e-8)
+    assert sum(delta < 0 for delta in block["deltas_vs_muon"]) == 3
+
+
 @pytest.mark.parametrize("builder,stem", [
     (fig_optimizer_journey.build, "fig_optimizer_journey"),
+    (fig_paired_900.build, "fig_paired_900"),
     (fig_horizon_v2.build, "fig_horizon_v2"),
     (fig_efficiency_v2.build, "fig_efficiency_v2"),
+    (fig_seed_replication.build, "fig_seed_replication"),
+    (fig_scale_status.build, "fig_scale_status"),
 ])
 def test_current_paper_figures_build(builder, stem) -> None:
     builder()
@@ -53,14 +72,21 @@ def test_current_paper_figures_build(builder, stem) -> None:
     assert (FIGURES / f"{stem}.json").is_file()
 
 
-def test_horizon_keeps_incomplete_cells_explicit() -> None:
+def test_horizon_keeps_only_2700_incomplete() -> None:
     block = paper_results()["horizon_124m_v2"]["steps"]
     assert block["300"]["complete"] is True
     assert block["600"]["complete"] is True
-    assert block["900"]["complete"] is False
+    assert block["900"]["complete"] is True
     assert block["2700"]["complete"] is False
-    assert len(block["900"]["deltas_vs_muon"]) == 2
+    assert len(block["900"]["deltas_vs_muon"]) == 5
     assert block["2700"]["deltas_vs_muon"] == []
+
+
+def test_replication_does_not_invent_astro_seeds() -> None:
+    block = paper_results()["replication_124m_900"]
+    assert len(block["muon"]["loss"]) == 7
+    assert block["astro_v2"]["loss"] == []
+    assert block["complete"] is False
 
 
 def test_trajectory_plotter_refuses_to_invent_missing_data(tmp_path, capsys) -> None:
