@@ -66,12 +66,17 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             latexmk texlive-latex-base texlive-latex-recommended \
             texlive-latex-extra texlive-fonts-recommended
-      - name: Compile manuscript
+      - name: Compile living manuscript
         working-directory: docs/paper
         run: latexmk -pdf -interaction=nonstopmode -halt-on-error paper.tex
-      - name: Upload compiled paper
+      - name: Compile focused technical report
+        working-directory: docs/paper
+        run: latexmk -pdf -interaction=nonstopmode -halt-on-error astro_technical_report.tex
+      - name: Upload compiled papers
         uses: actions/upload-artifact@v4
         with:
           name: astro-paper-pdf
-          path: docs/paper/paper.pdf
+          path: |
+            docs/paper/paper.pdf
+            docs/paper/astro_technical_report.pdf
           if-no-files-found: error
