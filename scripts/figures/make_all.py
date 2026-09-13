@@ -1,12 +1,12 @@
 """Build paper figures that have data, and name the ones that do not.
 
-Figure modules are imported lazily.  This matters because some mechanistic
+Figure modules are imported lazily. This matters because some mechanistic
 figures use PyTorch for exact matrix measurements, while the current ASTRO-v2
-empirical plots need only NumPy + Matplotlib.  Requesting one lightweight plot
+empirical plots need only NumPy + Matplotlib. Requesting one lightweight plot
 should not force every optional scientific dependency to be installed.
 
     python scripts/figures/make_all.py
-    python scripts/figures/make_all.py --only optimizer_journey horizon_v2 efficiency_v2
+    python scripts/figures/make_all.py --only optimizer_journey paired_900 horizon_v2
 """
 
 from __future__ import annotations
@@ -30,6 +30,11 @@ FIGURES = {
         "the progression from Muon/NorMuon/AdaMuon to ASTRO-MB and ASTRO-v2",
         False,
     ),
+    "paired_900": (
+        "fig_paired_900",
+        "all five 124M/900 shared-configuration pairings",
+        False,
+    ),
     "horizon_v2": (
         "fig_horizon_v2",
         "whether ASTRO-v2's paired margin survives longer training",
@@ -38,6 +43,16 @@ FIGURES = {
     "efficiency_v2": (
         "fig_efficiency_v2",
         "the validation-loss gain together with ASTRO-v2's measured runtime cost",
+        False,
+    ),
+    "seed_replication": (
+        "fig_seed_replication",
+        "independent-seed replication with pending-aware rendering",
+        False,
+    ),
+    "scale_status": (
+        "fig_scale_status",
+        "paper-eligible scale evidence with explicit empty experiment slots",
         False,
     ),
     "training_trajectories": (
@@ -111,8 +126,6 @@ def main() -> int:
             builder = load_builder(module_name)
             builder()
         except ModuleNotFoundError as exc:
-            # Optional scientific dependencies should fail the requested figure,
-            # not every unrelated figure in the suite.
             print(f"  FAILED {name}: missing dependency {exc.name!r}")
             failed.append(name)
             continue
