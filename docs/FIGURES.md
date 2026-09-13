@@ -1,81 +1,121 @@
 # ASTRO paper figure system
 
-The paper treats every figure as a reproducible result. The visual source of
-record is **Matplotlib + committed JSON**. Weights & Biases is optional and is
-used as an experiment browser, not as a dependency of the manuscript.
+The paper treats every figure as a reproducible result. The visual source of record is **Matplotlib + committed JSON**. Weights & Biases is optional and is used as an experiment browser, not as a dependency of the manuscript.
 
 ```bash
 pip install -e '.[paper]'
 python scripts/figures/make_all.py
 ```
 
-Every successful plot writes both:
+Every successful plot writes:
 
 - `artifacts/figures/<name>.pdf` — vector source used by LaTeX;
-- `artifacts/figures/<name>.png` — convenient preview for GitHub;
-- `artifacts/figures/<name>.json` — the exact values rendered.
+- `artifacts/figures/<name>.png` — GitHub/quick-look preview;
+- `artifacts/figures/<name>.json` — exact values rendered.
 
-This prevents a common paper failure mode: a plot is manually edited after the
-numbers change and silently stops matching the experiment.
+This prevents a common paper failure mode: a plot is manually edited after the numbers change and silently stops matching the experiment.
 
 ---
 
-## 1. Figure hierarchy
+## 1. Primary paper figures
 
-The current paper has a **primary empirical spine** and a **supporting mechanism
-suite**. Historical plots are retained because the research journey matters, but
-they are explicitly labeled as legacy rather than allowed to compete with the
-current ASTRO-v2 evidence.
-
-### Primary ASTRO-v2 figures
-
-| figure | purpose | current input |
+| figure | purpose | current status |
 |---|---|---|
-| `fig_optimizer_journey` | documents the progression Muon → NorMuon/AdaMuon → ASTRO-MB → ASTRO-v2, then shows the three-config mechanism comparison | `artifacts/paper_results.json` |
-| `fig_training_trajectories` | validation loss through training, shown against both steps and wall-clock | `artifacts/trajectories.json` |
-| `fig_horizon_v2` | asks whether the paired ASTRO-v2 margin survives 300 → 600 → 900 → 2700 steps; incomplete cells are visibly incomplete | `artifacts/paper_results.json` |
-| `fig_efficiency_v2` | makes the compute cost visible beside the loss improvement | `artifacts/paper_results.json` |
+| `fig_optimizer_journey` | headline progression from Muon/NorMuon/AdaMuon to ASTRO-MB and ASTRO-v2, plus the targeted mechanism comparison | measured |
+| `fig_paired_900` | all five 124M/900 shared settings shown as paired dumbbells instead of hiding the search behind one winner | measured |
+| `fig_horizon_v2` | 300 → 600 → 900 → 2700 horizon; small points are configurations, diamonds are means | measured through 900; 2700 pending |
+| `fig_efficiency_v2` | validation loss against measured runtime for the targeted mechanism study | measured |
+| `fig_seed_replication` | independent-seed replication; automatically changes from pending-aware view to paired connectors once ASTRO-v2 seeds exist | Muon 100–106 measured; ASTRO-v2 pending |
+| `fig_scale_status` | scale-study evidence without extrapolation; open markers are experiment slots | 124M measured; clean 355M + 774M pending |
+| `fig_training_trajectories` | validation loss against both training step and wall-clock | waiting for frozen trajectory run |
 
-### Supporting figures
-
-| figure | purpose |
-|---|---|
-| `fig1_leverage` | Q/K/V allocation and the leverage interpretation of the polar update |
-| `fig2_quintic` | numerical behavior of Muon's repeated quintic versus a converging schedule |
-| `fig3_curvature` | optional curvature decomposition at matched validation loss |
-| `fig5_inversion` | documents the cautious-mask sign inversion across scale |
-| `fig7_drift` | optional update-norm drift measured inside real training |
-
-`fig4_results` and the original `fig6_horizon` are retained as **legacy research
-history**. They describe earlier protocols and must not be used as the headline
-ASTRO-v2 result.
+Supporting mechanistic and historical figures remain available (`fig_leverage`, `fig_quintic`, curvature, drift, inversion, and legacy result plots), but they do not replace the current ASTRO-v2 empirical spine.
 
 ---
 
-## 2. The optimizer journey is part of the paper
+## 2. Aesthetic target
 
-We do not want a final paper that jumps straight from Muon to the best ASTRO-v2
-number. The path is scientifically useful:
+The visual target is the compact technical-report style used by strong optimizer papers: **small number of high-information figures, restrained typography, obvious comparison direction, and no dashboard decoration**.
+
+The current LaTeX manuscript mirrors that style on page one:
+
+1. strong horizontal rule;
+2. centered paper title and technical-report label;
+3. compact full-width abstract;
+4. a full-width headline empirical figure immediately below the abstract;
+5. two-column body afterward.
+
+The house style in `scripts/figures/style.py` enforces:
+
+- serif typography;
+- vector PDF output;
+- one optimizer = one colour throughout the paper;
+- ASTRO-v2 as the strongest accent;
+- no top/right plot spines;
+- light neutral grids;
+- direct numerical labels only when they help interpretation;
+- legends only when direct labels would collide;
+- uncertainty based only on measurements that exist;
+- open neutral markers for pending experiments rather than interpolation.
+
+The palette is deliberately print-safe and restrained. Muon is orange, ASTRO-v2 is deep purple, ASTRO-MB and gamma ablations use progressively lighter related accents, and pending evidence is neutral grey.
+
+---
+
+## 3. The optimizer journey is part of the result
+
+The paper should not jump straight from Muon to one best ASTRO number. The development path is scientifically useful:
 
 1. **Muon** — spectral reference;
 2. **NorMuon** — row-wise post-orthogonalization adaptation;
-3. **AdaMuon** — element-wise post-orthogonalization adaptation;
-4. **earlier ASTRO recipes** — useful negative evidence at 300 steps;
-5. **ASTRO-MB** — removes the scalar-path beta asymmetry;
-6. **ASTRO-v2** — the current recipe;
-7. **ASTRO-v2 γ=0** — asks whether the post-polar variance term is actually
-   responsible for the improvement.
+3. **AdaMuon** — finer post-orthogonalization adaptation;
+4. **earlier ASTRO recipes** — negative evidence at 300 steps;
+5. **ASTRO-MB** — beta-aligned recipe;
+6. **ASTRO-v2** — current recipe;
+7. **ASTRO-v2 gamma=0** — tests whether post-polar variance adaptation carries the result.
 
-The journey figure must always distinguish **pointwise shared-configuration
-comparisons** from **independent-seed replications**. A hyperparameter
-configuration is not a seed and must never be used to imply a significance test.
+`fig_optimizer_journey` is therefore the first-page headline figure, not an appendix artifact.
 
 ---
 
-## 3. Validation-loss trajectories
+## 4. Why `fig_paired_900` matters
 
-Final validation loss is not enough for an optimizer paper. We also want to see
-*how* the ordering develops.
+The completed 124M/900 grid has five shared configurations. Showing only the best Muon and best ASTRO-v2 values would hide the shape of the result because the minima occur at different settings.
+
+The dumbbell plot shows all five pairings directly:
+
+```text
+config 1   Δ ≈ -0.091
+config 2   Δ ≈ +0.067
+config 3   Δ ≈ -0.108
+config 4   Δ ≈ +0.006
+config 5   Δ ≈ -0.283
+mean       Δ ≈ -0.082
+```
+
+This makes the emerging robustness hypothesis visible: ASTRO-v2 does not win everywhere, but several settings improve substantially and the mean paired margin is negative.
+
+---
+
+## 5. Horizon, seeds, and scale must show missing evidence honestly
+
+### Horizon
+
+300, 600, and 900 are complete. 2700 is not. `fig_horizon_v2` therefore renders an **open grey diamond** at 2700 and does not connect the measured trend into that slot.
+
+### Independent seeds
+
+Seven Muon seeds (100–106) are measured. ASTRO-v2 is pending. `fig_seed_replication` currently renders the Muon distribution and an open pending ASTRO-v2 marker. Once seven ASTRO-v2 losses are added to `paper_results.json`, the same script automatically draws matched seed connectors.
+
+### Scale
+
+A partial 355M run used a different `astro_lab.py` fingerprint from the 124M evidence. It is excluded from the paper-facing scale result. `fig_scale_status` renders 355M as a clean-rerun slot rather than turning mismatched provenance into a datapoint.
+
+---
+
+## 6. Validation-loss trajectories
+
+Final validation loss is not enough for an optimizer paper. We also want to see *how* the ordering develops.
 
 Run the dedicated trajectory instrument only after configurations are frozen:
 
@@ -99,22 +139,13 @@ Copy the resulting JSON to `artifacts/trajectories.json` and run:
 python scripts/figures/make_all.py --only training_trajectories
 ```
 
-The trajectory runner periodically evaluates the same pinned validation slice.
-Probe time is subtracted from its training clock so the wall-clock panel is not
-artificially penalized by the act of measuring it. These trajectory runs are for
-visualizing learning dynamics; the headline runtime comparison still comes from
-the uninstrumented benchmark.
-
-For three independent evaluation seeds use the normal benchmark semantics:
-`--seeds 3` means seeds **100, 101, and 102**. `--seeds 100` means one hundred
-seeds and should not be used when the intent is literal seed 100.
+The trajectory runner evaluates the same pinned validation slice. Probe time is removed from the reported training clock so the wall-clock panel is not penalized by the act of measuring it.
 
 ---
 
-## 4. W&B is optional
+## 7. W&B is optional
 
-The committed JSON is the evidence. W&B is useful for interaction and run
-inspection:
+The committed JSON is the evidence. W&B is useful for interactive run inspection:
 
 ```bash
 pip install wandb
@@ -124,67 +155,35 @@ python scripts/paper/wandb_sync.py \
   --input artifacts/trajectories.json
 ```
 
-A reviewer must never need W&B access to reproduce a paper figure. If a W&B
-chart is useful, export its underlying history to JSON and render the final paper
-version with the Matplotlib scripts in this repository.
+A reviewer must never need W&B access to reproduce a paper figure. If a W&B chart is useful during exploration, export the underlying history and render the final paper version with Matplotlib.
 
 ---
 
-## 5. Visual language
+## 8. What a figure is allowed to claim
 
-The reference aesthetic is the compact two-column style used in contemporary
-optimizer papers such as *Why Muon Outperforms Adam: A Curvature Perspective*:
-small multiples, restrained typography, direct quantitative annotations, and
-plots that make the comparison readable before the caption is read.
+**Shared configurations.** They show sensitivity and robustness. They are not independent replications.
 
-The rules are encoded in `scripts/figures/style.py`:
+**Independent seeds.** They support stochastic reproducibility claims. The paper should show every seed, not only a mean/error bar.
 
-- serif type throughout;
-- vector PDF output for LaTeX;
-- one optimizer = one colour everywhere;
-- ASTRO-v2 is the strongest accent, not every ASTRO ablation;
-- no top/right plot spines;
-- light solid grids, not dark dashboard grids;
-- direct values when they help interpretation;
-- legends only when direct labels would collide;
-- uncertainty is drawn from the uncertainty we actually have;
-- missing measurements are marked as pending rather than interpolated.
+**Wall-clock.** ASTRO-v2 currently costs more per step than Muon in the targeted 124M/900 run. A step-matched loss win does not automatically imply a compute win.
 
-The paper itself uses a two-column LaTeX template. Full-width multi-panel figures
-use `figure*`; compact one-panel figures use `figure`. Tables use `booktabs` and
-avoid vertical rules.
+**Incomplete horizon/scale cells.** Open markers and explicit pending annotations. No line should visually imply a result that does not exist.
+
+**Mismatched provenance.** Keep it in the research log; do not place it in the same scientific curve.
 
 ---
 
-## 6. What a figure is allowed to claim
-
-**Shared configurations.** Show pointwise robustness and sensitivity. Do not call
-them independent replications.
-
-**Independent seeds.** Support statements about stochastic reproducibility. With
-three seeds, the minimum two-sided sign-test p-value is 0.25, so the paper should
-show all seed points rather than manufacture precision from an error bar.
-
-**Wall-clock.** ASTRO-v2 currently costs more per step than Muon in the targeted
-124M/900 run. A step-matched loss win therefore does not automatically imply a
-compute win. `fig_efficiency_v2` exists so this caveat cannot disappear from the
-paper layout.
-
-**Incomplete horizon cells.** Open markers and explicit `pending` annotations.
-No line should visually imply a completed 2700-step result before it exists.
-
----
-
-## 7. Recommended final paper order
+## 9. Recommended final paper order
 
 1. **Figure 1 — optimizer journey / headline empirical result**
-2. **Figure 2 — training trajectories, step and wall-clock**
-3. **Figure 3 — horizon and scale**
-4. **Figure 4 — QKV allocation mechanism**
-5. **Figure 5 — ablation / ASTRO-MB / γ=0 attribution**
-6. **Figure 6 — compute efficiency or time-to-target**
-7. optional appendix figures: quintic, curvature, drift, withdrawn protocols
+2. **Figure 2 — five paired 900-step shared configurations**
+3. **Figure 3 — horizon through 2700 once complete**
+4. **Figure 4 — independent-seed replication**
+5. **Figure 5 — scale**
+6. **Figure 6 — loss-vs-step and loss-vs-wall-clock trajectories**
+7. **Figure 7 — mechanism/QKV evidence**
+8. appendix: quintic, curvature, drift, failed hypotheses, and superseded protocols
 
-This ordering makes the paper read as a research argument rather than a gallery
-of plots: **what happens → does it persist → why might it happen → what does it
-cost → where does it fail?**
+The paper should read as a research argument rather than a gallery of plots:
+
+**what happens → does it persist → does it replicate → does it scale → what does it cost → why might it happen → where does it fail?**
