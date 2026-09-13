@@ -37,12 +37,6 @@ def build(source: str = "paper_results.json") -> None:
                        linewidths=0, zorder=3,
                        label=LABELS[name] if index == 0 else None)
 
-        # Identify the shared setting once, at the Muon endpoint of each pair.
-        ax.annotate(str(index + 1),
-                    (cfg["seconds"]["muon"], cfg["loss"]["muon"]),
-                    textcoords="offset points", xytext=(-7, 5), fontsize=5.7,
-                    color="#777777")
-
     ax.set_xlabel("wall-clock seconds / 900-step run")
     ax.set_ylabel("validation loss ↓")
     grid(ax)
@@ -60,6 +54,15 @@ def build(source: str = "paper_results.json") -> None:
             color=COLORS["astro_v2"])
     ax.text(0.02, 0.035, "lower-left is better",
             transform=ax.transAxes, fontsize=5.9, color="#666666")
+
+    # The second setting is the deliberately aggressive LR case and creates the
+    # visually dominant separation. Name the scientific fact instead of
+    # cluttering all three connectors with arbitrary 1/2/3 labels.
+    aggressive = configs[1]
+    ax.annotate("aggressive LR",
+                (aggressive["seconds"]["muon"], aggressive["loss"]["muon"]),
+                textcoords="offset points", xytext=(8, -10), ha="left",
+                fontsize=5.7, color="#777777")
 
     fig.tight_layout(pad=0.35)
     saved = save(fig, "fig_efficiency_v2")
