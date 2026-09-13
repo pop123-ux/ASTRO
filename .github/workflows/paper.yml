@@ -38,7 +38,8 @@ jobs:
       - name: Render current ASTRO-v2 figures
         run: >-
           python scripts/figures/make_all.py --only
-          optimizer_journey horizon_v2 efficiency_v2
+          optimizer_journey paired_900 horizon_v2 efficiency_v2
+          seed_replication scale_status
       - name: Upload rendered previews
         uses: actions/upload-artifact@v4
         with:
