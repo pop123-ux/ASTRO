@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Render the ASTRO paper figures and compile docs/paper/paper.tex.
 
-The build is intentionally boring: figures first, LaTeX second.  A figure script
+The build is intentionally boring: figures first, LaTeX second. A figure script
 may explicitly skip a measurement that is not available yet; the LaTeX source
 uses visible placeholders for missing optional figures so a living draft still
 compiles without pretending the experiment exists.
@@ -19,8 +19,11 @@ PAPER = ROOT / "docs" / "paper"
 
 PRIMARY_FIGURES = [
     "optimizer_journey",
+    "paired_900",
     "horizon_v2",
     "efficiency_v2",
+    "seed_replication",
+    "scale_status",
     "training_trajectories",
     "leverage",
     "quintic",
@@ -41,7 +44,6 @@ def main() -> int:
         run([latexmk, "-pdf", "-interaction=nonstopmode", "-halt-on-error", "paper.tex"],
             cwd=PAPER)
     elif pdflatex:
-        # Two passes resolve references and the table of figure numbers.
         run([pdflatex, "-interaction=nonstopmode", "-halt-on-error", "paper.tex"], cwd=PAPER)
         run([pdflatex, "-interaction=nonstopmode", "-halt-on-error", "paper.tex"], cwd=PAPER)
     else:
