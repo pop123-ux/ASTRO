@@ -9,8 +9,9 @@ validation-loss difference.
 from __future__ import annotations
 
 import numpy as np
+from matplotlib.lines import Line2D
 
-from style import COLORS, LABELS, column_figure, grid, missing, read_data, save, write_data
+from style import COLORS, column_figure, grid, missing, read_data, save, write_data
 
 
 def build(source: str = "paper_results.json") -> None:
@@ -24,7 +25,7 @@ def build(source: str = "paper_results.json") -> None:
         missing("fig_paired_900", "complete the five 124M/900 shared configurations")
         return
 
-    fig, ax = column_figure(height=2.55)
+    fig, ax = column_figure(height=2.58)
     y = np.arange(len(rows), 0, -1)
 
     for yi, row in zip(y, rows):
@@ -38,29 +39,41 @@ def build(source: str = "paper_results.json") -> None:
         ax.scatter(astro, yi, s=38, marker="D", color=COLORS["astro_v2"],
                    edgecolor="white", linewidth=0.5, zorder=4)
         right = max(muon, astro)
-        ax.annotate(f"Δ {delta:+.3f}", (right, yi), textcoords="offset points",
+        ax.annotate(f"{delta:+.3f}", (right, yi), textcoords="offset points",
                     xytext=(6, 0), ha="left", va="center", fontsize=5.9,
                     color=COLORS["astro_v2"] if delta < 0 else "#666666")
+
+    mean_delta = float(np.mean([float(row["delta"]) for row in rows]))
+    wins = sum(float(row["delta"]) < 0 for row in rows)
 
     ax.set_yticks(y)
     ax.set_yticklabels([f"config {row['config']}" for row in rows])
     ax.set_xlabel("validation loss ↓")
     ax.set_xlim(5.77, 6.205)
+    ax.set_ylim(0.55, 5.55)
     grid(ax, axis="x")
 
-    ax.text(0.02, 0.965, "124M · 900 steps · paired shared settings",
-            transform=ax.transAxes, ha="left", va="top", fontsize=6.05,
-            fontweight="bold", color="#333333")
-    ax.text(0.02, 0.035, "■ Muon      ◆ ASTRO-v2",
-            transform=ax.transAxes, fontsize=5.9, color="#555555")
+    ax.set_title("Five shared configurations · 124M / 900 steps",
+                 loc="left", pad=7, fontsize=7.7, fontweight="bold")
 
-    mean_delta = float(np.mean([float(row["delta"]) for row in rows]))
-    wins = sum(float(row["delta"]) < 0 for row in rows)
-    ax.text(0.98, 0.035, f"mean Δ {mean_delta:+.3f} · {wins}/5 favor ASTRO-v2",
-            transform=ax.transAxes, ha="right", fontsize=5.9,
+    handles = [
+        Line2D([0], [0], marker="s", linestyle="None", markersize=5.2,
+               markerfacecolor=COLORS["muon"], markeredgecolor="white", label="Muon"),
+        Line2D([0], [0], marker="D", linestyle="None", markersize=5.4,
+               markerfacecolor=COLORS["astro_v2"], markeredgecolor="white", label="ASTRO-v2"),
+    ]
+    ax.legend(handles=handles, loc="upper right", bbox_to_anchor=(0.995, 0.995),
+              ncol=1, fontsize=6.0, handlelength=0.8, borderaxespad=0.2)
+
+    ax.text(0.98, 0.055,
+            f"mean Δ {mean_delta:+.3f}   ·   {wins}/5 favor ASTRO-v2",
+            transform=ax.transAxes, ha="right", va="bottom", fontsize=5.9,
             color=COLORS["astro_v2"])
+    ax.text(0.02, 0.055, "paired settings, not independent seeds",
+            transform=ax.transAxes, ha="left", va="bottom", fontsize=5.7,
+            color="#777777")
 
-    fig.tight_layout(pad=0.35)
+    fig.tight_layout(pad=0.42)
     saved = save(fig, "fig_paired_900")
     write_data("fig_paired_900", {
         "rows": rows,
