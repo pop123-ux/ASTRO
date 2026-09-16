@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 """Audit the minimal ASTRO confirmatory campaign.
 
-The audit checks the evidence the paper actually needs: five-seed headline
-comparison, frozen causal controls, a two-seed 355M transfer, and a two-seed
-2700-step durability check.  It never treats an inconvenient scientific result
-as an error; ``--strict`` fails only for missing or provenance-inconsistent
-measurements.
+``--strict`` fails for missing/provenance-inconsistent evidence, never because a
+scientific result is negative. The output is a claim-safe summary for writing.
 """
 
 from __future__ import annotations
@@ -18,21 +15,13 @@ from pathlib import Path
 
 HEADLINE = ("adamw", "muon", "normuon", "adamuon_ref", "astro_v2")
 MECHANISM = (
-    "muon",
-    "muon_m90",
-    "astro_v2_gamma0",
-    "astro_v2_nosplit",
-    "astro_v2_blockwise",
-    "astro_v2",
+    "muon", "muon_m90", "astro_v2_gamma0", "astro_v2_nosplit",
+    "astro_v2_blockwise", "astro_v2",
 )
 
 
-def load(path: Path) -> dict:
-    payload = json.loads(path.read_text())
-    payload.setdefault("runs", {})
-    payload.setdefault("trials", {})
-    payload.setdefault("tuned", {})
-    return payload
+def read(path: Path) -> dict:
+    return json.loads(path.read_text())
 
 
 def mean_sd(values: list[float]) -> tuple[float, float]:
@@ -48,51 +37,63 @@ def sign_p(deltas: list[float]) -> float:
     return min(1.0, 2 * tail / 2**n)
 
 
-def run_key(size: str, steps: int, opt: str, seed: int) -> str:
-    return f"{size}|{steps}|{opt}|{seed}"
-
-
-def seed_rows(state: dict, size: str, steps: int, opt: str, seeds: list[int]):
-    rows, missing = [], []
-    for seed in seeds:
-        entry = state["runs"].get(run_key(size, steps, opt, seed))
-        if entry is None:
-            missing.append(seed)
-        else:
-            rows.append((seed, entry))
-    return rows, missing
-
-
 def config_key(config: dict) -> tuple:
     return tuple(sorted((key, round(float(value), 14)) for key, value in config.items()))
 
 
-def add_frozen_pair_section(lines: list[str], incomplete: list[str], state: dict,
-                            title: str, size: str, steps: int, seeds: list[int]) -> None:
-    lines += ["", f"## {title}", "",
+def headline_rows(state: dict, opt: str, seeds: list[int]):
+    rows, missing = [], []
+    for seed in seeds:
+        entry = state.get("runs", {}).get(f"124M|900|{opt}|{seed}")
+        (missing if entry is None else rows).append(seed if entry is None else (seed, entry))
+    return rows, missing
+
+
+def custom_rows(state: dict, opt: str):
+    seeds = list(state.get("protocol", {}).get("seeds", []))
+    rows, missing = [], []
+    for seed in seeds:
+        entry = state.get("runs", {}).get(f"{opt}|{seed}")
+        (missing if entry is None else rows).append(seed if entry is None else (seed, entry))
+    return seeds, rows, missing
+
+
+def validate_derived_protocol(label: str, state: dict, main_digest: str | None,
+                              incomplete: list[str]) -> None:
+    protocol = state.get("protocol", {})
+    derived = protocol.get("main_protocol", {}).get("code_digest")
+    if not protocol:
+        incomplete.append(f"{label} state has no protocol")
+    elif main_digest and derived != main_digest:
+        incomplete.append(f"{label} was not derived from the headline campaign code digest")
+
+
+def add_transfer(lines: list[str], incomplete: list[str], label: str,
+                 state: dict, main_digest: str | None) -> None:
+    validate_derived_protocol(label, state, main_digest, incomplete)
+    lines += ["", f"## {label}", "",
               "| optimizer | mean | sample sd | mean s/run | seeds |",
               "|---|---:|---:|---:|---:|"]
-    values = {}
+    values_by = {}
     for opt in ("muon", "astro_v2"):
-        rows, missing = seed_rows(state, size, steps, opt, seeds)
+        seeds, rows, missing = custom_rows(state, opt)
         if missing:
-            incomplete.append(f"{size}/{steps} {opt} missing seeds {missing}")
-        vals = [float(entry["value"]) for _, entry in rows]
-        secs = [float(entry["seconds"]) for _, entry in rows]
-        values[opt] = {seed: float(entry["value"]) for seed, entry in rows}
-        if vals:
-            mu, sd = mean_sd(vals)
+            incomplete.append(f"{label} {opt} missing seeds {missing}")
+        values = [float(entry["value"]) for _, entry in rows]
+        seconds = [float(entry["seconds"]) for _, entry in rows]
+        values_by[opt] = {seed: float(entry["value"]) for seed, entry in rows}
+        if values:
+            mu, sd = mean_sd(values)
             lines.append(
-                f"| `{opt}` | {mu:.5f} | {sd:.5f} | {statistics.fmean(secs):.1f} | "
-                f"{len(vals)}/{len(seeds)} |"
+                f"| `{opt}` | {mu:.5f} | {sd:.5f} | {statistics.fmean(seconds):.1f} | "
+                f"{len(values)}/{len(seeds)} |"
             )
         else:
             lines.append(f"| `{opt}` | — | — | — | 0/{len(seeds)} |")
-
-    common = sorted(set(values.get("muon", {})) & set(values.get("astro_v2", {})))
+    common = sorted(set(values_by.get("muon", {})) & set(values_by.get("astro_v2", {})))
     if common:
-        deltas = [values["astro_v2"][seed] - values["muon"][seed] for seed in common]
-        lines += ["", f"ASTRO-v2 − Muon: mean `{statistics.fmean(deltas):+.5f}`, "
+        deltas = [values_by["astro_v2"][s] - values_by["muon"][s] for s in common]
+        lines += ["", f"ASTRO-v2 − Muon mean Δ: `{statistics.fmean(deltas):+.5f}`; "
                   f"wins `{sum(d < 0 for d in deltas)}/{len(deltas)}`."]
 
 
@@ -100,38 +101,40 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--main-state", type=Path, required=True)
     parser.add_argument("--mechanism-state", type=Path, required=True)
+    parser.add_argument("--scale-state", type=Path, required=True)
+    parser.add_argument("--horizon-state", type=Path, required=True)
     parser.add_argument("--out", type=Path, default=Path("paper_evidence_summary.md"))
     parser.add_argument("--strict", action="store_true")
     args = parser.parse_args()
 
-    state = load(args.main_state)
-    mech = json.loads(args.mechanism_state.read_text())
+    main_state = read(args.main_state)
+    mech = read(args.mechanism_state)
+    scale = read(args.scale_state)
+    horizon = read(args.horizon_state)
     incomplete: list[str] = []
     lines = ["# ASTRO paper evidence audit", ""]
 
-    if not state.get("paper_protocol"):
-        incomplete.append("main state has no paper_campaign protocol signature")
-    main_digest = state.get("paper_protocol", {}).get("code_digest")
-    mech_main_digest = mech.get("protocol", {}).get("main_protocol", {}).get("code_digest")
-    if main_digest and mech_main_digest and main_digest != mech_main_digest:
-        incomplete.append("mechanism campaign was not derived from the same paper-campaign code digest")
+    main_protocol = main_state.get("paper_protocol")
+    if not main_protocol:
+        incomplete.append("headline state has no paper_campaign protocol signature")
+    main_digest = main_protocol.get("code_digest") if main_protocol else None
 
-    # Headline five-seed experiment ---------------------------------------
+    # Headline -------------------------------------------------------------
     seeds = list(range(100, 105))
     lines += ["## 124M / 900-step held-out confirmation", "",
               "| optimizer | mean | sample sd | mean s/run | seeds |",
               "|---|---:|---:|---:|---:|"]
     by_seed = {}
     for opt in HEADLINE:
-        rows, missing = seed_rows(state, "124M", 900, opt, seeds)
+        rows, missing = headline_rows(main_state, opt, seeds)
         if missing:
-            incomplete.append(f"124M/900 {opt} missing seeds {missing}")
+            incomplete.append(f"headline {opt} missing seeds {missing}")
         values = [float(entry["value"]) for _, entry in rows]
         seconds = [float(entry["seconds"]) for _, entry in rows]
-        by_seed[opt] = {seed: float(entry["value"]) for seed, entry in rows}
         configs = [entry.get("config", {}) for _, entry in rows]
+        by_seed[opt] = {seed: float(entry["value"]) for seed, entry in rows}
         if configs and any(config_key(cfg) != config_key(configs[0]) for cfg in configs[1:]):
-            incomplete.append(f"124M/900 {opt} held-out seeds used different configs")
+            incomplete.append(f"headline {opt} held-out seeds used different configs")
         if values:
             mu, sd = mean_sd(values)
             lines.append(
@@ -151,22 +154,22 @@ def main() -> int:
             common = sorted(set(by_seed["muon"]) & set(by_seed.get(opt, {})))
             if not common:
                 continue
-            deltas = [by_seed[opt][seed] - by_seed["muon"][seed] for seed in common]
+            deltas = [by_seed[opt][s] - by_seed["muon"][s] for s in common]
             lines.append(
                 f"| `{opt}` | {statistics.fmean(deltas):+.5f} | {max(deltas):+.5f} | "
                 f"{sum(d < 0 for d in deltas)}/{len(deltas)} | {sign_p(deltas):.4f} |"
             )
 
-    # Frozen mechanism campaign -------------------------------------------
+    # Mechanism ------------------------------------------------------------
+    validate_derived_protocol("mechanism", mech, main_digest, incomplete)
+    mech_seeds = list(mech.get("protocol", {}).get("seeds", []))
     lines += ["", "## Frozen causal controls", "",
               "| contrast (A − B) | paired seeds | mean Δ | worst Δ | A wins |",
               "|---|---:|---:|---:|---:|"]
-    mech_seeds = list(mech.get("protocol", {}).get("seeds", [200, 201]))
-    for name in MECHANISM:
-        missing = [seed for seed in mech_seeds if f"{name}|{seed}" not in mech.get("runs", {})]
+    for opt in MECHANISM:
+        _, _, missing = custom_rows(mech, opt)
         if missing:
-            incomplete.append(f"mechanism {name} missing seeds {missing}")
-
+            incomplete.append(f"mechanism {opt} missing seeds {missing}")
     contrasts = [
         ("muon_m90", "muon", "matrix beta .90 vs .95"),
         ("astro_v2", "astro_v2_gamma0", "post-spectral row adaptation"),
@@ -184,23 +187,16 @@ def main() -> int:
             lines.append(
                 f"| {label}: `{a}` − `{b}` | {len(deltas)} | "
                 f"{statistics.fmean(deltas):+.5f} | {max(deltas):+.5f} | "
-                f"{sum(delta < 0 for delta in deltas)}/{len(deltas)} |"
+                f"{sum(d < 0 for d in deltas)}/{len(deltas)} |"
             )
         else:
             lines.append(f"| {label}: `{a}` − `{b}` | 0 | — | — | — |")
+    lines += ["", "`astro_v2` vs `astro_v2_blockwise` isolates the candidate "
+              "ASTRO-specific operation identified by the prior-art audit. A positive "
+              "result establishes empirical value, not exhaustive literature novelty."]
 
-    lines += ["", "The `astro_v2` vs `astro_v2_blockwise` contrast isolates the "
-              "candidate ASTRO-specific operation identified by the 2026 prior-art audit: "
-              "one global redistribution/restoration after semantic blocks are independently "
-              "polarised. Empirical value does not by itself prove exhaustive literature novelty."]
-
-    # Two minimal robustness checks ---------------------------------------
-    add_frozen_pair_section(lines, incomplete, state,
-                            "355M / 900-step frozen scale transfer",
-                            "355M", 900, [100, 101])
-    add_frozen_pair_section(lines, incomplete, state,
-                            "124M / 2700-step frozen durability check",
-                            "124M", 2700, [100, 101])
+    add_transfer(lines, incomplete, "355M / 900-step frozen scale transfer", scale, main_digest)
+    add_transfer(lines, incomplete, "124M / 2700-step frozen durability check", horizon, main_digest)
 
     lines += ["", "## Completeness", ""]
     if incomplete:
