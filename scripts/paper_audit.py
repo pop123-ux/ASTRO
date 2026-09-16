@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Audit the minimal ASTRO confirmatory campaign.
 
-``--strict`` fails for missing/provenance-inconsistent evidence, never because a
-scientific result is negative. The output is a claim-safe summary for writing.
+``--strict`` fails for missing/provenance-inconsistent *mandatory* evidence,
+never because a scientific result is negative.  The mandatory first-paper
+campaign is headline + mechanism + long-horizon durability.  The 355M transfer
+is audited when supplied and can be made mandatory with ``--require-scale``.
 """
 
 from __future__ import annotations
@@ -101,16 +103,22 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--main-state", type=Path, required=True)
     parser.add_argument("--mechanism-state", type=Path, required=True)
-    parser.add_argument("--scale-state", type=Path, required=True)
     parser.add_argument("--horizon-state", type=Path, required=True)
+    parser.add_argument("--scale-state", type=Path,
+                        help="optional 355M frozen-transfer state")
+    parser.add_argument("--require-scale", action="store_true",
+                        help="treat the optional 355M transfer as mandatory")
     parser.add_argument("--out", type=Path, default=Path("paper_evidence_summary.md"))
     parser.add_argument("--strict", action="store_true")
     args = parser.parse_args()
 
+    if args.require_scale and args.scale_state is None:
+        raise SystemExit("--require-scale needs --scale-state")
+
     main_state = read(args.main_state)
     mech = read(args.mechanism_state)
-    scale = read(args.scale_state)
     horizon = read(args.horizon_state)
+    scale = read(args.scale_state) if args.scale_state is not None else None
     incomplete: list[str] = []
     lines = ["# ASTRO paper evidence audit", ""]
 
@@ -195,14 +203,21 @@ def main() -> int:
               "ASTRO-specific operation identified by the prior-art audit. A positive "
               "result establishes empirical value, not exhaustive literature novelty."]
 
-    add_transfer(lines, incomplete, "355M / 900-step frozen scale transfer", scale, main_digest)
+    # Mandatory durability; optional scale transfer -----------------------
     add_transfer(lines, incomplete, "124M / 2700-step frozen durability check", horizon, main_digest)
+    if scale is not None:
+        add_transfer(lines, incomplete, "355M / 900-step frozen scale transfer", scale, main_digest)
+    else:
+        lines += ["", "## 355M frozen scale transfer", "",
+                  "Not supplied; no scale-transfer claim should be made."]
+        if args.require_scale:
+            incomplete.append("355M frozen scale transfer was required but not supplied")
 
     lines += ["", "## Completeness", ""]
     if incomplete:
         lines += [f"- INCOMPLETE: {item}" for item in incomplete]
     else:
-        lines.append("All measurements required by the minimal paper campaign are complete.")
+        lines.append("All measurements required by the selected paper scope are complete.")
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text("\n".join(lines) + "\n")
