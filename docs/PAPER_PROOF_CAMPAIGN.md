@@ -2,9 +2,12 @@
 
 This is the confirmatory experiment sequence to run **after** the historical `astro_lab.py`
 results. Historical results remain useful research evidence, but the headline paper tables should
-come from `scripts/paper_campaign.py`, which fixes the auxiliary-LR schedule confound, pins the
-corpus revision/cache, adds a faithful AdaMuon reference baseline, and adds the structural control
-needed for the ASTRO novelty claim.
+come from `scripts/paper_campaign.py`.
+
+The paper harness fixes the historical auxiliary-LR schedule confound, uses one standard GPT-style
+weight-decay routing policy across all optimizers, pins the corpus revision/cache, adds a reference
+AdaMuon matrix implementation, locks code/environment provenance into each state file, and adds the
+structural control needed for the candidate ASTRO novelty claim.
 
 The campaign is designed for repeated Google Colab T4 sessions. Every GPU command uses a persistent
 Drive workdir. Re-run an interrupted command unchanged; completed trials/seeds are skipped.
@@ -19,7 +22,7 @@ If the measurements support it, the campaign can establish:
 4. the result survives an approximate equal-wall-clock Muon control;
 5. beta/weight-decay recipe effects are separated from architecture effects;
 6. semantic splitting, row adaptation, and **global-vs-blockwise post-split redistribution** are isolated;
-7. the candidate novel operation has empirical value beyond the known NorMuon + split-QKV pattern.
+7. the candidate new operation has empirical value beyond the known NorMuon + split-QKV pattern.
 
 Experiments cannot prove exhaustive literature novelty. Use `docs/PRIOR_ART_2026_AUDIT.md` together
 with the `astro_v2_blockwise` control, and update the prior-art search immediately before submission.
@@ -41,15 +44,28 @@ with the `astro_v2_blockwise` control, and update the prior-art search immediate
 
 Do not start expensive runs if the tests fail.
 
-A campaign run should begin with a line like:
+A campaign run begins with a code fingerprint, data protocol and Python/package environment. Each
+state file records those values and refuses to resume if they change. Do not bypass that refusal by
+editing the state file.
 
-```text
-paper_campaign <12-hex fingerprint> (...)
-protocol FineWeb-Edu@v1.0.0; shared cache ...
+---
+
+## 0B. Prepare the shared corpus once
+
+Run this once **before opening multiple training sessions**:
+
+```bash
+%cd /content/ASTRO
+!python scripts/prepare_paper_data.py
 ```
 
-Record that fingerprint. Do not mix campaign fingerprints in one paper table without explicitly
-re-running the affected cells.
+It streams the pinned `FineWeb-Edu@v1.0.0` token pool once, saves it under Drive and writes a SHA-256
+checksum. Keep that output with the experiment notes.
+
+After this finishes, separate Colab sessions may run `paper_main` and `paper_mechanism` concurrently
+because they use different state files and only read the already-built shared token cache. **Never
+run two sessions against the same `--work-dir` concurrently**; the JSON state file is intentionally
+simple and is not a distributed lock/database.
 
 ---
 
@@ -65,13 +81,15 @@ Optimizers:
 AdamW
 Muon
 NorMuon
-published/reference AdaMuon
+published/reference AdaMuon matrix rule + common auxiliary AdamW protocol
 ASTRO-v2
 ```
 
-Each optimizer gets **5 tuning trials on seed 0** and then **5 held-out seeds 100–104**.
-The search spaces may use different units where the algorithms require them, but each optimizer
-receives the same number of real tuning knobs and the same number of trials.
+Each optimizer gets **5 tuning trials on seed 0** and then **5 held-out seeds 100–104**. Every
+optimizer gets three declared tuning knobs and the same five-trial budget. All use the same model,
+initialization seed, minibatch generator, fixed validation slice, gradient clipping, precision,
+learning-rate schedule shape and GPT-style decay routing. Optimizer-specific update equations and
+natural LR units remain optimizer-specific by design.
 
 Run this exact cell repeatedly until it reports no work remaining:
 
@@ -105,9 +123,9 @@ Final readout:
 !python -m json.tool /content/drive/MyDrive/astro/paper_main/astro_lab_state.json
 ```
 
-**Paper gate:** do not proceed to a superiority claim unless ASTRO-v2's held-out result survives this
-fairness-fixed rerun. If it does not, rewrite the paper around the mechanism findings instead of
-trying more seeds until significance appears.
+**Paper gate:** do not proceed to a baseline-superiority claim unless ASTRO-v2's held-out result
+survives this fairness-fixed rerun. If it does not, write the paper around the mechanism findings
+instead of adding seeds after seeing the result.
 
 ---
 
@@ -128,7 +146,7 @@ astro_v2_nosplit      remove semantic QKV splitting
 astro_v2_blockwise    split QKV, but adapt/restore each block independently
 ```
 
-The key novelty contrast is:
+The key candidate-novelty contrast is:
 
 ```text
 astro_v2  vs  astro_v2_blockwise
@@ -136,7 +154,8 @@ astro_v2  vs  astro_v2_blockwise
 
 Both use the same beta, scalar path, QKV split, row statistic, weight decay and schedule. The only
 intended difference is whether post-spectral adaptive redistribution restores one **global** fused
-operator norm (ASTRO-v2) or restores each semantic block independently (prior-art-style control).
+operator norm after recombination (ASTRO-v2), or restores each semantic block independently
+(blockwise split-NorMuon-style control).
 
 Run the exact cell repeatedly until complete:
 
@@ -189,8 +208,8 @@ contrast supports it.
 
 ## 3. Frozen 355M scale transfer
 
-Do **not** retune at 355M. This experiment asks whether the 124M-selected configurations transfer.
-It reuses `paper_main`, so the selected configurations are loaded directly from state rather than
+Do **not** retune at 355M. This experiment asks whether the configurations selected at 124M transfer.
+It reuses `paper_main`, so the selected configurations are read directly from state rather than
 copied by hand.
 
 Run repeatedly until complete:
@@ -360,7 +379,8 @@ ASTRO-v2
 ```
 
 This independent harness is a robustness check against implementation-specific conclusions. It is
-not required to claim that one experiment ran, but it materially improves a first optimizer paper.
+not required for the first complete ASTRO paper draft, but it materially strengthens an optimizer
+paper if compute permits.
 
 ---
 
@@ -370,6 +390,7 @@ Stop expanding the benchmark and write the paper when all of the following are t
 
 ```text
 [ ] paper-campaign fairness tests pass
+[ ] shared corpus prepared once and SHA-256 recorded
 [ ] 124M/900 tuning complete for all headline baselines
 [ ] 5 held-out seeds complete for all headline baselines
 [ ] ASTRO-v2 vs blockwise structural control complete
