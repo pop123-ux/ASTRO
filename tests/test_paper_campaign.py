@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import paper_campaign as campaign  # noqa: E402
 
 
-def test_auxiliary_lr_receives_the_same_schedule_factor() -> None:
+def test_auxiliary_lr_receives_the_same_schedule_factor_without_compounding() -> None:
     class Dummy:
         param_groups = [{"lr": 0.02, "adamw_lr": 0.003}]
 
@@ -26,6 +26,35 @@ def test_auxiliary_lr_receives_the_same_schedule_factor() -> None:
     campaign.schedule_optimizer_lrs(opt, 0.5)
     assert opt.param_groups[0]["lr"] == pytest.approx(0.01)
     assert opt.param_groups[0]["adamw_lr"] == pytest.approx(0.0015)
+
+
+def test_common_decay_routing_matches_standard_gpt_policy() -> None:
+    from transformers import GPT2Config, GPT2LMHeadModel
+
+    model = GPT2LMHeadModel(
+        GPT2Config(n_layer=2, n_head=2, n_embd=64, n_positions=32, vocab_size=128)
+    )
+    groups = campaign.paper_groups(model, "astro", {"weight_decay": 0.1})
+    by_id = {
+        id(param): group
+        for group in groups
+        for param in group["params"]
+    }
+
+    # Biases and LayerNorm vectors do not decay.
+    for name, param in model.named_parameters():
+        if param.ndim < 2:
+            assert by_id[id(param)]["weight_decay"] == pytest.approx(0.0), name
+
+    # Tied token embedding / LM head stays on AdamW but does decay.
+    embedding = model.transformer.wte.weight
+    assert by_id[id(embedding)]["spectral"] is False
+    assert by_id[id(embedding)]["weight_decay"] == pytest.approx(0.1)
+
+    # Hidden operators decay and use the matrix path.
+    hidden = model.transformer.h[0].mlp.c_fc.weight
+    assert by_id[id(hidden)]["spectral"] is True
+    assert by_id[id(hidden)]["weight_decay"] == pytest.approx(0.1)
 
 
 def test_published_adamuon_signs_before_newton_schulz(monkeypatch) -> None:
@@ -44,7 +73,7 @@ def test_published_adamuon_signs_before_newton_schulz(monkeypatch) -> None:
     opt = campaign.PublishedAdaMuon(
         [{"params": [weight], "spectral": True, "transposed": False}],
         lr=0.01,
-        adamw_lr=0.01,
+        adamw_lr=0.001,
         weight_decay=0.0,
         momentum=0.0,
         nesterov=False,
@@ -54,10 +83,11 @@ def test_published_adamuon_signs_before_newton_schulz(monkeypatch) -> None:
     assert set(seen["x"].unique().tolist()) <= {-1.0, 0.0, 1.0}
 
 
-def test_published_adamuon_uses_adam_scaled_lr_search() -> None:
+def test_published_adamuon_uses_its_natural_lr_and_common_auxiliary_knob() -> None:
     space = campaign.paper_space_for("adamuon_ref")
     assert space["lr"] == campaign.lab.ADAM_LR
-    assert set(space) == {"lr", "weight_decay", "momentum"}
+    assert set(space) == {"lr", "weight_decay", "scalar_lr_mult"}
+    assert len(space) == len(campaign.paper_space_for("muon"))
 
 
 def test_paper_only_structural_controls_are_registered() -> None:
@@ -95,3 +125,13 @@ def test_corpus_protocol_is_fixed_and_revision_pinned() -> None:
     assert campaign.FINEWEB_REVISION == "v1.0.0"
     assert campaign.TRAIN_TOKENS == 12_000_000
     assert campaign.TOTAL_TOKENS == campaign.TRAIN_TOKENS + campaign.lab.VALIDATION_TOKENS
+
+
+def test_protocol_record_binds_code_data_and_environment() -> None:
+    record = campaign.protocol_record()
+    assert len(record["code_digest"]) == 64
+    assert record["fineweb_revision"] == "v1.0.0"
+    assert record["training_token_pool"] == 12_000_000
+    assert {"python", "torch", "torch_cuda", "transformers", "datasets"} <= set(
+        record["environment"]
+    )
