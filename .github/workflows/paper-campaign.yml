@@ -9,6 +9,7 @@ on:
       - "scripts/paper_mechanism.py"
       - "scripts/paper_transfer.py"
       - "scripts/paper_collect.py"
+      - "scripts/paper_plot.py"
       - "scripts/prepare_paper_data.py"
       - "scripts/paper_audit.py"
       - "scripts/novelty_gate.py"
@@ -27,6 +28,7 @@ on:
       - "scripts/paper_mechanism.py"
       - "scripts/paper_transfer.py"
       - "scripts/paper_collect.py"
+      - "scripts/paper_plot.py"
       - "scripts/prepare_paper_data.py"
       - "scripts/paper_audit.py"
       - "scripts/novelty_gate.py"
@@ -60,6 +62,7 @@ jobs:
             scripts/paper_mechanism.py \
             scripts/paper_transfer.py \
             scripts/paper_collect.py \
+            scripts/paper_plot.py \
             scripts/prepare_paper_data.py \
             scripts/paper_audit.py \
             scripts/novelty_gate.py \
@@ -77,5 +80,7 @@ jobs:
         run: python scripts/novelty_gate.py
       - name: Registry smoke test
         run: python scripts/paper_campaign.py --mode components > /tmp/components.txt
-      - name: Plotting smoke test
-        run: python scripts/figures/make_all.py --paper
+      - name: Plotting CLI smoke tests
+        run: |
+          python scripts/paper_plot.py --help > /tmp/paper_plot_help.txt
+          python scripts/figures/make_all.py --paper
