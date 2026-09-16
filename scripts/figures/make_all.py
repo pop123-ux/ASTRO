@@ -1,8 +1,7 @@
 """Build ASTRO paper figures that have data, and name the ones that do not.
 
-The final paper campaign is deliberately isolated from the historical figures.
-Use ``--paper`` after each experimental milestone; only figures backed by
-``artifacts/paper_campaign.json`` will render.
+The confirmatory paper campaign is deliberately isolated from historical plots.
+Use ``--paper`` after the final campaign or ``--only`` after each milestone.
 
     python scripts/figures/make_all.py --paper
     python scripts/figures/make_all.py --only paper_main paper_ablation
@@ -21,59 +20,53 @@ sys.path.insert(0, str(HERE))
 
 from style import OUT  # noqa: E402
 
-# name -> (module, what it supports, whether it needs a measurement upload)
 FIGURES = {
-    # Clean paper-proof campaign -------------------------------------------
+    # Clean confirmatory campaign -----------------------------------------
     "paper_main": (
         "fig_paper_main",
-        "five held-out seeds comparing Muon, faithful AdaMuon, and ASTRO-v2",
-        True,
-    ),
-    "paper_convergence": (
-        "fig_paper_convergence",
-        "training-loss convergence versus optimizer steps and measured wall-clock",
+        "five held-out seeds plus measured runtime for the headline baselines",
         True,
     ),
     "paper_ablation": (
         "fig_paper_ablation",
-        "the minimal beta / row-adaptation / QKV-split causal ladder",
+        "beta, row-adaptation, QKV-split, and global-vs-blockwise controls",
         True,
     ),
     "paper_scale": (
         "fig_paper_scale",
-        "frozen 124M recipe transfer to 355M",
+        "frozen Muon/ASTRO-v2 transfer from 124M to 355M",
         True,
     ),
     "paper_horizon": (
         "fig_paper_horizon",
-        "frozen-recipe durability from 900 to 2700 steps",
+        "frozen Muon/ASTRO-v2 durability from 900 to 2700 steps",
         True,
     ),
 
-    # Historical ASTRO-v2 research spine ---------------------------------
+    # Historical research figures retained for audit/history --------------
     "optimizer_journey": (
         "fig_optimizer_journey",
-        "the progression from Muon/NorMuon/AdaMuon to ASTRO-MB and ASTRO-v2",
+        "historical optimizer progression",
         False,
     ),
     "paired_900": (
         "fig_paired_900",
-        "all five historical 124M/900 shared-configuration pairings",
+        "historical 124M/900 shared-configuration pairings",
         False,
     ),
     "horizon_v2": (
         "fig_horizon_v2",
-        "the historical ASTRO-v2 paired margin across training horizons",
+        "historical pre-confirmatory horizon study",
         False,
     ),
     "efficiency_v2": (
         "fig_efficiency_v2",
-        "historical validation-loss gain and runtime cost",
+        "historical same-step runtime study",
         False,
     ),
     "seed_replication": (
         "fig_seed_replication",
-        "historical independent-seed replication rendering",
+        "historical seed-replication rendering",
         False,
     ),
     "scale_status": (
@@ -83,11 +76,9 @@ FIGURES = {
     ),
     "training_trajectories": (
         "fig_training_trajectories",
-        "historical validation loss versus step and wall-clock",
+        "historical trajectory figure",
         True,
     ),
-
-    # Mechanistic / historical figures retained as supporting evidence ----
     "leverage": (
         "fig_leverage",
         "row norms of a Muon update are leverage scores",
@@ -95,48 +86,41 @@ FIGURES = {
     ),
     "quintic": (
         "fig_quintic",
-        "Muon's repeated quintic does not converge to the exact polar factor",
+        "Muon quintic behaviour",
         False,
     ),
     "curvature": (
         "fig_curvature",
-        "the advantage is a direction effect, not only a step-size effect",
+        "direction versus step-size mechanism probe",
         True,
     ),
     "results_legacy": (
         "fig_results",
-        "the earlier 124M comparison, retained as research history",
+        "earlier 124M comparison",
         False,
     ),
     "inversion": (
         "fig_inversion",
-        "a component whose sign inverts with scale",
+        "historical component scale reversal",
         False,
     ),
     "horizon_legacy": (
         "fig_horizon",
-        "the superseded/earlier horizon study",
+        "superseded horizon study",
         False,
     ),
     "drift": (
         "fig_drift",
-        "spectral update-norm drift observed during real training",
+        "spectral update-norm drift probe",
         True,
     ),
 }
 
-PAPER_FIGURES = (
-    "paper_main",
-    "paper_convergence",
-    "paper_ablation",
-    "paper_scale",
-    "paper_horizon",
-)
+PAPER_FIGURES = ("paper_main", "paper_ablation", "paper_scale", "paper_horizon")
 
 
 def load_builder(module_name: str):
-    module = importlib.import_module(module_name)
-    return module.build
+    return importlib.import_module(module_name).build
 
 
 def main() -> int:
@@ -146,7 +130,7 @@ def main() -> int:
     parser.add_argument("--only", nargs="*", choices=sorted(FIGURES),
                         help="build a named subset")
     parser.add_argument("--paper", action="store_true",
-                        help="build only the clean paper-proof campaign figures")
+                        help="build only the clean confirmatory paper figures")
     args = parser.parse_args()
     if args.only and args.paper:
         parser.error("use either --paper or --only, not both")
@@ -160,12 +144,11 @@ def main() -> int:
 
     built, skipped, failed = [], [], []
     for name in wanted:
-        module_name, claim, needs_upload = FIGURES[name]
+        module_name, claim, needs_measurement = FIGURES[name]
         print(f"\n{name}: {claim}")
         before = stamps()
         try:
-            builder = load_builder(module_name)
-            builder()
+            load_builder(module_name)()
         except ModuleNotFoundError as exc:
             print(f"  FAILED {name}: missing dependency {exc.name!r}")
             failed.append(name)
@@ -178,14 +161,14 @@ def main() -> int:
         if any(time != before.get(path) for path, time in after.items()):
             built.append(name)
         else:
-            skipped.append((name, needs_upload))
+            skipped.append((name, needs_measurement))
 
     print("\n" + "=" * 70)
     print(f"built {len(built)}: {', '.join(built) or 'none'}")
     if skipped:
-        print("waiting on a measurement or input:")
-        for name, needs_upload in skipped:
-            where = "paper campaign measurement required" if needs_upload else "missing input"
+        print("waiting on input:")
+        for name, needs_measurement in skipped:
+            where = "confirmatory measurement required" if needs_measurement else "missing input"
             print(f"  {name:22s} -- {where}")
     if failed:
         print(f"FAILED {len(failed)}: {', '.join(failed)}")
