@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""Collect paper-campaign states into one plotting/paper artifact.
+"""Collect the clean ASTRO paper campaign into one plotting artifact.
 
-This script performs no training and never invents missing values. Stages that
-have not been run remain explicitly incomplete. The resulting
-``artifacts/paper_campaign.json`` is the only input used by the new paper-grade
-figures, keeping historical/confounded measurements out of the final plots.
+Inputs are deliberately narrow:
+
+* the canonical ``paper_campaign.py`` state, which contains the tuned 124M
+  result and later frozen 355M / 2700 transfer cells;
+* the frozen-config ``paper_mechanism.py`` state.
+
+No historical ``paper_results.json`` value is imported, so the final figures
+cannot silently mix the old confounded harness with the confirmatory campaign.
 """
 
 from __future__ import annotations
@@ -15,73 +19,77 @@ import statistics
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+HEADLINE = ("adamw", "muon", "normuon", "adamuon_ref", "astro_v2")
+MECHANISM = (
+    "muon",
+    "muon_m90",
+    "astro_v2_gamma0",
+    "astro_v2_nosplit",
+    "astro_v2_blockwise",
+    "astro_v2",
+)
 
 
-def _load(path: Path | None) -> dict | None:
-    if path is None or not path.is_file():
-        return None
-    return json.loads(path.read_text())
+def load(path: Path | None) -> dict | None:
+    return json.loads(path.read_text()) if path is not None and path.is_file() else None
 
 
-def _mean(values: list[float]) -> float | None:
+def mean(values: list[float]) -> float | None:
     return statistics.fmean(values) if values else None
 
 
-def _sd(values: list[float]) -> float | None:
+def sd(values: list[float]) -> float | None:
     return statistics.stdev(values) if len(values) > 1 else None
 
 
-def _main_block(state: dict | None, size: str = "124M", steps: int = 900) -> dict:
+def run_block(state: dict | None, size: str, steps: int, names, seeds) -> dict:
     if state is None:
-        return {"complete": False, "optimizers": {}}
-    # AdamW is the standard reference; Muon, NorMuon, and faithful AdaMuon are
-    # the closest matrix-optimizer prior art to the ASTRO recipe.
-    names = ["adamw", "muon", "normuon", "adamuon_ref", "astro_v2"]
-    out: dict = {"complete": True, "optimizers": {}}
+        return {"complete": False, "size": size, "steps": steps, "optimizers": {}}
+    out = {"complete": True, "size": size, "steps": steps, "optimizers": {}}
     for name in names:
         rows = []
-        for seed in range(100, 105):
-            key = f"{size}|{steps}|{name}|{seed}"
-            if key in state.get("runs", {}):
-                rows.append((seed, state["runs"][key]))
-        values = [float(row[1]["value"]) for row in rows]
-        seconds = [float(row[1]["seconds"]) for row in rows]
+        for seed in seeds:
+            entry = state.get("runs", {}).get(f"{size}|{steps}|{name}|{seed}")
+            if entry is not None:
+                rows.append((seed, entry))
+        values = [float(entry["value"]) for _, entry in rows]
+        seconds = [float(entry["seconds"]) for _, entry in rows]
         out["optimizers"][name] = {
-            "config": state.get("tuned", {}).get(name),
-            "seeds": [row[0] for row in rows],
+            "seeds": [seed for seed, _ in rows],
             "loss": values,
             "seconds": seconds,
-            "mean": _mean(values),
-            "sample_sd": _sd(values),
-            "mean_seconds": _mean(seconds),
-            "complete": len(rows) == 5,
+            "mean": mean(values),
+            "sample_sd": sd(values),
+            "mean_seconds": mean(seconds),
+            "config": rows[0][1].get("config") if rows else state.get("tuned", {}).get(name),
+            "complete": len(rows) == len(seeds),
         }
-        out["complete"] &= len(rows) == 5
+        out["complete"] &= len(rows) == len(seeds)
 
-    muon = out["optimizers"]["muon"]
-    m = {s: v for s, v in zip(muon["seeds"], muon["loss"])}
-    for name in ("adamw", "normuon", "adamuon_ref", "astro_v2"):
-        other = out["optimizers"][name]
-        common = sorted(set(muon["seeds"]) & set(other["seeds"]))
-        o = {s: v for s, v in zip(other["seeds"], other["loss"])}
-        deltas = [o[s] - m[s] for s in common]
-        other["paired_vs_muon"] = {
-            "seeds": common,
-            "delta": deltas,
-            "mean_delta": _mean(deltas),
-            "wins": sum(d < 0 for d in deltas),
-        }
+    if "muon" in out["optimizers"] and out["optimizers"]["muon"]["loss"]:
+        mrow = out["optimizers"]["muon"]
+        m = {s: v for s, v in zip(mrow["seeds"], mrow["loss"])}
+        for name, row in out["optimizers"].items():
+            if name == "muon":
+                continue
+            other = {s: v for s, v in zip(row["seeds"], row["loss"])}
+            common = sorted(set(m) & set(other))
+            deltas = [other[s] - m[s] for s in common]
+            row["paired_vs_muon"] = {
+                "seeds": common,
+                "delta": deltas,
+                "mean_delta": mean(deltas),
+                "wins": sum(delta < 0 for delta in deltas),
+            }
     return out
 
 
-def _stage_block(state: dict | None) -> dict:
+def mechanism_block(state: dict | None) -> dict:
     if state is None:
-        return {"complete": False, "protocol": None, "optimizers": {}}
-    protocol = state.get("protocol", {})
-    seeds = list(protocol.get("seeds", []))
-    names = list(protocol.get("optimizers", []))
-    out = {"complete": True, "protocol": protocol, "optimizers": {}}
-    for name in names:
+        return {"complete": False, "optimizers": {}, "protocol": None}
+    seeds = list(state.get("protocol", {}).get("seeds", [200, 201]))
+    out = {"complete": True, "protocol": state.get("protocol"), "optimizers": {}}
+    for name in MECHANISM:
         rows = []
         for seed in seeds:
             entry = state.get("runs", {}).get(f"{name}|{seed}")
@@ -93,76 +101,44 @@ def _stage_block(state: dict | None) -> dict:
             "seeds": [seed for seed, _ in rows],
             "loss": values,
             "seconds": seconds,
-            "mean": _mean(values),
-            "sample_sd": _sd(values),
-            "mean_seconds": _mean(seconds),
+            "mean": mean(values),
+            "sample_sd": sd(values),
+            "mean_seconds": mean(seconds),
             "config": rows[0][1].get("config") if rows else None,
-            "complete": len(rows) == len(seeds) and bool(seeds),
+            "complete": len(rows) == len(seeds),
         }
-        out["complete"] &= len(rows) == len(seeds) and bool(seeds)
-    return out
-
-
-def _traces(directory: Path | None) -> dict:
-    if directory is None or not directory.is_dir():
-        return {}
-    out: dict[str, dict[str, dict]] = {}
-    for path in sorted(directory.glob("*.json")):
-        try:
-            payload = json.loads(path.read_text())
-        except Exception:
-            continue
-        name = payload.get("optimizer")
-        seed = payload.get("seed")
-        if name is None or seed is None:
-            continue
-        out.setdefault(name, {})[str(seed)] = {
-            "step": payload.get("train_trace", {}).get("step", []),
-            "loss": payload.get("train_trace", {}).get("loss", []),
-            "seconds": payload.get("train_trace", {}).get("seconds", []),
-            "final_val_loss": payload.get("final_val_loss"),
-            "peak_vram_gb": payload.get("peak_vram_gb"),
-            "corpus_sha256": payload.get("corpus_sha256"),
-            "paper_lab_sha256": payload.get("paper_lab_sha256"),
-            "astro_lab_sha256": payload.get("astro_lab_sha256"),
-        }
+        out["complete"] &= len(rows) == len(seeds)
     return out
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--main", type=Path, required=True,
-                        help="main/astro_lab_state.json")
-    parser.add_argument("--ablation", type=Path)
-    parser.add_argument("--scale", type=Path)
-    parser.add_argument("--horizon", type=Path)
-    parser.add_argument("--main-traces", type=Path)
+                        help="paper_main/astro_lab_state.json")
+    parser.add_argument("--mechanism", type=Path,
+                        help="paper_mechanism/paper_mechanism_state.json")
     parser.add_argument("--out", type=Path,
                         default=ROOT / "artifacts" / "paper_campaign.json")
     args = parser.parse_args()
 
+    main_state = load(args.main)
+    mech_state = load(args.mechanism)
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "principle": (
-            "Only results produced by scripts/paper_lab.py or paper_stage.py belong "
-            "in this artifact. Historical astro_lab results remain separate."
+            "Only confirmatory paper_campaign.py / paper_mechanism.py results are "
+            "eligible. Historical astro_lab measurements are excluded."
         ),
-        "main_124m_900": _main_block(_load(args.main)),
-        "ablation_124m_900": _stage_block(_load(args.ablation)),
-        "scale_355m_900": _stage_block(_load(args.scale)),
-        "horizon_124m_2700": _stage_block(_load(args.horizon)),
-        "main_traces": _traces(args.main_traces),
+        "paper_protocol": main_state.get("paper_protocol") if main_state else None,
+        "main_124m_900": run_block(main_state, "124M", 900, HEADLINE, range(100, 105)),
+        "mechanism_124m_900": mechanism_block(mech_state),
+        "scale_355m_900": run_block(main_state, "355M", 900, ("muon", "astro_v2"), range(100, 102)),
+        "horizon_124m_2700": run_block(main_state, "124M", 2700, ("muon", "astro_v2"), range(100, 102)),
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(payload, indent=2, sort_keys=True))
-
     print(f"wrote {args.out}")
-    for key in (
-        "main_124m_900",
-        "ablation_124m_900",
-        "scale_355m_900",
-        "horizon_124m_2700",
-    ):
+    for key in ("main_124m_900", "mechanism_124m_900", "scale_355m_900", "horizon_124m_2700"):
         print(f"  {key:24s} complete={payload[key]['complete']}")
     return 0
 
