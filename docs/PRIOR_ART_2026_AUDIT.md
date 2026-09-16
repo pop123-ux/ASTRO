@@ -57,6 +57,20 @@ result to preserve the update norm.
 Not novel for ASTRO: row-wise post-polar adaptation followed by Frobenius-norm preservation.
 This is the closest prior art to ASTRO's redistribution stage.
 
+### TrasMuon — 2026
+
+TrasMuon explicitly combines Muon-style orthogonalisation with adaptive magnitude control through
+global RMS calibration and energy-based trust-region clipping.
+
+- Paper: https://arxiv.org/abs/2602.13498
+
+This is important nearby prior art because it rules out a broad claim that ASTRO is novel merely
+for restoring global magnitude information after a spectral update. TrasMuon does **not**, in the
+sources inspected for this audit, describe ASTRO's specific semantic-block sequence of separately
+polarising fused Q/K/V blocks, recombining them, then carrying out row-wise adaptive redistribution
+under one fused-operator Frobenius budget. Treat that narrower distinction as a candidate novelty,
+not as established priority.
+
 ### Split / chunked QKV Muon — public before this paper
 
 By 2026, operator-aware splitting of fused QKV before orthogonalisation is public in several places.
@@ -67,7 +81,9 @@ By 2026, operator-aware splitting of fused QKV before orthogonalisation is publi
 - Muonium: https://github.com/tonyf/muonium
 
 These implementations explicitly support splitting fused QKV into semantic row blocks before
-Newton–Schulz. Some support NorMuon together with split blocks.
+Newton–Schulz. Some support NorMuon together with split blocks. Muonium documents that when
+`split_sizes` is used with NorMuon, the blocks are orthogonalised and normalised independently,
+matching the updates separate block parameters would receive.
 
 Not novel for ASTRO: detecting fused QKV, splitting Q/K/V before orthogonalisation, or claiming
 that fused treatment can couple functionally distinct operators.
@@ -99,7 +115,7 @@ retains its own magnitude budget. ASTRO permits adaptive movement of update ener
 blocks while preserving only the total fused-operator magnitude.
 
 This is the exact hypothesis the paper must test. Do not call the whole recipe novel if the evidence
-only shows that QKV splitting or NorMuon-style adaptation helps.
+only shows that QKV splitting, NorMuon-style adaptation, or global magnitude calibration helps.
 
 ## Required novelty-control experiment
 
@@ -129,13 +145,14 @@ Allowed only if measured:
 
 - "ASTRO-v2 achieved lower validation loss than the tested baselines under the declared protocol."
 - "Global post-split redistribution improved over the matched blockwise control across X/Y settings."
-- "The candidate design differs from the prior-art split-NorMuon pattern by restoring magnitude
+- "The candidate design differs from the inspected split-NorMuon pattern by restoring magnitude
   globally after recombining semantic blocks."
 
 Do not write without stronger evidence:
 
 - "ASTRO invented QKV splitting."
 - "ASTRO invented post-polar row adaptation."
+- "ASTRO invented global RMS/Frobenius calibration after orthogonalisation."
 - "ASTRO is the first optimizer to combine Muon and NorMuon ideas."
 - "ASTRO is universally better than Muon/NorMuon/AdaMuon."
 - "The literature proves no previous method performs global cross-block redistribution."
@@ -151,6 +168,8 @@ split QKV row-wise adaptive Muon
 cross-block NorMuon
 operator-aware Muon adaptive redistribution
 fused projection orthogonalization global Frobenius
+TrasMuon fused QKV split
+semantic block adaptive Muon global RMS
 ```
 
 Record the search date and any newly surfaced papers/repositories in this document.
