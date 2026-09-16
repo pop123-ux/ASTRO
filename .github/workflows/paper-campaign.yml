@@ -1,0 +1,38 @@
+name: Paper campaign checks
+
+on:
+  push:
+    branches: [paper-proof-campaign]
+    paths:
+      - "scripts/paper_campaign.py"
+      - "scripts/paper_audit.py"
+      - "tests/test_paper_campaign.py"
+      - "docs/PAPER_PROOF_CAMPAIGN.md"
+      - "docs/PRIOR_ART_2026_AUDIT.md"
+      - ".github/workflows/paper-campaign.yml"
+  pull_request:
+    paths:
+      - "scripts/paper_campaign.py"
+      - "scripts/paper_audit.py"
+      - "tests/test_paper_campaign.py"
+      - ".github/workflows/paper-campaign.yml"
+
+jobs:
+  campaign-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch transformers datasets pytest
+      - name: Syntax check
+        run: python -m py_compile scripts/astro_lab.py scripts/paper_campaign.py scripts/paper_audit.py tests/test_paper_campaign.py
+      - name: Campaign fairness tests
+        run: pytest tests/test_paper_campaign.py -q
+      - name: Registry smoke test
+        run: python scripts/paper_campaign.py --mode components > /tmp/components.txt
