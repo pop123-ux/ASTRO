@@ -5,6 +5,7 @@ on:
     branches: [paper-proof-campaign]
     paths:
       - "scripts/paper_campaign.py"
+      - "scripts/prepare_paper_data.py"
       - "scripts/paper_audit.py"
       - "tests/test_paper_campaign.py"
       - "docs/PAPER_PROOF_CAMPAIGN.md"
@@ -13,6 +14,7 @@ on:
   pull_request:
     paths:
       - "scripts/paper_campaign.py"
+      - "scripts/prepare_paper_data.py"
       - "scripts/paper_audit.py"
       - "tests/test_paper_campaign.py"
       - ".github/workflows/paper-campaign.yml"
@@ -31,7 +33,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install torch transformers datasets pytest
       - name: Syntax check
-        run: python -m py_compile scripts/astro_lab.py scripts/paper_campaign.py scripts/paper_audit.py tests/test_paper_campaign.py
+        run: >-
+          python -m py_compile
+          scripts/astro_lab.py
+          scripts/paper_campaign.py
+          scripts/prepare_paper_data.py
+          scripts/paper_audit.py
+          tests/test_paper_campaign.py
       - name: Campaign fairness tests
         run: pytest tests/test_paper_campaign.py -q
       - name: Registry smoke test
