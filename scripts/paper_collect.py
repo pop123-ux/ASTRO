@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import statistics
 from pathlib import Path
 
@@ -35,7 +34,9 @@ def _sd(values: list[float]) -> float | None:
 def _main_block(state: dict | None, size: str = "124M", steps: int = 900) -> dict:
     if state is None:
         return {"complete": False, "optimizers": {}}
-    names = ["muon", "adamuon_ref", "astro_v2"]
+    # Direct matrix-optimizer baselines. AdamW can remain an appendix sanity
+    # baseline; these three are the closest prior-art comparators to ASTRO.
+    names = ["muon", "normuon", "adamuon_ref", "astro_v2"]
     out: dict = {"complete": True, "optimizers": {}}
     for name in names:
         rows = []
@@ -58,10 +59,10 @@ def _main_block(state: dict | None, size: str = "124M", steps: int = 900) -> dic
         out["complete"] &= len(rows) == 5
 
     muon = out["optimizers"]["muon"]
-    for name in ("adamuon_ref", "astro_v2"):
+    m = {s: v for s, v in zip(muon["seeds"], muon["loss"])}
+    for name in ("normuon", "adamuon_ref", "astro_v2"):
         other = out["optimizers"][name]
         common = sorted(set(muon["seeds"]) & set(other["seeds"]))
-        m = {s: v for s, v in zip(muon["seeds"], muon["loss"])}
         o = {s: v for s, v in zip(other["seeds"], other["loss"])}
         deltas = [o[s] - m[s] for s in common]
         other["paired_vs_muon"] = {
@@ -156,7 +157,12 @@ def main() -> int:
     args.out.write_text(json.dumps(payload, indent=2, sort_keys=True))
 
     print(f"wrote {args.out}")
-    for key in ("main_124m_900", "ablation_124m_900", "scale_355m_900", "horizon_124m_2700"):
+    for key in (
+        "main_124m_900",
+        "ablation_124m_900",
+        "scale_355m_900",
+        "horizon_124m_2700",
+    ):
         print(f"  {key:24s} complete={payload[key]['complete']}")
     return 0
 
