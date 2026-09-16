@@ -1,6 +1,6 @@
 """Paper figure: training-loss convergence versus steps and wall-clock.
 
-No extra evaluation passes are introduced for this plot.  ``paper_lab.py`` logs
+No extra evaluation passes are introduced for this plot. ``paper_lab.py`` logs
 training loss and elapsed time at the normal console logging points, and this
 figure averages those matched points over the five held-out seeds.
 """
@@ -36,7 +36,7 @@ def build(source: str = "paper_campaign.json") -> None:
         missing("fig_paper_convergence", "python scripts/paper_collect.py --main-traces ...")
         return
     traces = payload.get("main_traces", {})
-    names = ["muon", "adamuon_ref", "astro_v2"]
+    names = ["muon", "normuon", "adamuon_ref", "astro_v2"]
     averaged = {name: _mean_trace(traces.get(name, {})) for name in names}
     if any(averaged[name] is None for name in names):
         missing("fig_paper_convergence", "finish the clean main run and collect its paper_traces directory")
@@ -47,9 +47,9 @@ def build(source: str = "paper_campaign.json") -> None:
     output = {}
     for name in names:
         step, loss, seconds = averaged[name]  # type: ignore[misc]
-        ax_step.plot(step, loss, color=COLORS[name], linewidth=1.45,
+        ax_step.plot(step, loss, color=COLORS[name], linewidth=1.35,
                      label=LABELS[name])
-        ax_time.plot(seconds / 60.0, loss, color=COLORS[name], linewidth=1.45,
+        ax_time.plot(seconds / 60.0, loss, color=COLORS[name], linewidth=1.35,
                      label=LABELS[name])
         output[name] = {
             "step": step.tolist(),
@@ -66,12 +66,9 @@ def build(source: str = "paper_campaign.json") -> None:
                       fontsize=7.3, fontweight="bold")
     ax_time.set_title("measured wall-clock", loc="left", pad=6,
                       fontsize=7.3, fontweight="bold")
-    ax_time.legend(loc="upper right", fontsize=6.0, handlelength=1.1)
+    ax_time.legend(loc="upper right", fontsize=5.7, handlelength=1.0, labelspacing=0.28)
     label_panels(axes)
 
-    # The first few logged points dominate the y-range and hide the regime the
-    # paper actually discusses.  Keep all points but cap only if the common
-    # starting loss is far above the late-training range.
     late = np.concatenate([averaged[name][1][-6:] for name in names])  # type: ignore[index]
     upper = max(float(np.max(late)) + 0.8, float(np.min([averaged[n][1][0] for n in names])))
     for ax in axes:
