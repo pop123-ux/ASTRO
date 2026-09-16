@@ -32,7 +32,7 @@ required unless the paper claims wall-clock superiority.
 !git fetch origin
 !git checkout paper-proof-campaign
 !git pull origin paper-proof-campaign
-!pip -q install torch transformers datasets matplotlib numpy pytest
+!pip -q install transformers datasets matplotlib numpy pytest
 
 !pytest -q tests/test_paper_campaign.py tests/test_paper_mechanism.py
 !python scripts/novelty_gate.py
@@ -208,6 +208,13 @@ For the mandatory A--C campaign:
 ```python
 %cd /content/ASTRO
 
+!python scripts/paper_audit.py \
+  --main-state /content/drive/MyDrive/astro/paper_main/astro_lab_state.json \
+  --mechanism-state /content/drive/MyDrive/astro/paper_mechanism/paper_mechanism_state.json \
+  --horizon-state /content/drive/MyDrive/astro/paper_horizon_2700/paper_transfer_state.json \
+  --out /content/drive/MyDrive/astro/paper_evidence_summary.md \
+  --strict
+
 !python scripts/paper_collect.py \
   --main /content/drive/MyDrive/astro/paper_main/astro_lab_state.json \
   --mechanism /content/drive/MyDrive/astro/paper_mechanism/paper_mechanism_state.json \
@@ -222,26 +229,18 @@ If Stage D was also run, use:
 
 ```python
 %cd /content/ASTRO
-!python scripts/paper_plot.py --stage all
-```
-
-and run the strict evidence audit:
-
-```python
-%cd /content/ASTRO
 
 !python scripts/paper_audit.py \
   --main-state /content/drive/MyDrive/astro/paper_main/astro_lab_state.json \
   --mechanism-state /content/drive/MyDrive/astro/paper_mechanism/paper_mechanism_state.json \
-  --scale-state /content/drive/MyDrive/astro/paper_scale_355m/paper_transfer_state.json \
   --horizon-state /content/drive/MyDrive/astro/paper_horizon_2700/paper_transfer_state.json \
+  --scale-state /content/drive/MyDrive/astro/paper_scale_355m/paper_transfer_state.json \
+  --require-scale \
   --out /content/drive/MyDrive/astro/paper_evidence_summary.md \
   --strict
-```
 
-If Stage D is intentionally skipped, do not use `paper_audit.py --strict` in its
-current four-stage form; the paper can still be drafted from A--C with the scale
-claim omitted.
+!python scripts/paper_plot.py --stage all
+```
 
 ---
 
