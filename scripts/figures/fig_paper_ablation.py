@@ -1,18 +1,21 @@
-"""Paper figure: minimal causal ladder for the ASTRO-v2 recipe.
+"""Paper figure: minimal causal controls for the ASTRO-v2 recipe.
 
-The ladder answers exactly the attribution questions that matter:
-1) does changing Muon's matrix momentum from .95 to .90 matter?
-2) does an ASTRO implementation with both novel mechanisms disabled match the
-   beta-aligned Muon control?
-3) what changes when post-polar row redistribution is enabled?
-4) what changes when Q/K/V are treated as separate operators?
+Panel (a) removes the matrix-momentum confound and checks implementation parity.
+Panel (b) is the smallest factorial that can support a claim about the *combined*
+effect of post-polar row redistribution and operator-aware QKV splitting.  Both
+components have close prior art; the interaction/composition is therefore more
+important scientifically than presenting either component as independently new.
 """
 
 from __future__ import annotations
 
 import numpy as np
 
-from paper_style import COLORS, LABELS, column_figure, grid, missing, read_data, save, write_data
+from paper_style import COLORS, figure, grid, label_panels, missing, read_data, save, write_data
+
+
+def _values(block: dict, name: str) -> np.ndarray:
+    return np.asarray(block["optimizers"][name]["loss"], dtype=float)
 
 
 def build(source: str = "paper_campaign.json") -> None:
@@ -21,72 +24,99 @@ def build(source: str = "paper_campaign.json") -> None:
         missing("fig_paper_ablation", "python scripts/paper_collect.py ...")
         return
     block = payload.get("ablation_124m_900", {})
-    if not block.get("complete"):
-        missing("fig_paper_ablation", "finish the two-seed causal ablation stage")
-        return
-
-    names = [
+    required = [
         "muon",
         "muon_m90",
         "astro_v2_gamma0_nosplit",
+        "astro_v2_gamma0",
         "astro_v2_nosplit",
         "astro_v2",
     ]
-    labels = [
-        r"Muon\n$\beta=.95$",
-        r"Muon\n$\beta=.90$",
-        r"parity ctrl.\n$\gamma=0$, fused",
-        r"+ row adapt.\nfused",
-        r"+ QKV split\nASTRO-v2",
-    ]
+    if not block.get("complete") or any(name not in block.get("optimizers", {}) for name in required):
+        missing("fig_paper_ablation", "finish the six-condition, two-seed causal ablation stage")
+        return
 
-    fig, ax = column_figure(height=2.78)
-    x = np.arange(len(names), dtype=float)
-    means = []
-    payload_out = {}
+    fig, axes = figure(panels=2, height=2.48)
+    ax_beta, ax_factor = axes
+    output = {}
 
-    for xi, name in zip(x, names):
-        values = np.asarray(block["optimizers"][name]["loss"], dtype=float)
+    # (a) Beta + parity control --------------------------------------------
+    beta_names = ["muon", "muon_m90", "astro_v2_gamma0_nosplit"]
+    beta_labels = [r"Muon\n$\beta=.95$", r"Muon\n$\beta=.90$", r"ASTRO ctrl.\n$\gamma=0$, fused"]
+    beta_x = np.arange(3, dtype=float)
+    beta_means = []
+    for xi, name in zip(beta_x, beta_names):
+        values = _values(block, name)
         mean = float(values.mean())
-        means.append(mean)
-        jitter = np.linspace(-0.055, 0.055, len(values)) if len(values) > 1 else np.array([0.0])
-        ax.scatter(np.full(len(values), xi) + jitter, values, s=20,
-                   color=COLORS[name], alpha=0.70, linewidths=0, zorder=3)
-        ax.scatter(xi, mean, marker="D" if name == "astro_v2" else "o",
-                   s=36 if name == "astro_v2" else 29,
-                   color=COLORS[name], edgecolor="white", linewidth=0.5, zorder=4)
-        payload_out[name] = {"loss": values.tolist(), "mean": mean}
+        beta_means.append(mean)
+        jitter = np.linspace(-0.045, 0.045, len(values)) if len(values) > 1 else np.array([0.0])
+        ax_beta.scatter(np.full(len(values), xi) + jitter, values, s=18,
+                        color=COLORS[name], alpha=0.65, linewidths=0, zorder=3)
+        ax_beta.scatter(xi, mean, s=32, color=COLORS[name], edgecolor="white",
+                        linewidth=0.45, zorder=4)
+        output[name] = {"loss": values.tolist(), "mean": mean}
+    ax_beta.plot(beta_x, beta_means, color="#D2D2D2", linewidth=0.9, zorder=1)
+    ax_beta.set_xticks(beta_x)
+    ax_beta.set_xticklabels(beta_labels, fontsize=5.7)
+    ax_beta.set_ylabel("validation loss ↓")
+    ax_beta.set_title("beta control + parity check", loc="left", pad=6,
+                      fontsize=7.2, fontweight="bold")
+    grid(ax_beta, axis="y")
 
-    # Quiet connectors make the sequential interventions explicit without
-    # pretending the five points form a continuous scalar hyperparameter.
-    ax.plot(x, means, color="#D1D1D1", linewidth=1.0, zorder=1)
-    for i in range(1, len(names)):
-        delta = means[i] - means[i - 1]
-        y = (means[i] + means[i - 1]) / 2
-        ax.annotate(f"{delta:+.3f}", ((x[i] + x[i - 1]) / 2, y),
-                    textcoords="offset points", xytext=(0, 8), ha="center",
-                    fontsize=5.6, color="#666666")
+    # (b) 2x2 mechanism factorial -----------------------------------------
+    # x=0: row redistribution disabled (gamma=0); x=1: enabled (gamma=1).
+    # line 1: fused QKV; line 2: split Q/K/V.
+    factorial = {
+        "fused QKV": ["astro_v2_gamma0_nosplit", "astro_v2_nosplit"],
+        "split Q/K/V": ["astro_v2_gamma0", "astro_v2"],
+    }
+    line_colors = {"fused QKV": COLORS["astro_v2_nosplit"],
+                   "split Q/K/V": COLORS["astro_v2"]}
+    fx = np.asarray([0.0, 1.0])
+    factorial_means = {}
+    for label, names in factorial.items():
+        means = []
+        for xi, name in zip(fx, names):
+            values = _values(block, name)
+            mean = float(values.mean())
+            means.append(mean)
+            jitter = np.linspace(-0.025, 0.025, len(values)) if len(values) > 1 else np.array([0.0])
+            ax_factor.scatter(np.full(len(values), xi) + jitter, values, s=17,
+                              color=line_colors[label], alpha=0.55, linewidths=0, zorder=3)
+            output[name] = {"loss": values.tolist(), "mean": mean}
+        ax_factor.plot(fx, means, marker="D" if label == "split Q/K/V" else "o",
+                       markersize=4.2, color=line_colors[label], linewidth=1.35,
+                       label=label, zorder=4)
+        factorial_means[label] = means
 
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels, fontsize=5.7)
-    ax.set_ylabel("validation loss ↓")
-    grid(ax, axis="y")
-    ax.set_title("Causal recipe ladder · identical frozen hyperparameters",
-                 loc="left", pad=7, fontsize=7.5, fontweight="bold")
-    ax.text(0.02, 0.035, "two held-out seeds per intervention",
-            transform=ax.transAxes, fontsize=5.7, color="#666666")
+    ax_factor.set_xticks(fx)
+    ax_factor.set_xticklabels([r"row adapt. off\n$\gamma=0$", r"row adapt. on\n$\gamma=1$"],
+                              fontsize=5.8)
+    ax_factor.set_title("row adaptation × operator split", loc="left", pad=6,
+                        fontsize=7.2, fontweight="bold")
+    ax_factor.legend(loc="upper right", fontsize=5.8, handlelength=1.0)
+    grid(ax_factor, axis="y")
+    ax_factor.set_ylabel("validation loss ↓")
+    label_panels(axes)
 
-    all_values = np.concatenate([
-        np.asarray(block["optimizers"][name]["loss"], dtype=float) for name in names
-    ])
-    pad = max(0.02, 0.14 * float(all_values.max() - all_values.min()))
-    ax.set_ylim(float(all_values.min() - pad), float(all_values.max() + pad))
-    fig.tight_layout(pad=0.4)
+    all_values = np.concatenate([_values(block, name) for name in required])
+    pad = max(0.02, 0.13 * float(all_values.max() - all_values.min()))
+    lo, hi = float(all_values.min() - pad), float(all_values.max() + pad)
+    for ax in axes:
+        ax.set_ylim(lo, hi)
+
+    fig.tight_layout(pad=0.5, w_pad=1.0)
     saved = save(fig, "fig_paper_ablation")
     write_data("fig_paper_ablation", {
-        "ladder": payload_out,
-        "sequential_deltas": [means[i] - means[i - 1] for i in range(1, len(means))],
-        "note": "all variants use the frozen ASTRO-v2 hyperparameter configuration",
+        "conditions": output,
+        "beta_95_to_90": beta_means[1] - beta_means[0],
+        "parity_control_minus_muon_beta90": beta_means[2] - beta_means[1],
+        "factorial_means": factorial_means,
+        "row_effect_fused": factorial_means["fused QKV"][1] - factorial_means["fused QKV"][0],
+        "row_effect_split": factorial_means["split Q/K/V"][1] - factorial_means["split Q/K/V"][0],
+        "split_effect_gamma0": factorial_means["split Q/K/V"][0] - factorial_means["fused QKV"][0],
+        "split_effect_gamma1": factorial_means["split Q/K/V"][1] - factorial_means["fused QKV"][1],
+        "note": "all six conditions use the frozen ASTRO-v2 hyperparameter configuration",
     })
     print(f"  wrote {saved}")
 
