@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Collect paper-campaign states into one plotting/paper artifact.
 
-This script performs no training and never invents missing values.  Stages that
-have not been run remain explicitly incomplete.  The resulting
+This script performs no training and never invents missing values. Stages that
+have not been run remain explicitly incomplete. The resulting
 ``artifacts/paper_campaign.json`` is the only input used by the new paper-grade
 figures, keeping historical/confounded measurements out of the final plots.
 """
@@ -34,9 +34,9 @@ def _sd(values: list[float]) -> float | None:
 def _main_block(state: dict | None, size: str = "124M", steps: int = 900) -> dict:
     if state is None:
         return {"complete": False, "optimizers": {}}
-    # Direct matrix-optimizer baselines. AdamW can remain an appendix sanity
-    # baseline; these three are the closest prior-art comparators to ASTRO.
-    names = ["muon", "normuon", "adamuon_ref", "astro_v2"]
+    # AdamW is the standard reference; Muon, NorMuon, and faithful AdaMuon are
+    # the closest matrix-optimizer prior art to the ASTRO recipe.
+    names = ["adamw", "muon", "normuon", "adamuon_ref", "astro_v2"]
     out: dict = {"complete": True, "optimizers": {}}
     for name in names:
         rows = []
@@ -60,7 +60,7 @@ def _main_block(state: dict | None, size: str = "124M", steps: int = 900) -> dic
 
     muon = out["optimizers"]["muon"]
     m = {s: v for s, v in zip(muon["seeds"], muon["loss"])}
-    for name in ("normuon", "adamuon_ref", "astro_v2"):
+    for name in ("adamw", "normuon", "adamuon_ref", "astro_v2"):
         other = out["optimizers"][name]
         common = sorted(set(muon["seeds"]) & set(other["seeds"]))
         o = {s: v for s, v in zip(other["seeds"], other["loss"])}
