@@ -11,6 +11,7 @@ on:
       - "scripts/paper_collect.py"
       - "scripts/prepare_paper_data.py"
       - "scripts/paper_audit.py"
+      - "scripts/novelty_gate.py"
       - "scripts/figures/paper_style.py"
       - "scripts/figures/fig_paper_*.py"
       - "scripts/figures/make_all.py"
@@ -28,11 +29,14 @@ on:
       - "scripts/paper_collect.py"
       - "scripts/prepare_paper_data.py"
       - "scripts/paper_audit.py"
+      - "scripts/novelty_gate.py"
       - "scripts/figures/paper_style.py"
       - "scripts/figures/fig_paper_*.py"
       - "scripts/figures/make_all.py"
       - "tests/test_paper_campaign.py"
       - "tests/test_paper_mechanism.py"
+      - "docs/PAPER_PROOF_CAMPAIGN.md"
+      - "docs/PRIOR_ART_2026_AUDIT.md"
       - ".github/workflows/paper-campaign.yml"
 
 jobs:
@@ -58,6 +62,7 @@ jobs:
             scripts/paper_collect.py \
             scripts/prepare_paper_data.py \
             scripts/paper_audit.py \
+            scripts/novelty_gate.py \
             scripts/figures/paper_style.py \
             scripts/figures/fig_paper_main.py \
             scripts/figures/fig_paper_ablation.py \
@@ -68,6 +73,8 @@ jobs:
             tests/test_paper_mechanism.py
       - name: Campaign fairness and mechanism tests
         run: pytest tests/test_paper_campaign.py tests/test_paper_mechanism.py -q
+      - name: Structural prior-art gate
+        run: python scripts/novelty_gate.py
       - name: Registry smoke test
         run: python scripts/paper_campaign.py --mode components > /tmp/components.txt
       - name: Plotting smoke test
