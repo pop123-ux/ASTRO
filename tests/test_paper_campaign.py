@@ -121,6 +121,58 @@ def test_blockwise_control_matches_v2_on_a_single_block() -> None:
     assert torch.allclose(global_v2, blockwise, atol=1e-6, rtol=1e-5)
 
 
+def test_blockwise_control_matches_three_separate_normuon_parameters() -> None:
+    """Tie the novelty control to the actual split-NorMuon prior-art semantics.
+
+    Muonium/Dion-style ``split_sizes`` are documented to make a fused QKV tensor
+    receive the same update as separate Q/K/V parameters.  Here we verify that
+    ``AstroV2Blockwise`` does exactly that when beta1=.90: each block is
+    orthogonalized, row-normalized, norm-restored, and aspect-scaled under its
+    own magnitude budget.  Therefore any measured difference between full
+    ASTRO-v2 and this control is specifically the *global* post-recombination
+    redistribution/restoration, not QKV splitting or NorMuon adaptation itself.
+    """
+    torch.manual_seed(17)
+    q0, k0, v0 = (torch.randn(8, 8) for _ in range(3))
+    fused0 = torch.cat([q0, k0, v0], dim=0)
+
+    fused = torch.nn.Parameter(fused0.clone())
+    fused_opt = campaign.AstroV2Blockwise(
+        [{
+            "params": [fused],
+            "spectral": True,
+            "transposed": False,
+            "blocks": (8, 8, 8),
+        }],
+        lr=0.01,
+        scalar_lr_mult=1.0,
+        weight_decay=0.0,
+        betas=(0.9, 0.95),
+        cautious_wd=False,
+    )
+
+    separate = [torch.nn.Parameter(x.clone()) for x in (q0, k0, v0)]
+    split_opt = campaign.lab.NorMuon(
+        [{"params": separate, "spectral": True, "transposed": False}],
+        lr=0.01,
+        adamw_lr=0.01,
+        momentum=0.90,
+        betas=(0.9, 0.95),
+        weight_decay=0.0,
+    )
+
+    for _ in range(3):
+        grads = [torch.randn_like(q0), torch.randn_like(k0), torch.randn_like(v0)]
+        fused.grad = torch.cat(grads, dim=0)
+        for param, grad in zip(separate, grads):
+            param.grad = grad.clone()
+        fused_opt.step()
+        split_opt.step()
+
+    reference = torch.cat([p.detach() for p in separate], dim=0)
+    assert torch.allclose(fused.detach(), reference, atol=3e-5, rtol=3e-5)
+
+
 def test_corpus_protocol_is_fixed_and_revision_pinned() -> None:
     assert campaign.FINEWEB_REVISION == "v1.0.0"
     assert campaign.TRAIN_TOKENS == 12_000_000
