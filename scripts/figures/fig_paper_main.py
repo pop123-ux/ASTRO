@@ -21,29 +21,29 @@ def build(source: str = "paper_campaign.json") -> None:
         missing("fig_paper_main", "finish the clean 124M/900 five-seed main campaign")
         return
 
-    names = ["muon", "normuon", "adamuon_ref", "astro_v2"]
-    fig, ax = column_figure(height=2.68)
+    names = ["adamw", "muon", "normuon", "adamuon_ref", "astro_v2"]
+    fig, ax = column_figure(height=2.72)
     x = np.arange(len(names), dtype=float)
 
     summary = {}
     for xi, name in zip(x, names):
         row = block["optimizers"][name]
         values = np.asarray(row["loss"], dtype=float)
-        jitter = np.linspace(-0.075, 0.075, len(values)) if len(values) > 1 else np.array([0.0])
+        jitter = np.linspace(-0.072, 0.072, len(values)) if len(values) > 1 else np.array([0.0])
         ax.scatter(
             np.full(len(values), xi) + jitter,
             values,
-            s=23 if name != "astro_v2" else 27,
+            s=21 if name != "astro_v2" else 26,
             color=COLORS[name],
             alpha=0.78,
             linewidths=0,
             zorder=3,
         )
         mean = float(values.mean())
-        ax.scatter(xi, mean, marker="_", s=78, linewidths=2.2,
+        ax.scatter(xi, mean, marker="_", s=74, linewidths=2.1,
                    color=COLORS[name], zorder=5)
-        ax.annotate(f"{mean:.4f}", (xi, mean), textcoords="offset points",
-                    xytext=(0, 8), ha="center", fontsize=5.8, color=COLORS[name])
+        ax.annotate(f"{mean:.3f}", (xi, mean), textcoords="offset points",
+                    xytext=(0, 8), ha="center", fontsize=5.55, color=COLORS[name])
         summary[name] = {"mean": mean, "loss": values.tolist()}
 
     muon = block["optimizers"]["muon"]
@@ -55,14 +55,14 @@ def build(source: str = "paper_campaign.json") -> None:
     d_ada = float(astro["mean"] - adamuon["mean"])
 
     ax.set_xticks(x)
-    ax.set_xticklabels(["Muon", "NorMuon", "AdaMuon", "ASTRO-v2"], fontsize=6.2)
+    ax.set_xticklabels(["AdamW", "Muon", "NorMuon", "AdaMuon", "ASTRO-v2"], fontsize=5.75)
     ax.set_ylabel("validation loss ↓")
     grid(ax, axis="y")
     ax.set_title("124M · 900 steps · five held-out seeds", loc="left",
                  pad=15, fontsize=7.7, fontweight="bold")
     ax.text(0.0, 1.015,
             f"ASTRO-v2 Δ: Muon {d_muon:+.3f} · NorMuon {d_normuon:+.3f} · AdaMuon {d_ada:+.3f}",
-            transform=ax.transAxes, ha="left", va="bottom", fontsize=5.45,
+            transform=ax.transAxes, ha="left", va="bottom", fontsize=5.35,
             color="#666666")
     ax.text(0.02, 0.035, "dots = seeds   horizontal tick = mean",
             transform=ax.transAxes, fontsize=5.7, color="#666666")
