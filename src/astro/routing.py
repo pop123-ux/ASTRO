@@ -40,9 +40,13 @@ def classify_module(module:nn.Module,*,detect_head:bool=True,**kwargs:object)->d
         if isinstance(child,nn.Embedding) and id(child.weight) in name_of:
             n=name_of[id(child.weight)]; specs[n]=ParamSpec(n,ParamKind.TABLE,tuple(child.weight.shape),'nn.Embedding')
     if detect_head:
-        linears=[c for c in module.modules() if isinstance(c,nn.Linear)]
-        if len(specs)>1 and linears and id(linears[-1].weight) in name_of:
-            n=name_of[id(linears[-1].weight)]; specs[n]=ParamSpec(n,ParamKind.TABLE,tuple(linears[-1].weight.shape),'last Linear classifier head')
+        # Muon's reference routing keeps the output head on the auxiliary AdamW
+        # path.  A head is not necessarily nn.Linear (e.g. small CNN classifiers
+        # often end in a 1x1 convolution), so mark the final learnable operator
+        # module rather than only the final Linear.
+        operators=[c for c in module.modules() if isinstance(c,(nn.Linear,nn.Conv1d,nn.Conv2d,nn.Conv3d))]
+        if len(specs)>1 and operators and id(operators[-1].weight) in name_of:
+            n=name_of[id(operators[-1].weight)]; specs[n]=ParamSpec(n,ParamKind.TABLE,tuple(operators[-1].weight.shape),'final operator head')
     return specs
 
 def matrix_view(tensor:torch.Tensor)->torch.Tensor:
