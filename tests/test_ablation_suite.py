@@ -15,7 +15,8 @@ def test_suite_sizes_are_deterministic():
     # 21 methods * 3 horizons * 3 seeds + 5 methods * 6 non-duplicate LR factors * 3 seeds.
     assert len(build_suite("mechanisms")) == 279
     assert len(build_suite("robustness")) == 252
-    assert len(build_suite("stability")) == 192
+    # 7 methods * 8 learning rates * 4 weight decays.
+    assert len(build_suite("stability")) == 224
 
 
 def test_job_ids_are_unique():
