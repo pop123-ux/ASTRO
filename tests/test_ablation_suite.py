@@ -12,8 +12,8 @@ def test_optimizer_surface():
 def test_suite_sizes_are_deterministic():
     # 18 dense optimizers/variants * 6 LR * 5 WD * 5 scalar + 8 tuner controls.
     assert len(build_suite("primary")) == 2708
-    # 21 methods * 3 horizons * 3 seeds + 5 methods * 7 LR factors * 3 seeds.
-    assert len(build_suite("mechanisms")) == 252
+    # 21 methods * 3 horizons * 3 seeds + 5 methods * 6 non-duplicate LR factors * 3 seeds.
+    assert len(build_suite("mechanisms")) == 279
     assert len(build_suite("robustness")) == 252
     assert len(build_suite("stability")) == 192
 
