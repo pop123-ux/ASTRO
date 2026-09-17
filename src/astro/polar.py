@@ -13,7 +13,7 @@ class SpectralFilter:
             s2=s*s; s=a*s+b*s*s2+c*s*s2*s2
         return s
     def __call__(self,matrix:torch.Tensor,eps:float=1e-7)->torch.Tensor:
-        if matrix.ndim<2: raise ValueError(f'expected matrix, got {tuple(matrix.shape)}')
+        if matrix.ndim<2: raise ValueError(f'expected a matrix, got {tuple(matrix.shape)}')
         x=matrix.to(torch.float32); tr=x.size(-2)>x.size(-1)
         if tr:x=x.mT
         x=x/(x.norm(dim=(-2,-1),keepdim=True)+eps)
