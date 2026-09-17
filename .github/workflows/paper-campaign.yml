@@ -4,6 +4,8 @@ on:
   push:
     branches: [paper-proof-campaign]
     paths:
+      - "src/astro/**"
+      - "scripts/__init__.py"
       - "scripts/astro_lab.py"
       - "scripts/paper_campaign.py"
       - "scripts/paper_mechanism.py"
@@ -16,13 +18,14 @@ on:
       - "scripts/figures/paper_style.py"
       - "scripts/figures/fig_paper_*.py"
       - "scripts/figures/make_all.py"
-      - "tests/test_paper_campaign.py"
-      - "tests/test_paper_mechanism.py"
+      - "tests/**"
       - "docs/PAPER_PROOF_CAMPAIGN.md"
       - "docs/PRIOR_ART_2026_AUDIT.md"
       - ".github/workflows/paper-campaign.yml"
   pull_request:
     paths:
+      - "src/astro/**"
+      - "scripts/__init__.py"
       - "scripts/astro_lab.py"
       - "scripts/paper_campaign.py"
       - "scripts/paper_mechanism.py"
@@ -35,8 +38,7 @@ on:
       - "scripts/figures/paper_style.py"
       - "scripts/figures/fig_paper_*.py"
       - "scripts/figures/make_all.py"
-      - "tests/test_paper_campaign.py"
-      - "tests/test_paper_mechanism.py"
+      - "tests/**"
       - "docs/PAPER_PROOF_CAMPAIGN.md"
       - "docs/PRIOR_ART_2026_AUDIT.md"
       - ".github/workflows/paper-campaign.yml"
@@ -54,9 +56,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install torch transformers datasets pytest matplotlib numpy
+          pip install -e .
       - name: Syntax check
         run: |
           python -m py_compile \
+            src/astro/__init__.py \
+            src/astro/optimizer.py \
+            src/astro/polar.py \
+            src/astro/routing.py \
+            scripts/__init__.py \
             scripts/astro_lab.py \
             scripts/paper_campaign.py \
             scripts/paper_mechanism.py \
@@ -74,6 +82,8 @@ jobs:
             scripts/figures/make_all.py \
             tests/test_paper_campaign.py \
             tests/test_paper_mechanism.py
+      - name: Full repository test suite
+        run: pytest -q
       - name: Campaign fairness and mechanism tests
         run: pytest tests/test_paper_campaign.py tests/test_paper_mechanism.py -q
       - name: Structural prior-art gate
