@@ -123,6 +123,11 @@ def build_mechanisms() -> list[Job]:
                                   CORE, "component attribution across horizon"))
     for opt in ("muon", "normuon", "adamuon", "astro_v2", "astro_muon_betas"):
         for factor in (0.25, 0.5, 0.75, 1.0, 1.33, 2.0, 4.0):
+            # factor=1.0 is already present in the 900-step CORE grid above.
+            # Re-emitting it gives the same job id twice, which makes sharding
+            # non-disjoint and can duplicate expensive GPU work.
+            if factor == 1.0:
+                continue
             for seed in (100, 101, 102):
                 jobs.append(make(
                     "mechanisms", opt, "124M", 900, seed, 0,
