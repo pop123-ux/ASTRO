@@ -82,6 +82,7 @@ jobs:
             scripts/figures/fig_paper_scale.py \
             scripts/figures/fig_paper_horizon.py \
             scripts/figures/make_all.py \
+            tests/conftest.py \
             tests/test_paper_campaign.py \
             tests/test_paper_mechanism.py
       - name: Full repository test suite
