@@ -1,0 +1,58 @@
+{
+  "name": "ORBIT-v0",
+  "status": "research-candidate",
+  "model": {
+    "family": "GPT-2-sized pre-norm decoder with RoPE",
+    "sequence_length": 512,
+    "vocab": "GPT-2",
+    "sizes": {
+      "124M": {"n_layer": 12, "n_head": 12, "n_embd": 768, "batch": 8},
+      "355M": {"n_layer": 24, "n_head": 16, "n_embd": 1024, "batch": 4}
+    }
+  },
+  "orbit": {
+    "relative_position_deltas": [1, 2, 4, 8, 16, 32, 64, 128],
+    "functional_power": 1.0,
+    "metric_condition_cap": 100.0,
+    "metric_eps": 1e-5,
+    "qk_stat_ema_beta": 0.95,
+    "joint_qk_frobenius_restore": true,
+    "inference_change": false
+  },
+  "discovery": {
+    "size": "124M",
+    "steps": 300,
+    "trials_per_optimizer": 5,
+    "seed": 0,
+    "optimizers": ["adamw", "muon", "normuon", "adamuon_ref", "astro_v2", "orbit"]
+  },
+  "confirmation": {
+    "size": "124M",
+    "steps": 900,
+    "seeds": [100, 101, 102, 103, 104],
+    "configs": "frozen from discovery before held-out evaluation"
+  },
+  "ablation": {
+    "size": "124M",
+    "steps": 900,
+    "seeds": [200, 201, 202],
+    "variants": ["orbit", "orbit_norope", "orbit_diag", "orbit_identity"]
+  },
+  "horizon": {
+    "size": "124M",
+    "steps": 2700,
+    "seeds": [400, 401],
+    "optimizers": ["muon", "normuon", "orbit"]
+  },
+  "scale": {
+    "size": "355M",
+    "steps": 900,
+    "seeds": [300, 301],
+    "optimizers": ["muon", "normuon", "orbit"]
+  },
+  "production_gate": {
+    "required_after_paper_core": ["GQA", "QK-norm"],
+    "target_overhead_vs_muon_percent": 15,
+    "zero_inference_overhead_required": true
+  }
+}
