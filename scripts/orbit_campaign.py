@@ -336,7 +336,15 @@ def train_once(
     return record
 
 
-def completed_ids(path: Path) -> set[str]:
+def completed_ids(path: Path, *, digest: str, env: dict[str, str]) -> set[str]:
+    """Return tasks completed by the exact current implementation/environment.
+
+    After a numerical or algorithmic patch, old rows stay in the append-only log
+    for provenance but are intentionally not considered resumable. Re-running the
+    same command appends fresh rows for the same task IDs; merge keeps the latest
+    successful row. This prevents a post-fix campaign from silently mixing code
+    versions while preserving the audit trail.
+    """
     if not path.exists():
         return set()
     found = set()
@@ -347,7 +355,11 @@ def completed_ids(path: Path) -> set[str]:
             row = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if row.get("status") == "ok":
+        if (
+            row.get("status") == "ok"
+            and row.get("code_digest") == digest
+            and row.get("environment") == env
+        ):
             found.add(row["task_id"])
     return found
 
@@ -409,11 +421,13 @@ def main() -> None:
         return
 
     output = args.work_dir / "shards" / f"shard-{args.shard_id}" / f"{args.phase}.jsonl"
-    done = completed_ids(output)
+    digest = code_digest()
+    env = environment()
+    done = completed_ids(output, digest=digest, env=env)
     pending = [task for task in shard_tasks if task["task_id"] not in done]
     print(
         f"ORBIT phase={args.phase} shard={args.shard_id}/{args.num_shards} "
-        f"tasks={len(shard_tasks)} pending={len(pending)} digest={code_digest()[:12]}",
+        f"tasks={len(shard_tasks)} pending={len(pending)} digest={digest[:12]}",
         flush=True,
     )
     if not pending:
@@ -437,8 +451,8 @@ def main() -> None:
                 {
                     "status": "error",
                     "error": repr(exc),
-                    "code_digest": code_digest(),
-                    "environment": environment(),
+                    "code_digest": digest,
+                    "environment": env,
                     "device": device,
                 }
             )
