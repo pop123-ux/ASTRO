@@ -94,6 +94,10 @@ class Orbit(torch.optim.Optimizer):
             ),
         )
         self.model = model
+        # Statistics are opt-in so baseline wall-clock measurements do not pay
+        # ORBIT's forward-pass covariance cost. All ORBIT ablations keep the
+        # collection path enabled, including identity, to isolate update rules.
+        model.set_orbit_stat_collection(True)
         self.functional_power = float(functional_power)
         self.metric_eps = float(metric_eps)
         self.metric_condition_cap = float(metric_condition_cap)
