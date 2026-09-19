@@ -1,6 +1,7 @@
 import torch
 
 from orbit import Orbit, OrbitGPT, OrbitGPTConfig
+from orbit.optimizer import inverse_metric_power
 
 
 def tiny_model():
@@ -50,6 +51,47 @@ def test_rope_metric_is_spd_and_position_sensitive():
     assert torch.linalg.eigvalsh(mq0).min() > 0
     assert torch.linalg.eigvalsh(mq8).min() > 0
     assert not torch.allclose(mq0, mq8)
+
+
+def test_closed_form_inverse_metric_matches_eigh_reference():
+    torch.manual_seed(11)
+    x = torch.randn(128, 2, 2)
+    metric = x @ x.transpose(-1, -2) + 0.1 * torch.eye(2)
+    got, cond = inverse_metric_power(
+        metric, power=1.0, eps=1e-6, condition_cap=1e6
+    )
+    values, vectors = torch.linalg.eigh(metric)
+    reference = (vectors * values.rsqrt().unsqueeze(-2)) @ vectors.transpose(-1, -2)
+    assert torch.allclose(got, reference, atol=2e-5, rtol=2e-5)
+    assert torch.isfinite(cond).all()
+
+
+def test_closed_form_inverse_metric_handles_repeated_and_extreme_spectrum():
+    metric = torch.tensor(
+        [
+            [[3.0, 0.0], [0.0, 3.0]],
+            [[1.0e20, 1.0e10], [1.0e10, 1.0e-8]],
+            [[1.0, 1.0 - 1.0e-7], [1.0 - 1.0e-7, 1.0]],
+        ],
+        dtype=torch.float32,
+    )
+    transform, cond = inverse_metric_power(
+        metric, power=1.0, eps=1e-6, condition_cap=100.0
+    )
+    assert torch.isfinite(transform).all()
+    assert torch.isfinite(cond).all()
+    assert float(cond.max()) <= 100.0001
+    expected = torch.eye(2) / (3.0**0.5)
+    assert torch.allclose(transform[0], expected, atol=1e-6, rtol=1e-6)
+
+
+def test_closed_form_inverse_metric_nonfinite_pair_falls_back_to_identity():
+    metric = torch.tensor([[[float("nan"), 0.0], [0.0, 1.0]]])
+    transform, cond = inverse_metric_power(
+        metric, power=1.0, eps=1e-6, condition_cap=100.0
+    )
+    assert torch.equal(transform[0], torch.eye(2))
+    assert float(cond[0]) == 1.0
 
 
 def test_orbit_step_is_finite_and_changes_weights():
