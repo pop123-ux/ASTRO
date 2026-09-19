@@ -66,7 +66,9 @@ class RotaryAttention(nn.Module):
             "orbit_k_cov", eye.repeat(self.n_head, self.n_freq, 1, 1), persistent=False
         )
         self.register_buffer("orbit_stats_seen", torch.zeros((), dtype=torch.long), persistent=False)
-        self.collect_orbit_stats = True
+        # Baselines must not pay ORBIT's statistics overhead. Orbit.__init__
+        # explicitly enables collection only for ORBIT-family runs.
+        self.collect_orbit_stats = False
 
     def _apply_rope(self, x: torch.Tensor) -> torch.Tensor:
         # x: [batch, heads, time, head_dim]
