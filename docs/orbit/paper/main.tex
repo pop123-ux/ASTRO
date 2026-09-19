@@ -1,0 +1,158 @@
+\documentclass[10pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,graphicx,microtype,hyperref}
+\usepackage{siunitx}
+\usepackage{xcolor}
+\graphicspath{{figures/}}
+\title{ORBIT: Function-Space Optimization for Rotary Query--Key Interactions}
+\author{Alexandru Pop}
+\date{}
+
+\IfFileExists{generated_results.tex}{\input{generated_results.tex}}{%
+  \newcommand{\OrbitConfirmLoss}{TBD}
+  \newcommand{\OrbitConfirmSD}{TBD}
+  \newcommand{\MuonConfirmLoss}{TBD}
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Modern matrix optimizers treat query and key projection matrices as ordinary parameter
+operators even though rotary attention couples them through position-dependent bilinear
+interactions. We study ORBIT, an optimizer-only method that uses tiny frequency-resolved
+$2\times2$ metrics to precondition query/key updates according to their predicted movement
+in rotary attention-logit space. The model architecture and inference graph remain
+unchanged. This manuscript is intentionally claim-free until the frozen multi-seed campaign
+is complete; numerical claims are injected only from the recorded result artifacts.
+\end{abstract}
+
+\section{Introduction}
+The central question is whether an optimizer for rotary attention should measure a query/key
+step in raw parameter space or in the function induced on attention logits. ORBIT tests the
+second hypothesis while retaining ordinary Transformer weights and standard inference.
+The paper is structured to separate three questions: (i) does the functional metric improve
+optimization, (ii) is the RoPE/phase structure itself necessary, and (iii) does any gain
+survive held-out seeds, longer training, and increased model scale?
+
+\paragraph{Contributions.}
+The intended contributions, subject to the final prior-art and empirical gates, are:
+\begin{enumerate}
+  \item a cheap RoPE-aware local metric for joint query/key optimization based only on
+  $2\times2$ frequency-pair statistics;
+  \item an optimizer implementation that preserves the total Q/K update norm after
+  functional preconditioning and changes no inference computation;
+  \item a paper-grade comparison against tuned AdamW, Muon, NorMuon, AdaMuon and the
+  inherited ASTRO baseline with fixed corpus, scheduling and decay policy;
+  \item ablations that isolate relative-position rotations, off-diagonal phase coupling,
+  and the complete functional preconditioner.
+\end{enumerate}
+
+\section{Related Work and Novelty Boundary}
+ORBIT is not a claim to invent optimization of QK/OV products or low-rank quotient geometry.
+Knight's recent Riemannian optimizer explicitly treats QK/VO products as rank-constrained
+optimization objects while preserving factorized implementations~\cite{knight2026}.
+The present work instead targets the setting where RoPE prevents the query--key interaction
+from collapsing to one position-independent product. The final paper must update this
+section from the branch's dated prior-art gate immediately before submission.
+
+\section{Method}
+For a single attention head and RoPE frequency pair $f$, write the relative-position score
+contribution as
+\begin{equation}
+  s_{ij,f}=q_{i,f}^{\top}R_f(\Delta)k_{j,f},\qquad \Delta=i-j.
+\end{equation}
+Let $C_{Q,f}$ and $C_{K,f}$ be exponential-moving-average $2\times2$ covariances of the
+unrotated query and key coordinates. ORBIT defines
+\begin{align}
+M_{Q,f} &= \mathbb{E}_{\Delta}\left[R_f(\Delta)C_{K,f}R_f(\Delta)^\top\right],\\
+M_{K,f} &= \mathbb{E}_{\Delta}\left[R_f(\Delta)^\top C_{Q,f}R_f(\Delta)\right].
+\end{align}
+The expectation uses a frozen logarithmic displacement grid. A Muon candidate direction
+$U_Q,U_K$ is computed first. For exponent $p$,
+\begin{align}
+\widetilde U_{Q,f} &= M_{Q,f}^{-p/2} U_{Q,f},\\
+\widetilde U_{K,f} &= M_{K,f}^{-p/2} U_{K,f}.
+\end{align}
+A single joint scalar then restores
+\begin{equation}
+\|\widetilde U_Q\|_F^2+\|\widetilde U_K\|_F^2
+=
+\|U_Q\|_F^2+\|U_K\|_F^2,
+\end{equation}
+preventing an aggregate step-size increase from masquerading as a geometric gain. All
+matrix operations unique to ORBIT are batched $2\times2$ eigendecompositions.
+
+\section{Experimental Protocol}
+The discovery and confirmatory campaign inherits the ASTRO paper harness's pinned
+FineWeb-Edu corpus, common warmup--cosine LR factor, GPT-style weight-decay routing,
+environment fingerprinting, and faithful AdaMuon reference. The research model is
+GPT-2-sized but replaces learned absolute positional embeddings with RoPE; this is required
+by the hypothesis rather than presented as a model improvement. Every optimizer sees the
+same model and data.
+
+Hyperparameter discovery uses the same number of free tuning dimensions for ORBIT and Muon.
+The ORBIT functional exponent, displacement grid, and condition cap are frozen mechanism
+choices. Five held-out seeds are evaluated only after discovery configurations are frozen.
+The branch also defines 2700-step and 355M transfer phases.
+
+\section{Results}
+\IfFileExists{generated_results.tex}{\input{generated_results.tex}}{No confirmatory results yet.}
+
+\IfFileExists{figures/confirm_training_curves.pdf}{%
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.78\linewidth]{confirm_training_curves.pdf}
+\caption{Held-out training trajectories.}
+\label{fig:curves}
+\end{figure}}{}
+
+\IfFileExists{figures/confirm_efficiency.pdf}{%
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.67\linewidth]{confirm_efficiency.pdf}
+\caption{Validation loss versus measured wall-clock time.}
+\label{fig:efficiency}
+\end{figure}}{}
+
+\section{Mechanism Ablations}
+The required controls are \texttt{orbit\_identity}, \texttt{orbit\_norope}, and
+\texttt{orbit\_diag}. Identity tests whether the implementation is merely another Muon
+recipe; no-RoPE tests whether ordinary Q/K covariance adaptation explains the effect; and
+diagonal removes the two-dimensional phase coupling while preserving per-frequency scaling.
+
+\IfFileExists{figures/ablations.pdf}{%
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.67\linewidth]{ablations.pdf}
+\caption{ORBIT mechanism ablations.}
+\label{fig:ablations}
+\end{figure}}{}
+
+\section{Scaling and Production Relevance}
+ORBIT changes only training-time optimization. Standard Q/K/V/O weights are retained, so
+there is no additional inference state or compute. A successful 124M result is not by itself
+sufficient: the branch requires a longer-horizon test and a 355M transfer before a strong
+performance claim. A subsequent modern-architecture gate must test GQA and QK-normalization.
+
+\section{Limitations and Falsification Criteria}
+The local metric assumes that small query/key perturbations can be usefully characterized by
+second-order frequency-pair statistics. It is an approximation to attention-logit function
+space, not an exact natural gradient. The method should be rejected as a paper contribution
+if gains disappear under held-out seeds, if the no-RoPE or identity controls match ORBIT, or
+if the wall-clock overhead is not defensible for production training.
+
+\section{Conclusion}
+To be written after the confirmatory campaign. The conclusion must report failures and
+negative ablations with the same prominence as positive results.
+
+\appendix
+\section{Reproducibility}
+All runs are append-only JSONL records containing the optimizer configuration, random seed,
+code digest, Python/package environment, GPU model, wall-clock time, validation loss,
+training curve, and peak CUDA allocation. Four Colab workers write independent shard files;
+merging refuses mixed implementation or environment fingerprints.
+
+\bibliographystyle{plain}
+\bibliography{references}
+\end{document}
