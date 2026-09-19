@@ -1,0 +1,70 @@
+name: ORBIT paper campaign
+
+on:
+  push:
+    branches: [orbit-paper-campaign]
+    paths:
+      - "src/orbit/**"
+      - "scripts/orbit_*.py"
+      - "tests/test_orbit.py"
+      - "docs/orbit/**"
+      - "configs/orbit_protocol.json"
+      - ".github/workflows/orbit-paper.yml"
+  pull_request:
+    paths:
+      - "src/orbit/**"
+      - "scripts/orbit_*.py"
+      - "tests/test_orbit.py"
+      - "docs/orbit/**"
+      - "configs/orbit_protocol.json"
+      - ".github/workflows/orbit-paper.yml"
+
+jobs:
+  unit-and-mechanism:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install CPU dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e . "transformers>=4.56,<5" "datasets>=3,<5" "matplotlib>=3.8" "pytest>=8"
+      - name: Syntax check
+        run: |
+          python -m compileall -q src/orbit
+          python -m py_compile scripts/orbit_campaign.py scripts/orbit_merge.py scripts/orbit_plot.py scripts/orbit_novelty_gate.py scripts/orbit_build_paper.py
+      - name: Unit tests
+        run: python -m pytest tests/test_orbit.py
+      - name: Mechanism gate
+        run: python scripts/orbit_novelty_gate.py --strict --output /tmp/orbit_gate.json
+      - name: Generate claim-free paper artifacts
+        run: |
+          mkdir -p /tmp/orbit-empty/merged
+          echo '{}' > /tmp/orbit-empty/merged/summary.json
+          python scripts/orbit_build_paper.py --work-dir /tmp/orbit-empty --no-compile
+
+  latex:
+    runs-on: ubuntu-latest
+    needs: unit-and-mechanism
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install LaTeX and minimal Python dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y latexmk texlive-latex-base texlive-latex-extra texlive-fonts-recommended texlive-science
+          pip install -e .
+      - name: Build manuscript skeleton
+        run: |
+          mkdir -p /tmp/orbit-empty/merged
+          echo '{}' > /tmp/orbit-empty/merged/summary.json
+          python scripts/orbit_build_paper.py --work-dir /tmp/orbit-empty
+      - uses: actions/upload-artifact@v4
+        with:
+          name: orbit-paper-skeleton
+          path: docs/orbit/paper/main.pdf
