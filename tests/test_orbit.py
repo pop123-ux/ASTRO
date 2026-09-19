@@ -17,8 +17,16 @@ def tiny_model():
     )
 
 
-def test_forward_backward_collects_optimizer_stats():
+def test_statistics_are_off_for_baseline_model_by_default():
     model = tiny_model()
+    x = torch.randint(0, 127, (2, 16))
+    model(x, labels=x)
+    assert all(int(block.attn.orbit_stats_seen) == 0 for block in model.blocks)
+
+
+def test_orbit_optimizer_enables_functional_statistics():
+    model = tiny_model()
+    Orbit(model, lr=0.01, adamw_lr=3e-4)
     x = torch.randint(0, 127, (2, 16))
     out = model(x, labels=x)
     assert out.logits.shape == (2, 16, 127)
@@ -66,10 +74,13 @@ def test_identity_variant_runs_same_model_without_functional_metric():
     model(x, labels=x).loss.backward()
     optimizer.step()
     assert optimizer.diagnostics() == {}
+    assert all(int(block.attn.orbit_stats_seen) > 0 for block in model.blocks)
 
 
 def test_eval_does_not_mutate_stats():
-    model = tiny_model().eval()
+    model = tiny_model()
+    Orbit(model)
+    model.eval()
     seen = [int(block.attn.orbit_stats_seen) for block in model.blocks]
     with torch.no_grad():
         model(torch.randint(0, 127, (1, 8)))
