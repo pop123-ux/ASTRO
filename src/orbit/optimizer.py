@@ -28,15 +28,72 @@ def inverse_metric_power(
     eps: float,
     condition_cap: float,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """M^{-power/2} for batches of 2x2 SPD matrices."""
-    values, vectors = torch.linalg.eigh(metric.float())
-    values = values.clamp_min(eps)
-    largest = values[..., -1:]
-    floor = largest / max(condition_cap, 1.0)
-    values = torch.maximum(values, floor)
-    factors = values.pow(-0.5 * power)
-    transform = (vectors * factors.unsqueeze(-2)) @ vectors.transpose(-1, -2)
-    condition = values[..., -1] / values[..., 0].clamp_min(eps)
+    """Stable ``M^{-power/2}`` for batches of symmetric 2x2 metrics.
+
+    ORBIT only ever needs 2x2 RoPE-frequency metrics. Using a general batched
+    eigensolver for those matrices proved unnecessarily fragile on mixed-
+    precision Colab GPUs: a nearly repeated eigenpair can make cuSOLVER's
+    ``eigh`` fail even though the metric is finite and the training loss is
+    well behaved. This implementation uses the closed-form spectrum of a 2x2
+    symmetric matrix and never calls a numerical eigensolver.
+
+    The computation is scale-normalised, explicitly symmetrises the metric,
+    clips the effective condition number, and falls back to the identity for a
+    genuinely non-finite metric. The fallback cannot amplify an update; it is
+    equivalent to disabling ORBIT for that one frequency pair on that step.
+    """
+    m = metric.float()
+    if m.shape[-2:] != (2, 2):
+        raise ValueError(f"ORBIT metric must end in 2x2, got {tuple(m.shape)}")
+    m = 0.5 * (m + m.transpose(-1, -2))
+    finite = torch.isfinite(m).all(dim=(-2, -1))
+    m = torch.where(finite[..., None, None], m, torch.zeros_like(m))
+
+    a = m[..., 0, 0]
+    b = m[..., 0, 1]
+    d = m[..., 1, 1]
+    # Normalise before the quadratic formula so very large but finite covariance
+    # statistics do not overflow when squared.
+    scale = torch.maximum(a.abs() + b.abs(), d.abs() + b.abs()).clamp_min(eps)
+    an, bn, dn = a / scale, b / scale, d / scale
+    centre = 0.5 * (an + dn)
+    radius = torch.hypot(0.5 * (an - dn), bn)
+    lo_raw = centre - radius
+    hi_raw = centre + radius
+
+    hi = hi_raw.clamp_min(eps)
+    lo = lo_raw.clamp_min(eps)
+    cap = max(float(condition_cap), 1.0)
+    lo = torch.maximum(lo, hi / cap)
+    condition = hi / lo.clamp_min(eps)
+
+    # Restore the scale removed above before applying the matrix power.
+    scale_factor = scale.pow(-0.5 * power)
+    f_lo = lo.pow(-0.5 * power) * scale_factor
+    f_hi = hi.pow(-0.5 * power) * scale_factor
+
+    eye = torch.eye(2, device=m.device, dtype=m.dtype)
+    eye = eye.expand(m.shape[:-2] + (2, 2))
+    gap = hi_raw - lo_raw
+    tolerance = 64.0 * torch.finfo(m.dtype).eps
+    safe_gap = gap.clamp_min(tolerance)
+    projector_hi = (m / scale[..., None, None] - lo_raw[..., None, None] * eye)
+    projector_hi = projector_hi / safe_gap[..., None, None]
+    transform = f_lo[..., None, None] * eye + (
+        f_hi - f_lo
+    )[..., None, None] * projector_hi
+
+    # Exactly/near repeated eigenvalues are isotropic. Avoid an arbitrary
+    # projector constructed from division by a tiny eigengap.
+    repeated = gap <= tolerance
+    isotropic = (0.5 * (f_lo + f_hi))[..., None, None] * eye
+    transform = torch.where(repeated[..., None, None], isotropic, transform)
+
+    # A non-finite covariance statistic means the auxiliary metric is invalid,
+    # not that the parameter update itself is invalid. The safest local fallback
+    # is therefore identity preconditioning for that pair.
+    transform = torch.where(finite[..., None, None], transform, eye)
+    condition = torch.where(finite, condition, torch.ones_like(condition))
     return transform, condition
 
 
