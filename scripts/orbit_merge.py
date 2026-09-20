@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
-"""Merge append-only ORBIT shard outputs and freeze discovery winners.
+"""Merge append-only ORBIT shard outputs and freeze campaign results safely.
 
-Historical rows are intentionally retained in the shard JSONL logs for audit
-provenance. Merge only consumes rows produced by the *current* ORBIT code
-digest, so a numerical/algorithmic patch does not require deleting old results.
+Shard logs are append-only and intentionally retain historical runs. A merge
+therefore applies two independent provenance filters:
+
+1. the row must have been produced by the current ORBIT experiment digest; and
+2. for post-discovery phases, its task id must be one of the exact tasks implied
+   by the currently frozen ``best_configs.json``.
+
+The second rule prevents an early confirmation run (started before discovery was
+finally frozen) from contaminating the final confirmation summary even when both
+runs used the same code digest.
 """
 
 from __future__ import annotations
@@ -14,24 +21,35 @@ import statistics
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from orbit_campaign import code_digest
+from orbit_campaign import DEFAULT_OPTIMIZERS, code_digest, make_tasks
 
 
 DISCOVERY_TRIALS = 5
-DISCOVERY_OPTIMIZERS = (
-    "adamw",
-    "muon",
-    "normuon",
-    "adamuon_ref",
-    "astro_v2",
-    "orbit",
-)
+DISCOVERY_OPTIMIZERS = tuple(DEFAULT_OPTIMIZERS)
 
 
-def load_rows(work_dir: Path, phase: str, *, digest: str) -> tuple[list[dict], int]:
-    """Load latest successful row per task for the current code digest only."""
+def expected_tasks(work_dir: Path, phase: str) -> list[dict]:
+    """Reconstruct the exact frozen campaign tasks for ``phase``."""
+    return make_tasks(
+        phase,
+        work_dir=work_dir,
+        trials=DISCOVERY_TRIALS,
+        optimizers=DISCOVERY_OPTIMIZERS,
+        steps_override=None,
+    )
+
+
+def load_rows(
+    work_dir: Path,
+    phase: str,
+    *,
+    digest: str,
+    allowed_task_ids: set[str] | None = None,
+) -> tuple[list[dict], int, int]:
+    """Load latest successful row per task after provenance filtering."""
     rows: dict[str, dict] = {}
-    stale_ok_rows = 0
+    stale_digest_rows = 0
+    foreign_current_rows = 0
     for path in sorted((work_dir / "shards").glob(f"shard-*/{phase}.jsonl")):
         for line in path.read_text().splitlines():
             if not line.strip():
@@ -43,16 +61,20 @@ def load_rows(work_dir: Path, phase: str, *, digest: str) -> tuple[list[dict], i
             if row.get("status") != "ok":
                 continue
             if row.get("code_digest") != digest:
-                stale_ok_rows += 1
+                stale_digest_rows += 1
                 continue
-            # Append-only files may contain a rerun of the same task. Keep the
-            # latest successful current-digest row encountered for that task.
-            rows[row["task_id"]] = row
+            task_id = row.get("task_id")
+            if allowed_task_ids is not None and task_id not in allowed_task_ids:
+                foreign_current_rows += 1
+                continue
+            # A task can appear multiple times after a resume/retry. Keeping the
+            # latest successful matching row preserves append-only provenance.
+            rows[task_id] = row
     ordered = sorted(
         rows.values(),
         key=lambda r: (r["optimizer"], r["seed"], str(r.get("trial"))),
     )
-    return ordered, stale_ok_rows
+    return ordered, stale_digest_rows, foreign_current_rows
 
 
 def summarize(rows: list[dict]) -> dict:
@@ -92,25 +114,30 @@ def freeze_discovery(rows: list[dict]) -> dict:
     return best
 
 
-def require_complete_discovery(rows: list[dict]) -> None:
-    """Never freeze discovery configs from a partial current-digest campaign."""
-    counts = Counter(row["optimizer"] for row in rows)
-    problems = []
-    for name in DISCOVERY_OPTIMIZERS:
-        got = counts.get(name, 0)
-        if got != DISCOVERY_TRIALS:
-            problems.append(f"{name}={got}/{DISCOVERY_TRIALS}")
-    extras = sorted(set(counts) - set(DISCOVERY_OPTIMIZERS))
-    if extras:
-        problems.append("unexpected=" + ",".join(extras))
-    expected_total = len(DISCOVERY_OPTIMIZERS) * DISCOVERY_TRIALS
-    if len(rows) != expected_total:
-        problems.append(f"total={len(rows)}/{expected_total}")
-    if problems:
-        raise SystemExit(
-            "discovery incomplete for current code digest; do not freeze configs yet: "
-            + "; ".join(problems)
+def require_complete(rows: list[dict], tasks: list[dict], *, phase: str) -> None:
+    """Refuse to summarize/freeze a partial or unexpected campaign phase."""
+    expected = {task["task_id"]: task for task in tasks}
+    actual = {row["task_id"]: row for row in rows}
+    missing_ids = sorted(set(expected) - set(actual))
+    extra_ids = sorted(set(actual) - set(expected))
+    if not missing_ids and not extra_ids:
+        return
+
+    missing_counts = Counter(expected[task_id]["optimizer"] for task_id in missing_ids)
+    extra_counts = Counter(actual[task_id]["optimizer"] for task_id in extra_ids)
+    pieces = [f"total={len(actual)}/{len(expected)}"]
+    if missing_counts:
+        pieces.append(
+            "missing=" + ",".join(f"{name}:{count}" for name, count in sorted(missing_counts.items()))
         )
+    if extra_counts:
+        pieces.append(
+            "unexpected=" + ",".join(f"{name}:{count}" for name, count in sorted(extra_counts.items()))
+        )
+    raise SystemExit(
+        f"{phase}: incomplete exact frozen campaign; do not use this summary yet: "
+        + "; ".join(pieces)
+    )
 
 
 def write_jsonl(path: Path, rows: list[dict]) -> None:
@@ -145,22 +172,33 @@ def main() -> None:
         full_summary.update(json.loads(existing_summary.read_text()))
 
     for phase in phases:
-        rows, stale_ok_rows = load_rows(args.work_dir, phase, digest=current_digest)
-        if stale_ok_rows:
+        tasks = expected_tasks(args.work_dir, phase)
+        allowed_ids = {task["task_id"] for task in tasks}
+        rows, stale_digest_rows, foreign_current_rows = load_rows(
+            args.work_dir,
+            phase,
+            digest=current_digest,
+            allowed_task_ids=allowed_ids,
+        )
+        if stale_digest_rows:
             print(
-                f"{phase}: ignored {stale_ok_rows} successful historical rows "
+                f"{phase}: ignored {stale_digest_rows} successful historical rows "
                 "from stale code digests"
             )
+        if foreign_current_rows:
+            print(
+                f"{phase}: ignored {foreign_current_rows} successful current-digest rows "
+                "that are not part of the exact frozen campaign"
+            )
         if not rows:
-            print(f"{phase}: no completed rows for current digest {current_digest[:12]}")
-            continue
+            raise SystemExit(
+                f"{phase}: no matching completed rows for current digest "
+                f"{current_digest[:12]}"
+            )
 
-        # This is mostly defensive because load_rows already filters the digest.
         digests = {row["code_digest"] for row in rows}
         if digests != {current_digest}:
-            raise SystemExit(
-                f"{phase}: internal digest filter failure: {sorted(digests)}"
-            )
+            raise SystemExit(f"{phase}: internal digest filter failure: {sorted(digests)}")
         envs = {json.dumps(row["environment"], sort_keys=True) for row in rows}
         if len(envs) != 1:
             raise SystemExit(
@@ -168,8 +206,7 @@ def main() -> None:
                 "Recreate matching Colabs before merging."
             )
 
-        if phase == "discovery":
-            require_complete_discovery(rows)
+        require_complete(rows, tasks, phase=phase)
 
         write_jsonl(merged_dir / f"{phase}.jsonl", rows)
         phase_summary = summarize(rows)
@@ -183,7 +220,9 @@ def main() -> None:
                 json.dumps(best, indent=2, sort_keys=True) + "\n"
             )
             print("discovery configurations frozen -> merged/best_configs.json")
-        print(f"{phase}: merged {len(rows)} unique completed current-digest tasks")
+        print(
+            f"{phase}: merged {len(rows)} exact current-digest frozen-campaign tasks"
+        )
 
     (merged_dir / "summary.json").write_text(
         json.dumps(full_summary, indent=2, sort_keys=True) + "\n"
