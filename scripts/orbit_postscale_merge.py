@@ -250,6 +250,39 @@ def paired_delta(rows: list[dict], a: str, b: str) -> dict:
     }
 
 
+def interaction_delta(rows: list[dict]) -> dict:
+    """2x2 optimizer-by-config interaction on the shared xconfig seeds."""
+    by_label: dict[str, dict[int, float]] = defaultdict(dict)
+    for row in rows:
+        label = row.get("analysis_label", row["optimizer"])
+        by_label[label][int(row["seed"])] = float(row["val_loss"])
+    labels = (
+        "orbit_at_orbit_config",
+        "muon_at_orbit_config",
+        "orbit_at_muon_config",
+        "muon_at_muon_config",
+    )
+    shared = sorted(set.intersection(*(set(by_label[label]) for label in labels)))
+    values = []
+    for seed in shared:
+        mechanism_orbit_cfg = (
+            by_label["orbit_at_orbit_config"][seed]
+            - by_label["muon_at_orbit_config"][seed]
+        )
+        mechanism_muon_cfg = (
+            by_label["orbit_at_muon_config"][seed]
+            - by_label["muon_at_muon_config"][seed]
+        )
+        values.append(mechanism_orbit_cfg - mechanism_muon_cfg)
+    return {
+        "definition": "(ORBIT-Muon at ORBIT config) - (ORBIT-Muon at Muon config)",
+        "n": len(values),
+        "mean_interaction": statistics.fmean(values),
+        "sd_interaction": statistics.stdev(values) if len(values) > 1 else 0.0,
+        "per_seed": {str(seed): value for seed, value in zip(shared, values)},
+    }
+
+
 def write_phase_analysis(work_dir: Path, phase: str, rows: list[dict]) -> None:
     merged = work_dir / "merged"
     analysis: dict[str, object] = {}
@@ -267,6 +300,7 @@ def write_phase_analysis(work_dir: Path, phase: str, rows: list[dict]) -> None:
         analysis["recipe_effect_on_orbit"] = paired_delta(
             rows, "orbit_at_orbit_config", "orbit_at_muon_config"
         )
+        analysis["optimizer_by_config_interaction"] = interaction_delta(rows)
     elif phase == "matched_confirm":
         analysis["orbit_vs_muon"] = paired_delta(rows, "orbit", "muon")
     elif phase == "ablation_ext":
@@ -340,6 +374,14 @@ def main() -> None:
             (merged / "horizon_with_astro_summary.json").write_text(
                 json.dumps(combined_summary, indent=2, sort_keys=True) + "\n"
             )
+            strong_analysis = {
+                "orbit_vs_astro_v2": paired_delta(combined, "orbit", "astro_v2"),
+                "orbit_vs_muon": paired_delta(combined, "orbit", "muon"),
+                "orbit_vs_normuon": paired_delta(combined, "orbit", "normuon"),
+            }
+            (merged / "horizon_with_astro_analysis.json").write_text(
+                json.dumps(strong_analysis, indent=2, sort_keys=True) + "\n"
+            )
 
         if phase == "astro_scale":
             combined, combined_summary = combine_strong_baseline(
@@ -350,6 +392,14 @@ def main() -> None:
             write_jsonl(merged / "scale_with_astro.jsonl", combined)
             (merged / "scale_with_astro_summary.json").write_text(
                 json.dumps(combined_summary, indent=2, sort_keys=True) + "\n"
+            )
+            strong_analysis = {
+                "orbit_vs_astro_v2": paired_delta(combined, "orbit", "astro_v2"),
+                "orbit_vs_muon": paired_delta(combined, "orbit", "muon"),
+                "orbit_vs_normuon": paired_delta(combined, "orbit", "normuon"),
+            }
+            (merged / "scale_with_astro_analysis.json").write_text(
+                json.dumps(strong_analysis, indent=2, sort_keys=True) + "\n"
             )
 
         print(f"{phase}: merged {len(rows)} exact post-scale tasks")
