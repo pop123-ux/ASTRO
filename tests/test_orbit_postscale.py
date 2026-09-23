@@ -109,5 +109,7 @@ def test_paired_delta_reports_seedwise_wins():
 
 
 def test_core_digest_does_not_include_postscale_script():
-    assert len(base.code_digest()) == 64
+    # Lock the exact implementation fingerprint that produced the 84 legacy
+    # rows. Additive post-scale orchestration must never silently change it.
+    assert base.code_digest() == "de8b994a734276871770c6c67648117d3613d0954f3ae90d7e7b69246308c200"
     assert len(post.postscale_digest()) == 64
