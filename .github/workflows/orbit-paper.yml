@@ -6,7 +6,7 @@ on:
     paths:
       - "src/orbit/**"
       - "scripts/orbit_*.py"
-      - "tests/test_orbit.py"
+      - "tests/test_orbit*.py"
       - "docs/orbit/**"
       - "configs/orbit_protocol.json"
       - ".github/workflows/orbit-paper.yml"
@@ -14,7 +14,7 @@ on:
     paths:
       - "src/orbit/**"
       - "scripts/orbit_*.py"
-      - "tests/test_orbit.py"
+      - "tests/test_orbit*.py"
       - "docs/orbit/**"
       - "configs/orbit_protocol.json"
       - ".github/workflows/orbit-paper.yml"
@@ -35,9 +35,9 @@ jobs:
       - name: Syntax check
         run: |
           python -m compileall -q src/orbit
-          python -m py_compile scripts/orbit_campaign.py scripts/orbit_merge.py scripts/orbit_plot.py scripts/orbit_novelty_gate.py scripts/orbit_build_paper.py
+          python -m py_compile scripts/orbit_campaign.py scripts/orbit_merge.py scripts/orbit_postscale.py scripts/orbit_postscale_merge.py scripts/orbit_plot.py scripts/orbit_novelty_gate.py scripts/orbit_build_paper.py
       - name: Unit tests
-        run: python -m pytest tests/test_orbit.py
+        run: python -m pytest tests/test_orbit.py tests/test_orbit_postscale.py
       - name: Mechanism gate
         run: python scripts/orbit_novelty_gate.py --strict --output /tmp/orbit_gate.json
       - name: Generate claim-free paper artifacts
