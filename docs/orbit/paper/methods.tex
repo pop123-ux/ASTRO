@@ -110,19 +110,16 @@ uses Q/K covariance metrics without relative-position rotation. \textbf{Diagonal
 RoPE-aware per-frequency scaling while removing off-diagonal coupling within each
 $2\times2$ pair.
 
-\section{Materials and Methods}
-\subsection{Model architecture}
+\section{Experimental Setup}
+\subsection{Models and data}
 All reported comparisons use the same decoder implementation within a given size. The
 124M model has 12 layers, 12 attention heads, width 768, and approximately 124M parameters.
 The 355M model has 24 layers, 16 heads, width 1024, and uses gradient checkpointing. Both
 use context length 512, GPT-2 token embeddings with tied input/output weights, pre-norm
 Transformer blocks, GELU MLPs with $4d$ hidden width, and zero dropout. Learned absolute
 position embeddings are replaced by RoPE with base 10,000. Attention uses separate
-$q_{\mathrm{proj}}$, $k_{\mathrm{proj}}$, and $v_{\mathrm{proj}}$ matrices, so the Muon
-baseline is not penalized by fused-QKV treatment; this also follows the empirical guidance
-in the original Muon writeup~\cite{jordan2024muon}.
+$q_{\mathrm{proj}}$, $k_{\mathrm{proj}}$, and $v_{\mathrm{proj}}$ matrices.
 
-\subsection{Data and tokenization}
 The corpus is \texttt{HuggingFaceFW/fineweb-edu}, configuration \texttt{sample-10BT},
 revision \texttt{v1.0.0}. Text is tokenized with the GPT-2 tokenizer. A single cached stream
 of exactly 12.4M tokens is used across sessions: the first 400,000 tokens form the fixed
@@ -131,7 +128,8 @@ samples random contiguous 512-token windows from that pool with a seeded generat
 evaluation always uses a separate generator with seed 777 and averages 20 validation
 batches. Thus every optimizer in a paired setting sees the same validation windows.
 
-\subsection{Optimization schedule and numerical settings}
+\subsection{Training setup}
+\label{sec:training-setup}
 All optimizers use the same warmup--cosine multiplier. The first 10\% of steps are warmup;
 the remaining schedule follows a cosine decay ending at $0.1$ times the peak learning rate.
 The same multiplier is applied to every learning-rate field, including the auxiliary AdamW
@@ -141,8 +139,12 @@ step); the 355M model uses batch size 4 (2,048 sampled tokens per step). The lat
 difference is disclosed because it prevents interpreting the 355M result as a pure
 model-size scaling experiment.
 
-\subsection{Hyperparameter policy}
-The original broad campaign gives every optimizer the same number of tuned dimensions.
+\subsection{Baselines and hyperparameter selection}
+The broad campaign includes AdamW, Muon, NorMuon, AdaMuon, ASTRO, and ORBIT. ASTRO is a
+pre-existing frozen baseline selected during the preceding ASTRO development study before
+any ORBIT result was observed; it is not retuned during the ORBIT campaign.
+
+Every optimizer receives the same number of tuned dimensions in the broad campaign.
 Muon-family methods search learning rate in $[2\times10^{-3},10^{-1}]$, weight decay in
 $[10^{-3},3\times10^{-1}]$, and auxiliary AdamW multiplier in $[0.02,1.5]$, with
 log-uniform deterministic sampling. AdamW tunes learning rate, weight decay, and $\beta_2$.
@@ -156,10 +158,10 @@ candidate, \texttt{shared-04}, before any held-out matched-confirmation seed was
 That frozen configuration is then reused in the matched confirmation and expanded ORBIT
 ablation.
 
-\subsection{Experiment matrix}
-Table~\ref{tab:protocol} records every reported training stage. The chronological
-campaign contains 188 successful optimizer tasks when all final merged artifacts are
-present.
+\subsection{Evaluation protocol}
+Table~\ref{tab:protocol} summarizes the reported training stages. The chronological
+campaign contains 188 successful optimizer tasks across discovery, confirmation, ablation,
+cross-configuration, long-horizon, and scale-transfer stages.
 
 \begin{table*}[t]
 \centering
@@ -206,7 +208,7 @@ At 124M, 300, 900, and 2700 steps correspond to 1.23M, 3.69M, and 11.06M sampled
 tokens respectively. At 355M, 900 steps correspond to 1.84M sampled training tokens because
 of the smaller batch size required on a 16GB T4.
 
-\subsection{Statistical analysis}
+\paragraph{Statistical analysis.}
 The primary estimand is the paired per-seed validation-loss difference, ORBIT minus the
 comparison method. Reported statistics include the paired mean, sample standard deviation,
 seed-wise win count, and a two-sided 95\% Student-$t$ confidence interval for the mean
@@ -218,7 +220,7 @@ their individual seed values are therefore shown explicitly and treated as trans
 rather than as high-powered inferential tests. Wall-clock time and peak CUDA allocation are
 reported alongside loss.
 
-\subsection{Hardware, software, and provenance}
+\subsection{Compute and reproducibility}
 The recorded campaign runs use NVIDIA Tesla T4 GPUs with CUDA 12.8, Python 3.13.15,
 PyTorch 2.11.0+cu128, Transformers 4.57.6, and Datasets 4.8.5. Each JSONL record stores
 the random seed, optimizer configuration, code digest, environment fingerprint, GPU label,
