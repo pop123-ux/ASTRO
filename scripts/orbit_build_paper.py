@@ -141,7 +141,7 @@ def write_macros(results: dict, generated: Path) -> None:
             f"\\renewcommand{{\\BroadNorMuonLoss}}{{{sm['normuon']['mean_val_loss']:.4f}}}",
         ]
 
-    generated.joinpath("macros.tex").write_text("\\n".join(lines) + "\\n")
+    generated.joinpath("macros.tex").write_text("\n".join(lines) + "\n")
 
 
 def write_matched_table(results: dict, generated: Path) -> None:
