@@ -110,29 +110,38 @@ present.
 \caption{Complete experiment matrix. ``Frozen'' means the configuration was selected before
 the listed evaluation seeds were inspected.}
 \label{tab:protocol}
-\small
-\begin{tabular}{p{2.6cm}p{4.9cm}lrrp{4.1cm}}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{@{}
+>{\raggedright\arraybackslash}p{1.75cm}
+>{\raggedright\arraybackslash}p{3.35cm}
+>{\centering\arraybackslash}p{0.9cm}
+>{\centering\arraybackslash}p{0.75cm}
+>{\raggedright\arraybackslash}p{1.95cm}
+>{\raggedright\arraybackslash}p{4.35cm}
+@{}}
 \toprule
 Stage & Purpose & Model & Steps & Seeds / trials & Optimizers or controls \\
 \midrule
 Discovery & Equal-budget broad hyperparameter selection & 124M & 300 &
-5 trials, seed 0 & AdamW, Muon, NorMuon, AdaMuon, ASTRO, ORBIT \\
-Broad confirmation & Contextual comparison under independently frozen recipes & 124M & 900 &
-seeds 100--104 & same six methods \\
-Preliminary ablation & Early mechanism check used to motivate the larger ablation & 124M & 900 &
-seeds 200--202 & ORBIT, no-RoPE, diagonal, identity \\
-Cross-configuration & Separate optimizer mechanism from hyperparameter recipe & 124M & 900 &
-seeds 100--104 & Muon/ORBIT crossed with Muon/ORBIT discovery recipes \\
-Matched tuning & Eliminate independent-search luck & 124M & 900 &
-10 shared trials, seed 0 & Muon, ORBIT \\
+5 trials; seed 0 & AdamW, Muon, NorMuon, AdaMuon, ASTRO, ORBIT \\
+Broad confirmation & Independently frozen recipe comparison & 124M & 900 &
+100--104 & Same six methods \\
+Preliminary ablation & Early mechanism check motivating the expanded ablation & 124M & 900 &
+200--202 & ORBIT, no-RoPE, diagonal, identity \\
+Cross-configuration & Separate optimizer mechanism from recipe choice & 124M & 900 &
+100--104 & Muon and ORBIT crossed with both frozen recipes \\
+Matched tuning & Remove independent-search luck & 124M & 900 &
+10 shared trials; seed 0 & Muon, ORBIT \\
 Matched confirmation & Primary mechanism-isolated comparison & 124M & 900 &
-seeds 500--509 & Muon, ORBIT at their frozen shared winner \\
-Expanded ablation & Replicate mechanism attribution at higher seed count & 124M & 900 &
-seeds 600--609 & ORBIT, no-RoPE, diagonal, identity at matched ORBIT config \\
-Long horizon & Test persistence at longer optimization horizon & 124M & 2700 &
-seeds 400--401 & Muon, NorMuon, ORBIT; ASTRO added with identical seeds \\
+500--509 & Muon, ORBIT; shared frozen winner \\
+Expanded ablation & Higher-powered mechanism attribution & 124M & 900 &
+600--609 & ORBIT, no-RoPE, diagonal, identity; shared ORBIT config \\
+Long horizon & Test persistence at longer training horizon & 124M & 2700 &
+400--401 & Muon, NorMuon, ORBIT, ASTRO \\
 Scale transfer & Test transfer to a larger model & 355M & 900 &
-seeds 300--301 & Muon, NorMuon, ORBIT; ASTRO added with identical seeds \\
+300--301 & Muon, NorMuon, ORBIT, ASTRO \\
 \bottomrule
 \end{tabular}
 \end{table*}
