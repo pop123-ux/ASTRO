@@ -77,7 +77,7 @@ mean and the shaded band is its 95\% confidence interval.}
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.76\linewidth]{xconfig_interaction.pdf}
-\caption{Cross-over experiment separating optimizer mechanism from hyperparameter recipe.}
+\caption{Cross-over experiment separating optimizer mechanism from hyperparameter recipe. Points show cell means; error bars are one sample standard deviation across the five paired seeds.}
 \label{fig:xconfig}
 \end{figure}}{}
 
@@ -93,7 +93,7 @@ retaining per-frequency scaling.
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.79\linewidth]{ablation_effects.pdf}
-\caption{Paired ablation effects. Negative values favor full ORBIT.}
+\caption{Paired ablation effects with 95\% confidence intervals. Negative values favor full ORBIT; right-side annotations report seed-wise wins for full ORBIT.}
 \label{fig:ablation}
 \end{figure}}{}
 
@@ -104,7 +104,7 @@ retaining per-frequency scaling.
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.72\linewidth]{transfer_horizon.pdf}
-\caption{124M long-horizon transfer. Individual seed outcomes are shown because $n=2$.}
+\caption{124M long-horizon transfer. Individual seed outcomes and their mean are shown because each optimizer has only $n=2$ paired seeds; this panel is treated as transfer evidence rather than a high-powered significance test.}
 \label{fig:horizon}
 \end{figure}}{}
 
@@ -112,7 +112,7 @@ retaining per-frequency scaling.
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.72\linewidth]{transfer_scale.pdf}
-\caption{355M transfer. Individual seed outcomes are shown because $n=2$.}
+\caption{355M transfer. Individual seed outcomes and their mean are shown because each optimizer has only $n=2$ paired seeds; this panel is treated as transfer evidence rather than a high-powered significance test.}
 \label{fig:scale}
 \end{figure}}{}
 
@@ -176,7 +176,7 @@ audit. Negative and unresolved findings must receive the same prominence as posi
 \begin{figure}[ht]
 \centering
 \includegraphics[width=0.75\linewidth]{broad_confirmation.pdf}
-\caption{Broad independently tuned confirmation, retained as secondary context.}
+\caption{Broad independently tuned confirmation (mean $\pm$ SD across five seeds), retained as secondary context because each optimizer uses its independently selected recipe.}
 \end{figure}}{}
 
 \section{Reproducibility}
