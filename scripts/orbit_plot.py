@@ -173,7 +173,7 @@ def plot_ablation_effects(results: dict, out: Path) -> None:
 def plot_transfer(rows: list[dict], out: Path, *, stem: str, title: str) -> None:
     by = grouped(rows, "optimizer")
     order = ["muon", "normuon", "astro_v2", "orbit"]
-    display = {"muon": "Muon", "normuon": "NorMuon", "astro_v2": "ASTRO-v2", "orbit": "ORBIT"}
+    display = {"muon": "Muon", "normuon": "NorMuon", "astro_v2": "ASTRO", "orbit": "ORBIT"}
 
     fig, ax = plt.subplots(figsize=(7.1, 4.5))
     for xi, name in enumerate(order):
@@ -202,7 +202,7 @@ def plot_broad_confirmation(rows: list[dict], out: Path) -> None:
         "adamuon_ref": "AdaMuon",
         "muon": "Muon",
         "normuon": "NorMuon",
-        "astro_v2": "ASTRO-v2",
+        "astro_v2": "ASTRO",
         "orbit": "ORBIT",
     }
     stats = []
