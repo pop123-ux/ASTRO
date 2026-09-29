@@ -44,7 +44,21 @@ def display_name(name: str) -> str:
 
 
 def write_macros(results: dict, generated: Path) -> None:
+    macro_names = [
+        "MatchedMuonLoss", "MatchedOrbitLoss", "MatchedDelta", "MatchedCILow",
+        "MatchedCIHigh", "MatchedWins", "MatchedRuntimeOverhead",
+        "MatchedMemoryOverhead", "XConfigMechanismMuon",
+        "XConfigMechanismMuonWins", "XConfigMechanismOrbit",
+        "XConfigMechanismOrbitWins", "XConfigRecipeMuon", "XConfigRecipeOrbit",
+        "AblIdentityDelta", "AblIdentityCILow", "AblIdentityCIHigh",
+        "AblIdentityWins", "AblNoRoPEDelta", "AblNoRoPECILow",
+        "AblNoRoPECIHigh", "AblNoRoPEWins", "AblDiagDelta", "AblDiagCILow",
+        "AblDiagCIHigh", "AblDiagWins", "HorizonVsAstro", "HorizonVsMuon",
+        "HorizonVsNorMuon", "ScaleVsAstro", "ScaleVsMuon", "ScaleVsNorMuon",
+        "BroadAstroLoss", "BroadOrbitLoss", "BroadMuonLoss", "BroadNorMuonLoss",
+    ]
     lines = ["% AUTO-GENERATED. Do not edit."]
+    lines.extend(f"\\renewcommand{{\\{name}}}{{--}}" for name in macro_names)
 
     mc = results.get("matched_confirmation")
     if mc:
@@ -52,14 +66,14 @@ def write_macros(results: dict, generated: Path) -> None:
         eff = mc["orbit_vs_muon"]
         lo, hi = eff["ci95"]
         lines += [
-            f"\\newcommand{{\\MatchedMuonLoss}}{{{sm['muon']['mean_val_loss']:.4f}}}",
-            f"\\newcommand{{\\MatchedOrbitLoss}}{{{sm['orbit']['mean_val_loss']:.4f}}}",
-            f"\\newcommand{{\\MatchedDelta}}{{{eff['mean_delta']:.4f}}}",
-            f"\\newcommand{{\\MatchedCILow}}{{{lo:.4f}}}",
-            f"\\newcommand{{\\MatchedCIHigh}}{{{hi:.4f}}}",
-            f"\\newcommand{{\\MatchedWins}}{{{eff['a_wins']}/{eff['n']}}}",
-            f"\\newcommand{{\\MatchedRuntimeOverhead}}{{{100*mc['runtime_overhead_fraction']:.1f}\\%}}",
-            f"\\newcommand{{\\MatchedMemoryOverhead}}{{{100*mc['memory_overhead_fraction']:.1f}\\%}}",
+            f"\\renewcommand{{\\MatchedMuonLoss}}{{{sm['muon']['mean_val_loss']:.4f}}}",
+            f"\\renewcommand{{\\MatchedOrbitLoss}}{{{sm['orbit']['mean_val_loss']:.4f}}}",
+            f"\\renewcommand{{\\MatchedDelta}}{{{eff['mean_delta']:.4f}}}",
+            f"\\renewcommand{{\\MatchedCILow}}{{{lo:.4f}}}",
+            f"\\renewcommand{{\\MatchedCIHigh}}{{{hi:.4f}}}",
+            f"\\renewcommand{{\\MatchedWins}}{{{eff['a_wins']}/{eff['n']}}}",
+            f"\\renewcommand{{\\MatchedRuntimeOverhead}}{{{100*mc['runtime_overhead_fraction']:.1f}\\%}}",
+            f"\\renewcommand{{\\MatchedMemoryOverhead}}{{{100*mc['memory_overhead_fraction']:.1f}\\%}}",
         ]
 
     xc = results.get("cross_configuration_isolation")
@@ -69,12 +83,12 @@ def write_macros(results: dict, generated: Path) -> None:
         r_mu = xc["recipe_effect_on_muon"]
         r_or = xc["recipe_effect_on_orbit"]
         lines += [
-            f"\\newcommand{{\\XConfigMechanismMuon}}{{{m_mu['mean_delta']:.4f}}}",
-            f"\\newcommand{{\\XConfigMechanismMuonWins}}{{{m_mu['a_wins']}/{m_mu['n']}}}",
-            f"\\newcommand{{\\XConfigMechanismOrbit}}{{{m_or['mean_delta']:.4f}}}",
-            f"\\newcommand{{\\XConfigMechanismOrbitWins}}{{{m_or['a_wins']}/{m_or['n']}}}",
-            f"\\newcommand{{\\XConfigRecipeMuon}}{{{r_mu['mean_delta']:.4f}}}",
-            f"\\newcommand{{\\XConfigRecipeOrbit}}{{{r_or['mean_delta']:.4f}}}",
+            f"\\renewcommand{{\\XConfigMechanismMuon}}{{{m_mu['mean_delta']:.4f}}}",
+            f"\\renewcommand{{\\XConfigMechanismMuonWins}}{{{m_mu['a_wins']}/{m_mu['n']}}}",
+            f"\\renewcommand{{\\XConfigMechanismOrbit}}{{{m_or['mean_delta']:.4f}}}",
+            f"\\renewcommand{{\\XConfigMechanismOrbitWins}}{{{m_or['a_wins']}/{m_or['n']}}}",
+            f"\\renewcommand{{\\XConfigRecipeMuon}}{{{r_mu['mean_delta']:.4f}}}",
+            f"\\renewcommand{{\\XConfigRecipeOrbit}}{{{r_or['mean_delta']:.4f}}}",
         ]
 
     ab = results.get("mechanism_ablation")
@@ -87,10 +101,10 @@ def write_macros(results: dict, generated: Path) -> None:
             eff = ab[key]
             lo, hi = eff["ci95"]
             lines += [
-                f"\\newcommand{{\\Abl{stem}Delta}}{{{eff['mean_delta']:.4f}}}",
-                f"\\newcommand{{\\Abl{stem}CILow}}{{{lo:.4f}}}",
-                f"\\newcommand{{\\Abl{stem}CIHigh}}{{{hi:.4f}}}",
-                f"\\newcommand{{\\Abl{stem}Wins}}{{{eff['a_wins']}/{eff['n']}}}",
+                f"\\renewcommand{{\\Abl{stem}Delta}}{{{eff['mean_delta']:.4f}}}",
+                f"\\renewcommand{{\\Abl{stem}CILow}}{{{lo:.4f}}}",
+                f"\\renewcommand{{\\Abl{stem}CIHigh}}{{{hi:.4f}}}",
+                f"\\renewcommand{{\\Abl{stem}Wins}}{{{eff['a_wins']}/{eff['n']}}}",
             ]
 
     horizon = results.get("long_horizon_transfer")
@@ -102,7 +116,7 @@ def write_macros(results: dict, generated: Path) -> None:
         ):
             eff = horizon[key]
             lines.append(
-                f"\\newcommand{{\\HorizonVs{stem}}}{{{eff['mean_delta']:.4f}}}"
+                f"\\renewcommand{{\\HorizonVs{stem}}}{{{eff['mean_delta']:.4f}}}"
             )
 
     scale = results.get("scale_transfer")
@@ -114,17 +128,17 @@ def write_macros(results: dict, generated: Path) -> None:
         ):
             eff = scale[key]
             lines.append(
-                f"\\newcommand{{\\ScaleVs{stem}}}{{{eff['mean_delta']:.4f}}}"
+                f"\\renewcommand{{\\ScaleVs{stem}}}{{{eff['mean_delta']:.4f}}}"
             )
 
     broad = results.get("broad_independently_tuned_context")
     if broad:
         sm = broad["summary"]
         lines += [
-            f"\\newcommand{{\\BroadAstroLoss}}{{{sm['astro_v2']['mean_val_loss']:.4f}}}",
-            f"\\newcommand{{\\BroadOrbitLoss}}{{{sm['orbit']['mean_val_loss']:.4f}}}",
-            f"\\newcommand{{\\BroadMuonLoss}}{{{sm['muon']['mean_val_loss']:.4f}}}",
-            f"\\newcommand{{\\BroadNorMuonLoss}}{{{sm['normuon']['mean_val_loss']:.4f}}}",
+            f"\\renewcommand{{\\BroadAstroLoss}}{{{sm['astro_v2']['mean_val_loss']:.4f}}}",
+            f"\\renewcommand{{\\BroadOrbitLoss}}{{{sm['orbit']['mean_val_loss']:.4f}}}",
+            f"\\renewcommand{{\\BroadMuonLoss}}{{{sm['muon']['mean_val_loss']:.4f}}}",
+            f"\\renewcommand{{\\BroadNorMuonLoss}}{{{sm['normuon']['mean_val_loss']:.4f}}}",
         ]
 
     generated.joinpath("macros.tex").write_text("\\n".join(lines) + "\\n")
