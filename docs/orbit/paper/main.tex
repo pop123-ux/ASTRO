@@ -55,47 +55,7 @@ instead targets the setting in which RoPE makes the query--key interaction
 relative-position dependent. This section must be refreshed from the final dated
 equation-level prior-art audit immediately before public submission.
 
-\section{Method}
-For a single attention head and RoPE frequency pair $f$, write the relative-position score
-contribution as
-\begin{equation}
-  s_{ij,f}=q_{i,f}^{\top}R_f(\Delta)k_{j,f},\qquad \Delta=i-j.
-\end{equation}
-Let $C_{Q,f}$ and $C_{K,f}$ be exponential-moving-average $2\times2$ covariances of the
-unrotated query and key coordinates. ORBIT defines
-\begin{align}
-M_{Q,f} &= \mathbb{E}_{\Delta}\left[R_f(\Delta)C_{K,f}R_f(\Delta)^\top\right],\\
-M_{K,f} &= \mathbb{E}_{\Delta}\left[R_f(\Delta)^\top C_{Q,f}R_f(\Delta)\right].
-\end{align}
-The expectation uses a frozen logarithmic displacement grid. A Muon-style candidate
-direction $U_Q,U_K$ is computed first. For exponent $p$,
-\begin{align}
-\widetilde U_{Q,f} &= M_{Q,f}^{-p/2} U_{Q,f},\\
-\widetilde U_{K,f} &= M_{K,f}^{-p/2} U_{K,f}.
-\end{align}
-A single joint scalar then restores
-\begin{equation}
-\|\widetilde U_Q\|_F^2+\|\widetilde U_K\|_F^2
-=
-\|U_Q\|_F^2+\|U_K\|_F^2,
-\end{equation}
-preventing an aggregate step-size increase from masquerading as a geometric gain.
-ORBIT's unique matrix operations are frequency-local $2\times2$ operations; the current
-implementation uses a robust analytic inverse metric power for the SPD $2\times2$ metric
-rather than a generic eigendecomposition.
-
-\section{Experimental Protocol}
-The campaign uses the pinned FineWeb-Edu corpus, a common warmup--cosine schedule,
-GPT-style weight-decay routing, environment fingerprints, and the same RoPE-modified
-GPT-2 research architecture for every optimizer in a given comparison.
-
-The evidence is interpreted in a fixed order. First, Muon and ORBIT are tuned over the
-same deterministic set of ten 900-step hyperparameter candidates. Their frozen winners
-are then tested on ten unseen paired seeds. Second, a $2\times2$ optimizer/configuration
-cross-over quantifies the tuning-recipe confound. Third, the full ORBIT update is compared
-against identity, no-RoPE, and diagonal controls over ten paired seeds. Finally, the frozen
-recipes are tested at 2700 steps and at 355M parameters, with the latter two stages treated
-as secondary transfer evidence because each has only two seeds.
+\input{methods.tex}
 
 \section{Primary Matched Confirmation}
 \IfFileExists{generated/table_matched.tex}{\input{generated/table_matched.tex}}{}
@@ -178,6 +138,8 @@ To be written after the evidence freeze, final plotting pass, and equation-level
 audit. Negative and unresolved findings must receive the same prominence as positive ones.
 
 \appendix
+\input{astro_provenance.tex}
+
 
 \section{Matched Training Dynamics}
 \IfFileExists{figures/matched_seed_pairs.pdf}{%
