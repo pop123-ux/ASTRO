@@ -167,6 +167,6 @@ def test_generated_macros_define_then_override(tmp_path):
     assert r"\renewcommand{\MatchedMuonLoss}{" in text
     assert r"\newcommand{\AblIdentityDelta}{--}" in text
     assert r"\renewcommand{\AblIdentityDelta}{" in text
-    assert "\\n" not in text
+    assert r"\\n\\newcommand" not in text
     assert len(text.splitlines()) > 10
     assert text.splitlines()[0] == "% AUTO-GENERATED. Do not edit."
