@@ -1,6 +1,7 @@
 \documentclass[10pt]{article}
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath,amssymb,booktabs,graphicx,microtype,hyperref}
+\usepackage{placeins}
 \usepackage{siunitx}
 \usepackage{xcolor}
 \graphicspath{{figures/}}
@@ -29,9 +30,9 @@ runtime overhead and no material increase in peak allocated memory. Cross-config
 experiments show that recipe choice explains a substantial fraction of the much larger
 independently tuned gap. Expanded ablations support both functional Q/K conditioning and a
 RoPE-specific contribution, while evidence for the full off-diagonal metric is weak.
-Two-seed transfer experiments show persistence at 2700 steps and transfer to 355M parameters
-against Muon and NorMuon; the 355M comparison with ASTRO is unresolved. ORBIT changes no
-inference-time computation.
+In two-seed secondary transfer tests, the frozen ORBIT recipe remains lower-loss than the
+frozen Muon and NorMuon recipes at 2700 steps and at 355M parameters; the 355M comparison
+with ASTRO is unresolved. ORBIT changes no inference-time computation.
 \end{abstract}
 
 \section{Introduction}
@@ -121,11 +122,11 @@ analyze or modify the attention function, but do not use its relative-position r
 precondition Q/K parameter updates during pretraining.
 
 \paragraph{Novelty boundary.}
-Our literature audit through September 29, 2026 did not identify a prior training optimizer
-whose Q/K preconditioner is derived from the RoPE-conditioned relative-position bilinear
-interaction and implemented with per-frequency $2\times2$ statistics. We therefore make
-the narrow claim that ORBIT contributes this specific training-time metric and its
-mechanism-isolated evaluation. We do not claim to originate spectral descent, QK-product
+To our knowledge, prior work has not introduced a training optimizer whose Q/K
+preconditioner is derived from the RoPE-conditioned relative-position bilinear interaction
+and implemented with per-frequency $2\times2$ statistics. We therefore make the narrow
+claim that ORBIT contributes this specific training-time metric and its mechanism-isolated
+evaluation. We do not claim to originate spectral descent, QK-product
 optimization, architecture-aware optimization, RoPE geometry, or gauge-equivariant
 conditioning.
 
@@ -231,16 +232,22 @@ ORBIT; right-side annotations report seed-wise wins for full ORBIT.}
 \label{fig:ablation}
 \end{figure}}{}
 
-\subsection{The gain persists at a longer horizon and transfers to 355M}
-At 124M and 2700 steps, ORBIT remains below each comparison method in both tested seeds.
+\subsection{The frozen ORBIT recipe transfers across horizon and model size}
+Unlike the primary matched confirmation, these transfer cells preserve each optimizer's
+independently frozen recipe. They therefore test recipe-level persistence and transfer, not
+the matched ORBIT mechanism estimand.
+
+At 124M and 2700 steps, the frozen ORBIT recipe remains below each comparison recipe in both
+tested seeds.
 Its mean paired differences are \HorizonVsMuon{} nats versus Muon,
 \HorizonVsNorMuon{} versus NorMuon, and \HorizonVsAstro{} versus ASTRO. The two
-ORBIT--ASTRO seed differences are closely aligned in sign and magnitude. Because this stage
-contains only two paired seeds per optimizer, we treat the result as evidence that the
-advantage can persist over a substantially longer training horizon, not as a high-powered
-inferential comparison.
+ORBIT--ASTRO seed differences are closely aligned in sign and magnitude. Because this stage contains only two paired seeds per optimizer, we treat the result as
+secondary evidence that the frozen ORBIT recipe can remain effective over a substantially
+longer training horizon, not as a high-powered inferential comparison or a matched
+mechanism estimate.
 
-At 355M and 900 steps, ORBIT again beats Muon and NorMuon on both tested seeds, with mean
+At 355M and 900 steps, the frozen ORBIT recipe again beats the frozen Muon and NorMuon
+recipes on both tested seeds, with mean
 paired differences of \ScaleVsMuon{} and \ScaleVsNorMuon{} nats respectively. The ASTRO
 comparison is unresolved: the mean ORBIT-minus-ASTRO difference is \ScaleVsAstro{} nats,
 but one seed favors ORBIT and the other favors ASTRO. We therefore do not claim superiority
@@ -273,9 +280,8 @@ than a high-powered significance test.}
 \subsection{Independently tuned baselines provide context, not the causal estimate}
 The broad 124M confirmation places ORBIT among the stronger recipes in the campaign.
 ASTRO reaches mean validation loss \BroadAstroLoss{}, ORBIT \BroadOrbitLoss{}, NorMuon
-\BroadNorMuonLoss{}, and Muon \BroadMuonLoss{}. ORBIT and ASTRO are therefore essentially
-tied at this horizon under their independently selected recipes, while both outperform the
-original Muon recipe by a much larger margin.
+\BroadNorMuonLoss{}, and Muon \BroadMuonLoss{}. ORBIT and ASTRO are therefore numerically close at this horizon under their independently
+selected recipes, while both outperform the original Muon recipe by a much larger margin.
 
 These numbers are useful for practical context, but they are not the primary estimate of
 ORBIT's algorithmic effect because each optimizer enters the comparison with a separately
@@ -284,9 +290,11 @@ separate optimizer mechanism from recipe selection.
 
 \IfFileExists{generated/table_broad.tex}{\input{generated/table_broad.tex}}{}
 
+\FloatBarrier
 \section{Discussion}
 Three conclusions follow from the complete campaign. First, the clean mechanism effect is
-real but modest: after forcing Muon and ORBIT onto the same hyperparameter configuration,
+reproducible in this setting but modest: after forcing Muon and ORBIT onto the same
+hyperparameter configuration,
 ORBIT still improves validation loss across unseen seeds, but by far less than the original
 independently tuned comparison suggested. This distinction matters for optimizer research,
 where a limited search budget can easily fold recipe quality into the apparent value of a
@@ -301,20 +309,21 @@ increment in the present setting. A simpler diagonal approximation may therefore
 future study, but selecting it as the final method after observing these ablations would be
 post-hoc and is deliberately avoided here.
 
-Third, ORBIT's advantage is not confined to the original 900-step 124M setting. It persists
-at 2700 steps against Muon, NorMuon, and ASTRO in the two tested seeds and transfers to a
-355M model against Muon and NorMuon. The larger-model comparison with ASTRO remains
-unresolved, which defines a useful boundary on the present evidence rather than a failure
-to report an inconvenient result. Together, these observations support ORBIT as a
-lightweight geometry-aware modification to Muon-family training rather than as a universal
-replacement for every strong optimizer recipe.
+Third, the frozen ORBIT recipe's lower validation loss is not confined to the original
+900-step 124M setting. It remains lower than the frozen Muon and NorMuon recipes at 2700
+steps and at 355M in the two tested seeds, and it is lower than ASTRO at the long horizon.
+Because these transfer cells retain independently selected recipes, they do not isolate the
+ORBIT mechanism. The 355M comparison with ASTRO remains unresolved. Together, these
+observations support ORBIT as a lightweight geometry-aware modification to Muon-family
+training while preserving a clear boundary between mechanism-isolated and recipe-level
+evidence.
 
 \section{Limitations}
 The local metric is an approximation to rotary attention-logit function space rather than
 an exact natural gradient. The matched effect is smaller than the original independently
 tuned ORBIT--Muon gap, demonstrating that tuning recipe materially affects headline
-optimizer comparisons. The off-diagonal ablation must be reported even if it does not
-establish a benefit. The long-horizon and 355M transfer cells use only two paired seeds and
+optimizer comparisons. The off-diagonal ablation provides only weak evidence of an additional benefit beyond the
+diagonal approximation. The long-horizon and 355M transfer cells use only two paired seeds and
 therefore provide transfer evidence rather than high-powered inferential tests. The 355M
 batch/token regime also differs from the 124M experiments, so the paper does not infer that
 the ORBIT advantage grows with model scale from these cells alone. Finally, all experiments
@@ -336,8 +345,9 @@ rule alone.
 
 Mechanism ablations support functional Q/K conditioning and a specifically RoPE-aware
 component, but provide only weak evidence for the full off-diagonal $2\times2$ coupling.
-Longer-horizon and 355M experiments suggest transfer beyond the primary setting, while the
-355M comparison with ASTRO remains unresolved. The resulting picture is not that ORBIT
+Secondary longer-horizon and 355M experiments suggest that the frozen ORBIT recipe can
+transfer beyond the primary setting, while the 355M comparison with ASTRO remains
+unresolved. The resulting picture is not that ORBIT
 universally dominates strong optimizer recipes, but that a small, reproducible gain remains
 after tuning effects are removed. More broadly, the results support optimizer design that
 targets the computation induced by a parameter block, while also showing the importance of
@@ -369,6 +379,7 @@ matched tuning and explicit negative controls when evaluating such methods.
 \caption{Matched held-out validation loss versus measured wall-clock time.}
 \end{figure}}{}
 
+\FloatBarrier
 \section{Optimizer Diagnostics}
 \IfFileExists{figures/metric_diagnostics.pdf}{%
 \begin{figure}[ht]
@@ -377,6 +388,7 @@ matched tuning and explicit negative controls when evaluating such methods.
 \caption{Recorded ORBIT metric diagnostics across matched held-out seeds.}
 \end{figure}}{}
 
+\FloatBarrier
 \section{Broad Confirmation Visualization}
 \IfFileExists{figures/broad_confirmation.pdf}{%
 \begin{figure}[ht]
@@ -385,6 +397,7 @@ matched tuning and explicit negative controls when evaluating such methods.
 \caption{Broad independently tuned confirmation (mean $\pm$ SD across five seeds), retained as secondary context because each optimizer uses its independently selected recipe.}
 \end{figure}}{}
 
+\FloatBarrier
 \section{Reproducibility}
 All runs are append-only JSONL records containing the optimizer configuration, random seed,
 code digest, Python/package environment, GPU model, wall-clock time, validation loss,
@@ -393,6 +406,7 @@ freeze that checks exact task counts, expected seeds, the frozen core digest, a 
 software environment, identical matched configurations, and finite metrics before writing a
 manifest, claim ledger, tables, or figures.
 
+\FloatBarrier
 \bibliographystyle{plain}
 \bibliography{references}
 \end{document}
