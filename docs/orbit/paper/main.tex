@@ -62,7 +62,7 @@ not model this interaction.
 ORBIT incorporates that functional geometry without replacing Muon's efficient spectral
 update or changing inference. It first forms the ordinary
 Muon-style candidate Q/K directions, then preconditions each RoPE frequency pair with a
-small metric derived from the covariance of the opposite circuit after transport through a
+compact metric derived from the covariance of the opposite circuit after transport through a
 fixed distribution of relative-position rotations. A single joint Frobenius restoration
 prevents this conditioning from winning merely by increasing the total Q/K step norm. The
 result is an optimizer-only modification whose unique operations are local $2\times2$
@@ -75,7 +75,7 @@ selected winner on unseen paired seeds. This mechanism-isolated comparison ancho
 subsequent ablations and longer-horizon/model-scale transfer experiments.
 
 \paragraph{Contributions.}
-This work makes fcontributions:
+This work makes four contributions:
 \begin{enumerate}
   \item A RoPE-conditioned local metric for Q/K optimization is derived directly from the
   relative-position bilinear attention interaction and implemented using frequency-local
@@ -322,8 +322,7 @@ Under identical hyperparameters selected from the same search grid, ORBIT lowers
 loss on \MatchedWins{} unseen seeds with a paired mean difference of \MatchedDelta{} nats
 and a 95\% confidence interval of [\MatchedCILow{}, \MatchedCIHigh{}]. Cross-configuration
 experiments show that the improvement is present under both frozen recipes, and the expanded
-ablations attribute the effect to functional Q/K conditioning, RoPE-aware rotation, and a
-smaller additional contribution from full frequency-pair coupling. The advantage also
+ablations attribute the effect to functional Q/K conditioning, RoPE-aware rotation, and an additional contribution from full frequency-pair coupling. The advantage also
 persists at a longer training horizon and transfers to the 355M setting against Muon and
 NorMuon in the tested seeds.
 
