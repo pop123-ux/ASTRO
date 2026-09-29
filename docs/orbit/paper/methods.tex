@@ -1,0 +1,163 @@
+\section{Method}
+\subsection{Functional metric for rotary Q/K interactions}
+For a single attention head and RoPE frequency pair $f$, write the relative-position score
+contribution as
+\begin{equation}
+  s_{ij,f}=q_{i,f}^{\top}R_f(\Delta)k_{j,f},\qquad \Delta=i-j.
+\end{equation}
+Let $C_{Q,f}$ and $C_{K,f}$ be exponential-moving-average $2\times2$ covariances of the
+unrotated query and key coordinates. ORBIT defines
+\begin{align}
+M_{Q,f} &= \mathbb{E}_{\Delta}\left[R_f(\Delta)C_{K,f}R_f(\Delta)^\top\right],\\
+M_{K,f} &= \mathbb{E}_{\Delta}\left[R_f(\Delta)^\top C_{Q,f}R_f(\Delta)\right].
+\end{align}
+The expectation is evaluated on the fixed displacement grid
+$\{1,2,4,8,16,32,64,128\}$. Q/K covariances use an EMA coefficient of $0.95$ after the
+initial observation. A Muon-style candidate direction $U_Q,U_K$ is computed first. With
+the functional exponent frozen to $p=1$,
+\begin{align}
+\widetilde U_{Q,f} &= M_{Q,f}^{-1/2} U_{Q,f},\\
+\widetilde U_{K,f} &= M_{K,f}^{-1/2} U_{K,f}.
+\end{align}
+The metric is regularized by $10^{-5}I$ and its condition number is capped at 100. A single
+joint scalar then restores
+\begin{equation}
+\|\widetilde U_Q\|_F^2+\|\widetilde U_K\|_F^2
+=
+\|U_Q\|_F^2+\|U_K\|_F^2,
+\end{equation}
+preventing an aggregate step-size increase from masquerading as a geometric gain. ORBIT's
+unique matrix operations are frequency-local $2\times2$ operations. The implementation uses
+a closed-form analytic inverse metric power for these SPD matrices rather than a generic
+eigendecomposition.
+
+\subsection{Muon-family base update}
+The Muon baseline uses Nesterov momentum $0.95$, five iterations of the quintic
+Newton--Schulz map with coefficients $(3.4445,-4.7750,2.0315)$, and the conventional
+aspect-ratio update scaling used by the public Muon implementation~\cite{jordan2024muon}.
+On Tesla T4 hardware the Newton--Schulz calculation is performed in float32 because native
+BF16 tensor-core execution is unavailable; the same numerical kernel is used for all
+Muon-family methods in this campaign. Two-dimensional hidden operators take the spectral
+path. Embeddings and the tied language-model head use the auxiliary AdamW path with weight
+decay, while biases and LayerNorm parameters use the auxiliary AdamW path without decay.
+The auxiliary learning rate is a tuned scalar multiple of the matrix learning rate.
+
+\subsection{ASTRO baseline naming and provenance}
+The paper uses the name \textbf{ASTRO} throughout. In the experiment code, the frozen ASTRO
+baseline is identified internally as \texttt{astro\_v2}; that implementation label is not a
+separate public method name. It was selected before the ORBIT campaign from the preceding
+ASTRO development study. In those historical experiments, the final recipe had the best
+mean margin against Muon across three targeted 124M/900-step configurations, while an
+ASTRO-Muon-Betas variant was effectively tied with it at one shared configuration. Earlier
+plain ASTRO variants also produced negative results. We therefore treat ASTRO as a frozen
+external baseline for the ORBIT study rather than retuning or choosing among ASTRO
+development variants after seeing ORBIT results. Historical ASTRO development measurements
+are summarized in the appendix and are not pooled with ORBIT's confirmatory statistics.
+
+\section{Materials and Methods}
+\subsection{Model architecture}
+All paper-facing comparisons use the same decoder implementation within a given size. The
+124M model has 12 layers, 12 attention heads, width 768, and approximately 124M parameters.
+The 355M model has 24 layers, 16 heads, width 1024, and uses gradient checkpointing. Both
+use context length 512, GPT-2 token embeddings with tied input/output weights, pre-norm
+Transformer blocks, GELU MLPs with $4d$ hidden width, and zero dropout. Learned absolute
+position embeddings are replaced by RoPE with base 10,000. Attention uses separate
+$q_{\mathrm{proj}}$, $k_{\mathrm{proj}}$, and $v_{\mathrm{proj}}$ matrices, so the Muon
+baseline is not penalized by fused-QKV treatment; this also follows the empirical guidance
+in the original Muon writeup~\cite{jordan2024muon}.
+
+\subsection{Data and tokenization}
+The corpus is \texttt{HuggingFaceFW/fineweb-edu}, configuration \texttt{sample-10BT},
+revision \texttt{v1.0.0}. Text is tokenized with the GPT-2 tokenizer. A single cached stream
+of exactly 12.4M tokens is used across sessions: the first 400,000 tokens form the fixed
+validation pool and the next 12,000,000 tokens form the training pool. Every training step
+samples random contiguous 512-token windows from that pool with a seeded generator;
+evaluation always uses a separate generator with seed 777 and averages 20 validation
+batches. Thus every optimizer in a paired setting sees the same validation windows.
+
+\subsection{Optimization schedule and numerical settings}
+All optimizers use the same warmup--cosine multiplier. The first 10\% of steps are warmup;
+the remaining schedule follows a cosine decay ending at $0.1$ times the peak learning rate.
+The same multiplier is applied to every learning-rate field, including the auxiliary AdamW
+path. Global gradient norm is clipped at 1.0. Training uses CUDA autocast in float16 with
+gradient scaling. The 124M model uses batch size 8 (4,096 sampled tokens per optimizer
+step); the 355M model uses batch size 4 (2,048 sampled tokens per step). The latter
+difference is disclosed because it prevents interpreting the 355M result as a pure
+model-size scaling experiment.
+
+\subsection{Hyperparameter policy}
+The original broad campaign gives every optimizer the same number of tuned dimensions.
+Muon-family methods search learning rate in $[2\times10^{-3},10^{-1}]$, weight decay in
+$[10^{-3},3\times10^{-1}]$, and auxiliary AdamW multiplier in $[0.02,1.5]$, with
+log-uniform deterministic sampling. AdamW tunes learning rate, weight decay, and $\beta_2$.
+AdaMuon uses its published natural learning-rate range but the same weight-decay and
+auxiliary-rate policy. Five discovery trials are used per optimizer in the broad campaign.
+
+The primary Muon--ORBIT causal comparison uses a stricter matched policy: ten deterministic
+900-step candidate configurations are generated once from the Muon search space and
+presented identically to both methods. Both methods independently selected the same
+candidate, \texttt{shared-04}, before any held-out matched-confirmation seed was evaluated.
+That frozen configuration is then reused in the matched confirmation and expanded ORBIT
+ablation.
+
+\subsection{Experiment matrix}
+Table~\ref{tab:protocol} records every paper-facing training stage. The chronological
+campaign contains 188 successful optimizer tasks when all final merged artifacts are
+present.
+
+\begin{table*}[t]
+\centering
+\caption{Complete experiment matrix. ``Frozen'' means the configuration was selected before
+the listed evaluation seeds were inspected.}
+\label{tab:protocol}
+\small
+\begin{tabular}{p{2.6cm}p{4.9cm}lrrp{4.1cm}}
+\toprule
+Stage & Purpose & Model & Steps & Seeds / trials & Optimizers or controls \\
+\midrule
+Discovery & Equal-budget broad hyperparameter selection & 124M & 300 &
+5 trials, seed 0 & AdamW, Muon, NorMuon, AdaMuon, ASTRO, ORBIT \\
+Broad confirmation & Contextual comparison under independently frozen recipes & 124M & 900 &
+seeds 100--104 & same six methods \\
+Preliminary ablation & Early mechanism check used to motivate the larger ablation & 124M & 900 &
+seeds 200--202 & ORBIT, no-RoPE, diagonal, identity \\
+Cross-configuration & Separate optimizer mechanism from hyperparameter recipe & 124M & 900 &
+seeds 100--104 & Muon/ORBIT crossed with Muon/ORBIT discovery recipes \\
+Matched tuning & Eliminate independent-search luck & 124M & 900 &
+10 shared trials, seed 0 & Muon, ORBIT \\
+Matched confirmation & Primary mechanism-isolated comparison & 124M & 900 &
+seeds 500--509 & Muon, ORBIT at their frozen shared winner \\
+Expanded ablation & Replicate mechanism attribution at higher seed count & 124M & 900 &
+seeds 600--609 & ORBIT, no-RoPE, diagonal, identity at matched ORBIT config \\
+Long horizon & Test persistence at longer optimization horizon & 124M & 2700 &
+seeds 400--401 & Muon, NorMuon, ORBIT; ASTRO added with identical seeds \\
+Scale transfer & Test transfer to a larger model & 355M & 900 &
+seeds 300--301 & Muon, NorMuon, ORBIT; ASTRO added with identical seeds \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+At 124M, 300, 900, and 2700 steps correspond to 1.23M, 3.69M, and 11.06M sampled training
+tokens respectively. At 355M, 900 steps correspond to 1.84M sampled training tokens because
+of the smaller batch size required on a 16GB T4.
+
+\subsection{Statistical analysis}
+The primary estimand is the paired per-seed validation-loss difference, ORBIT minus the
+comparison method. We report the paired mean, sample standard deviation, seed-wise win
+count, and a two-sided 95\% Student-$t$ confidence interval for the mean paired difference.
+The matched Muon--ORBIT comparison is the primary confirmatory contrast. The three
+mechanism ablations are interpreted as mechanistic follow-ups rather than independent
+headline efficacy tests. The 2700-step and 355M experiments contain only two paired seeds;
+their individual seed values are therefore shown explicitly and treated as transfer evidence
+rather than as high-powered inferential tests. Wall-clock time and peak CUDA allocation are
+reported alongside loss.
+
+\subsection{Hardware, software, and provenance}
+The recorded campaign runs use NVIDIA Tesla T4 GPUs with CUDA 12.8, Python 3.13.15,
+PyTorch 2.11.0+cu128, Transformers 4.57.6, and Datasets 4.8.5. Each JSONL record stores
+the random seed, optimizer configuration, code digest, environment fingerprint, GPU label,
+wall-clock duration, peak CUDA allocation, validation loss, and logged training trajectory.
+The frozen core implementation digest is
+\texttt{de8b994a734276871770c6c67648117d3613d0954f3ae90d7e7b69246308c200}.
+Four logical shards write independently to persistent storage; merging rejects missing
+expected task IDs, mixed core digests, and mixed software environments.
