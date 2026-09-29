@@ -1,6 +1,6 @@
 # ORBIT prior-art gate
 
-**Audit date:** 2026-09-19
+**Audit date:** 2026-09-29
 
 This file exists to prevent a fourth optimizer restart caused by discovering a close
 precedent after expensive training. It is deliberately conservative. ORBIT may not be
@@ -50,8 +50,42 @@ The precise candidate claim is therefore narrow:
 > RoPE-conditioned relative-position bilinear interaction, implemented with frequency-local
 > 2x2 statistics and no inference change.**
 
-This wording is provisional until the exact implementation is searched again immediately
-before any public novelty claim.
+This wording was re-audited on 2026-09-29 immediately before final manuscript drafting.
+
+## Final dated audit outcome (2026-09-29)
+
+The final search rechecked the candidate claim against the closest 2026 work found in the
+following categories:
+
+- Muon and scalable Muon (spectral/matrix descent and update scaling);
+- PRISM: Structured Optimization via Anisotropic Spectral Shaping (spectral preconditioning);
+- Nicholas Knight, arXiv:2606.02328 (Riemannian optimization of low-rank attention products);
+- Dead-Direction Conditioners, arXiv:2606.29176 (gauge-equivariant optimization including
+  a per-head rotation symmetry matched to RoPE);
+- The Loss Does Not See the Basis, but Adam Does, arXiv:2608.05136 (gauge-sensitive
+  optimization and Q/K-product invariants);
+- Faster Query-Key Learning Sharpens Attention, arXiv:2608.06776 (QK-vs-OV learning-rate
+  dynamics);
+- Spectral Query-Key Product Weight Steering, arXiv:2606.20419 (post-hoc QK-product editing);
+- LeRoPE, arXiv:2607.10134 (learnable RoPE frequencies);
+- RoPE attention is an exact forward-pass gradient step with softmax intact,
+  arXiv:2609.06685 (forward-pass RoPE geometry);
+- LoRA-TSD, arXiv:2609.02734, and ISO-LoRA, arXiv:2609.12123 (tangent-space optimization
+  of induced low-rank weight updates).
+
+Searches also included combinations of "RoPE", "rotary", "query-key", "preconditioner",
+"natural gradient", "function space", "attention-logit metric", "frequency-wise", and the
+final ORBIT equations/2x2 construction.
+
+No checked work simultaneously matched the go/no-go conditions below. In particular, no
+prior work found in this audit used a training-time Q/K preconditioner derived from the
+RoPE-conditioned relative-position bilinear interaction with frequency-local 2x2
+statistics while leaving the inference graph unchanged. The manuscript therefore uses the
+narrow "to our knowledge" novelty boundary rather than a broad architecture-aware optimizer
+claim.
+
+This is a dated literature audit, not a proof of absence. It must be rerun if submission is
+materially delayed or if a new close precedent appears before release.
 
 ## Final novelty search checklist
 
