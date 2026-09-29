@@ -118,13 +118,6 @@ def plot_xconfig(results: dict, out: Path) -> None:
     ax.set_ylabel("Validation loss")
     ax.set_title("Optimizer × hyperparameter-recipe cross-over")
     ax.legend(frameon=False)
-    ax.text(
-        0.02,
-        0.04,
-        "Lower is better. Interaction is reported numerically in the paper table.",
-        transform=ax.transAxes,
-        va="bottom",
-    )
     save(fig, out, "xconfig_interaction")
 
 
@@ -160,13 +153,6 @@ def plot_ablation_effects(results: dict, out: Path) -> None:
     ax.invert_yaxis()
     ax.set_xlabel("Validation-loss difference (full ORBIT − control)")
     ax.set_title("Mechanism ablation: paired effects with 95% CIs")
-    ax.text(
-        0.02,
-        0.03,
-        "Negative favors full ORBIT; annotation = seed wins.",
-        transform=ax.transAxes,
-        va="bottom",
-    )
     save(fig, out, "ablation_effects")
 
 
@@ -185,13 +171,6 @@ def plot_transfer(rows: list[dict], out: Path, *, stem: str, title: str) -> None
     ax.set_xticks(range(len(order)), [display[x] for x in order])
     ax.set_ylabel("Validation loss")
     ax.set_title(title)
-    ax.text(
-        0.02,
-        0.04,
-        "Individual seeds shown; n=2 per optimizer. No significance claim from this panel.",
-        transform=ax.transAxes,
-        va="bottom",
-    )
     save(fig, out, stem)
 
 
@@ -218,13 +197,6 @@ def plot_broad_confirmation(rows: list[dict], out: Path) -> None:
     ax.set_yticks(range(len(stats)), [display.get(x[2], x[2]) for x in stats])
     ax.set_xlabel("Validation loss (mean ± SD)")
     ax.set_title("Broad independently tuned confirmation")
-    ax.text(
-        0.02,
-        0.03,
-        "Context only: configurations were selected independently; not the primary causal test.",
-        transform=ax.transAxes,
-        va="bottom",
-    )
     save(fig, out, "broad_confirmation")
 
 
