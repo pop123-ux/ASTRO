@@ -140,3 +140,16 @@ def test_strict_freeze_refuses_missing_ablation(tmp_path):
         assert "ablation_ext.jsonl" in str(exc)
     else:
         raise AssertionError("strict evidence freeze accepted a missing ablation phase")
+
+
+def test_paper_facing_astRO_name_is_clean():
+    paths = [
+        ROOT / "docs" / "orbit" / "paper" / "main.tex",
+        ROOT / "docs" / "orbit" / "paper" / "methods.tex",
+        ROOT / "docs" / "orbit" / "paper" / "astro_provenance.tex",
+        ROOT / "scripts" / "orbit_plot.py",
+        ROOT / "scripts" / "orbit_build_paper.py",
+    ]
+    for path in paths:
+        text = path.read_text()
+        assert "ASTRO-v2" not in text, f"public ASTRO-v2 label leaked into {path}"
