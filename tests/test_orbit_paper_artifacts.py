@@ -29,7 +29,7 @@ def row(phase: str, optimizer: str, seed: int, idx: int, *, label=None, trial=No
         "phase": phase,
         "optimizer": optimizer,
         "seed": seed,
-        "task_id": f"{phase}-{optimizer}-{seed}-{idx}",
+        "task_id": f"{phase}-{optimizer}-{label or 'default'}-{seed}-{idx}",
         "status": "ok",
         "code_digest": paper.CORE_DIGEST,
         "environment": ENV,
