@@ -143,17 +143,25 @@ def test_strict_freeze_refuses_missing_ablation(tmp_path):
         raise AssertionError("strict evidence freeze accepted a missing ablation phase")
 
 
-def test_paper_facing_astRO_name_is_clean():
-    paths = [
+def test_paper_facing_astro_name_is_clean():
+    paper_paths = [
         ROOT / "docs" / "orbit" / "paper" / "main.tex",
         ROOT / "docs" / "orbit" / "paper" / "methods.tex",
         ROOT / "docs" / "orbit" / "paper" / "astro_provenance.tex",
+    ]
+    forbidden = ("ASTRO-v2", "astro_v2", r"astro\_v2")
+    for path in paper_paths:
+        text = path.read_text()
+        for token in forbidden:
+            assert token not in text, f"internal ASTRO label leaked into {path}: {token}"
+
+    # Plot/build code may use the frozen internal identifier to read historical
+    # artifacts, but it must never render the public label as ASTRO-v2.
+    for path in (
         ROOT / "scripts" / "orbit_plot.py",
         ROOT / "scripts" / "orbit_build_paper.py",
-    ]
-    for path in paths:
-        text = path.read_text()
-        assert "ASTRO-v2" not in text, f"public ASTRO-v2 label leaked into {path}"
+    ):
+        assert "ASTRO-v2" not in path.read_text()
 
 
 def test_generated_macros_define_then_override(tmp_path):
