@@ -242,7 +242,7 @@ def write_claim_ledger(results: dict, manifest: dict, artifact_dir: Path) -> Non
         "# ORBIT paper claim ledger",
         "",
         f"Evidence freeze status: **{manifest['status']}**",
-        f"Core experiment digest: \`{manifest['core_digest']}\`",
+        f"Core experiment digest: `{manifest['core_digest']}`",
         "",
         "## Primary supported claim",
     ]
