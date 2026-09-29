@@ -58,7 +58,7 @@ def write_macros(results: dict, generated: Path) -> None:
         "BroadAstroLoss", "BroadOrbitLoss", "BroadMuonLoss", "BroadNorMuonLoss",
     ]
     lines = ["% AUTO-GENERATED. Do not edit."]
-    lines.extend(f"\\renewcommand{{\\{name}}}{{--}}" for name in macro_names)
+    lines.extend(f"\\newcommand{{\\{name}}}{{--}}" for name in macro_names)
 
     mc = results.get("matched_confirmation")
     if mc:
