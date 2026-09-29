@@ -1,55 +1,114 @@
 \section{Method}
-\subsection{Functional metric for rotary Q/K interactions}
-For a single attention head and RoPE frequency pair $f$, write the relative-position score
-contribution as
+
+\subsection{Muon matrix update}
+ORBIT retains Muon as the base update for matrix-valued parameters. For a matrix parameter
+$W_t$ with gradient $G_t$ and momentum state $m_t$, the implementation forms
+\begin{equation}
+m_t=\mu m_{t-1}+G_t,\qquad
+U_t=\alpha(W_t)\,\operatorname{NS}_5\!\left(G_t+\mu m_t\right),
+\label{eq:muon-candidate}
+\end{equation}
+where $\mu=0.95$, $\operatorname{NS}_5$ denotes five iterations of the quintic
+Newton--Schulz polar map, and
+$\alpha(W)=\sqrt{\max(1,n_{\mathrm{row}}/n_{\mathrm{col}})}$ is the standard
+aspect-ratio scaling used by the Muon implementation~\cite{jordan2024muon}. ORBIT changes
+this candidate only for query and key projections. Other two-dimensional hidden operators
+use the ordinary Muon update, while embeddings, the tied language-model head, biases, and
+normalization vectors use the auxiliary AdamW path described in
+Section~\ref{sec:training-setup}.
+
+\subsection{RoPE-conditioned query--key geometry}
+For a single attention head and RoPE frequency pair $f$, the pre-softmax score contribution
+between positions $i$ and $j$ is
 \begin{equation}
   s_{ij,f}=q_{i,f}^{\top}R_f(\Delta)k_{j,f},\qquad \Delta=i-j.
+  \label{eq:rope-score}
 \end{equation}
-Let $C_{Q,f}$ and $C_{K,f}$ be exponential-moving-average $2\times2$ covariances of the
+A perturbation of the query therefore interacts with the rotated key statistics, while a
+key perturbation interacts with the corresponding rotated query statistics. Let
+$C_{Q,f}$ and $C_{K,f}$ denote exponential-moving-average $2\times2$ covariances of the
 unrotated query and key coordinates. ORBIT defines
 \begin{align}
-M_{Q,f} &= \mathbb{E}_{\Delta}\left[R_f(\Delta)C_{K,f}R_f(\Delta)^\top\right],\\
-M_{K,f} &= \mathbb{E}_{\Delta}\left[R_f(\Delta)^\top C_{Q,f}R_f(\Delta)\right].
+M_{Q,f} &= \mathbb{E}_{\Delta}\!\left[R_f(\Delta)C_{K,f}R_f(\Delta)^\top\right],\\
+M_{K,f} &= \mathbb{E}_{\Delta}\!\left[R_f(\Delta)^\top C_{Q,f}R_f(\Delta)\right].
+\label{eq:orbit-metrics}
 \end{align}
-The expectation is evaluated on the fixed displacement grid
-$\{1,2,4,8,16,32,64,128\}$. Q/K covariances use an EMA coefficient of $0.95$ after the
-initial observation. A Muon-style candidate direction $U_Q,U_K$ is computed first. With
-the functional exponent frozen to $p=1$,
+The expectation is evaluated on the displacement grid
+$\mathcal{D}=\{1,2,4,8,16,32,64,128\}$. Covariances are updated during training with EMA
+coefficient $\beta=0.95$ after the first observation. These statistics are optimizer-only
+buffers and are absent from the inference graph.
+
+\subsection{ORBIT preconditioning}
+Let $U_Q$ and $U_K$ be the Muon candidates from Equation~\ref{eq:muon-candidate}. For each
+head and RoPE frequency pair,
 \begin{align}
-\widetilde U_{Q,f} &= M_{Q,f}^{-1/2} U_{Q,f},\\
-\widetilde U_{K,f} &= M_{K,f}^{-1/2} U_{K,f}.
+\widehat U_{Q,f} &= M_{Q,f}^{-1/2}U_{Q,f},\\
+\widehat U_{K,f} &= M_{K,f}^{-1/2}U_{K,f}.
 \end{align}
-The metric is regularized by $10^{-5}I$ and its condition number is capped at 100. A single
-joint scalar then restores
+The metrics are regularized by $10^{-5}I$, their effective condition number is capped at
+100, and the inverse square root is evaluated analytically for each symmetric positive
+$2\times2$ matrix.
+
+A single joint restoration factor then preserves the total Q/K update budget:
 \begin{equation}
-\|\widetilde U_Q\|_F^2+\|\widetilde U_K\|_F^2
-=
-\|U_Q\|_F^2+\|U_K\|_F^2,
+\rho =
+\sqrt{
+\frac{\|U_Q\|_F^2+\|U_K\|_F^2}
+     {\|\widehat U_Q\|_F^2+\|\widehat U_K\|_F^2}
+},
+\qquad
+\widetilde U_Q=\rho\widehat U_Q,\quad
+\widetilde U_K=\rho\widehat U_K.
+\label{eq:joint-restore}
 \end{equation}
-preventing an aggregate step-size increase from masquerading as a geometric gain. ORBIT's
-unique matrix operations are frequency-local $2\times2$ operations. The implementation uses
-a closed-form analytic inverse metric power for these SPD matrices rather than a generic
-eigendecomposition.
+The functional metric therefore changes the direction of the joint Q/K update without
+increasing its aggregate Frobenius norm.
 
-\subsection{Muon-family base update}
-The Muon baseline uses Nesterov momentum $0.95$, five iterations of the quintic
-Newton--Schulz map with coefficients $(3.4445,-4.7750,2.0315)$, and the conventional
-aspect-ratio update scaling used by the public Muon implementation~\cite{jordan2024muon}.
-On Tesla T4 hardware the Newton--Schulz calculation is performed in float32 because native
-BF16 tensor-core execution is unavailable; the same numerical kernel is used for all
-Muon-family methods in this campaign. Two-dimensional hidden operators take the spectral
-path. Embeddings and the tied language-model head use the auxiliary AdamW path with weight
-decay, while biases and LayerNorm parameters use the auxiliary AdamW path without decay.
-The auxiliary learning rate is a tuned scalar multiple of the matrix learning rate.
+Algorithm~\ref{alg:orbit} summarizes the complete Q/K path for one attention layer.
+Standard Muon and auxiliary AdamW updates proceed unchanged for the remaining parameter
+classes.
 
-\subsection{ASTRO baseline provenance}
-ASTRO enters the ORBIT campaign as a pre-existing frozen baseline selected during the
-preceding ASTRO development study, before any ORBIT result was observed. The selected
-recipe had the strongest mean margin against Muon across three targeted 124M/900-step
-configurations, while an ASTRO-Muon-Betas variant was numerically close at one shared
-configuration. No ASTRO variant was retuned or selected after the ORBIT campaign began.
-Historical ASTRO development measurements are summarized in the appendix and are not
-pooled with ORBIT's confirmatory statistics.
+\begin{algorithm}[t]
+\caption{ORBIT update for a RoPE query--key projection pair}
+\label{alg:orbit}
+\DontPrintSemicolon
+\KwIn{$W_Q,W_K$; gradients $G_Q,G_K$; momentum $m_Q,m_K$; covariances $C_Q,C_K$;
+learning rate $\eta$; weight decay $\lambda$; momentum $\mu$; EMA $\beta$;
+displacements $\mathcal{D}$}
+\textbf{Forward statistics:} update $C_Q,C_K$ from current unrotated Q/K activations
+with EMA coefficient $\beta$\;
+$m_Q \leftarrow \mu m_Q+G_Q$;\quad $m_K \leftarrow \mu m_K+G_K$\;
+$U_Q \leftarrow \operatorname{MuonCandidate}(G_Q+\mu m_Q)$;\quad
+$U_K \leftarrow \operatorname{MuonCandidate}(G_K+\mu m_K)$\;
+\ForEach{attention head $h$ and RoPE frequency pair $f$}{
+  $M_{Q,f}\leftarrow |\mathcal{D}|^{-1}\sum_{\Delta\in\mathcal{D}}
+  R_f(\Delta)C_{K,f}R_f(\Delta)^\top + 10^{-5}I$\;
+  $M_{K,f}\leftarrow |\mathcal{D}|^{-1}\sum_{\Delta\in\mathcal{D}}
+  R_f(\Delta)^\top C_{Q,f}R_f(\Delta) + 10^{-5}I$\;
+  $T_{Q,f}\leftarrow \operatorname{InvSqrt}_{2\times2}(M_{Q,f})$;\quad
+  $T_{K,f}\leftarrow \operatorname{InvSqrt}_{2\times2}(M_{K,f})$\;
+  $\widehat U_{Q,f}\leftarrow T_{Q,f}U_{Q,f}$;\quad
+  $\widehat U_{K,f}\leftarrow T_{K,f}U_{K,f}$\;
+}
+$\rho\leftarrow
+\sqrt{(\|U_Q\|_F^2+\|U_K\|_F^2)/
+(\|\widehat U_Q\|_F^2+\|\widehat U_K\|_F^2)}$\;
+$\widetilde U_Q\leftarrow\rho\widehat U_Q$;\quad
+$\widetilde U_K\leftarrow\rho\widehat U_K$\;
+$W_Q\leftarrow(1-\eta\lambda)W_Q-\eta\widetilde U_Q$;\quad
+$W_K\leftarrow(1-\eta\lambda)W_K-\eta\widetilde U_K$\;
+\end{algorithm}
+
+\subsection{Cost and ablation variants}
+The additional state consists of two $2\times2$ covariance matrices for every attention
+head and RoPE frequency pair. The unique per-step matrix operations are local $2\times2$
+transforms rather than dense model-width preconditioners, leaving inference unchanged.
+
+Three controls isolate the update components. \textbf{Identity} keeps the ORBIT training
+path and statistics collection but disables functional preconditioning. \textbf{No-RoPE}
+uses Q/K covariance metrics without relative-position rotation. \textbf{Diagonal} retains
+RoPE-aware per-frequency scaling while removing off-diagonal coupling within each
+$2\times2$ pair.
 
 \section{Materials and Methods}
 \subsection{Model architecture}
