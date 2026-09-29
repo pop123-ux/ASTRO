@@ -35,16 +35,16 @@ jobs:
       - name: Syntax check
         run: |
           python -m compileall -q src/orbit
-          python -m py_compile scripts/orbit_campaign.py scripts/orbit_merge.py scripts/orbit_postscale.py scripts/orbit_postscale_merge.py scripts/orbit_plot.py scripts/orbit_novelty_gate.py scripts/orbit_build_paper.py
+          python -m py_compile scripts/orbit_campaign.py scripts/orbit_merge.py scripts/orbit_postscale.py scripts/orbit_postscale_merge.py scripts/orbit_paper_artifacts.py scripts/orbit_plot.py scripts/orbit_novelty_gate.py scripts/orbit_build_paper.py
       - name: Unit tests
         run: python -m pytest tests/test_orbit.py tests/test_orbit_postscale.py
       - name: Mechanism gate
         run: python scripts/orbit_novelty_gate.py --strict --output /tmp/orbit_gate.json
-      - name: Generate claim-free paper artifacts
+      - name: Generate incomplete-safe paper artifacts
         run: |
           mkdir -p /tmp/orbit-empty/merged
-          echo '{}' > /tmp/orbit-empty/merged/summary.json
-          python scripts/orbit_build_paper.py --work-dir /tmp/orbit-empty --no-compile
+          python scripts/orbit_paper_artifacts.py --work-dir /tmp/orbit-empty --allow-incomplete
+          python scripts/orbit_build_paper.py --work-dir /tmp/orbit-empty --no-compile --allow-incomplete
 
   latex:
     runs-on: ubuntu-latest
@@ -58,12 +58,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y latexmk texlive-latex-base texlive-latex-extra texlive-fonts-recommended texlive-science
-          pip install -e .
+          pip install -e . "matplotlib>=3.8"
       - name: Build manuscript skeleton
         run: |
           mkdir -p /tmp/orbit-empty/merged
-          echo '{}' > /tmp/orbit-empty/merged/summary.json
-          python scripts/orbit_build_paper.py --work-dir /tmp/orbit-empty
+          python scripts/orbit_build_paper.py --work-dir /tmp/orbit-empty --allow-incomplete
       - uses: actions/upload-artifact@v4
         with:
           name: orbit-paper-skeleton
