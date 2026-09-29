@@ -20,6 +20,8 @@ plt.rcParams.update(
     {
         "figure.dpi": 140,
         "savefig.dpi": 240,
+        "pdf.fonttype": 42,
+        "ps.fonttype": 42,
         "font.size": 10.5,
         "axes.titlesize": 11.5,
         "axes.labelsize": 10.5,
