@@ -45,6 +45,7 @@ def display_name(name: str) -> str:
 
 def write_macros(results: dict, generated: Path) -> None:
     lines = ["% AUTO-GENERATED. Do not edit."]
+
     mc = results.get("matched_confirmation")
     if mc:
         sm = mc["summary"]
@@ -60,7 +61,73 @@ def write_macros(results: dict, generated: Path) -> None:
             f"\\newcommand{{\\MatchedRuntimeOverhead}}{{{100*mc['runtime_overhead_fraction']:.1f}\\%}}",
             f"\\newcommand{{\\MatchedMemoryOverhead}}{{{100*mc['memory_overhead_fraction']:.1f}\\%}}",
         ]
-    generated.joinpath("macros.tex").write_text("\n".join(lines) + "\n")
+
+    xc = results.get("cross_configuration_isolation")
+    if xc:
+        m_mu = xc["mechanism_at_muon_config"]
+        m_or = xc["mechanism_at_orbit_config"]
+        r_mu = xc["recipe_effect_on_muon"]
+        r_or = xc["recipe_effect_on_orbit"]
+        lines += [
+            f"\\newcommand{{\\XConfigMechanismMuon}}{{{m_mu['mean_delta']:.4f}}}",
+            f"\\newcommand{{\\XConfigMechanismMuonWins}}{{{m_mu['a_wins']}/{m_mu['n']}}}",
+            f"\\newcommand{{\\XConfigMechanismOrbit}}{{{m_or['mean_delta']:.4f}}}",
+            f"\\newcommand{{\\XConfigMechanismOrbitWins}}{{{m_or['a_wins']}/{m_or['n']}}}",
+            f"\\newcommand{{\\XConfigRecipeMuon}}{{{r_mu['mean_delta']:.4f}}}",
+            f"\\newcommand{{\\XConfigRecipeOrbit}}{{{r_or['mean_delta']:.4f}}}",
+        ]
+
+    ab = results.get("mechanism_ablation")
+    if ab:
+        for stem, key in (
+            ("Identity", "orbit_vs_identity"),
+            ("NoRoPE", "orbit_vs_norope"),
+            ("Diag", "orbit_vs_diag"),
+        ):
+            eff = ab[key]
+            lo, hi = eff["ci95"]
+            lines += [
+                f"\\newcommand{{\\Abl{stem}Delta}}{{{eff['mean_delta']:.4f}}}",
+                f"\\newcommand{{\\Abl{stem}CILow}}{{{lo:.4f}}}",
+                f"\\newcommand{{\\Abl{stem}CIHigh}}{{{hi:.4f}}}",
+                f"\\newcommand{{\\Abl{stem}Wins}}{{{eff['a_wins']}/{eff['n']}}}",
+            ]
+
+    horizon = results.get("long_horizon_transfer")
+    if horizon:
+        for stem, key in (
+            ("Astro", "orbit_vs_astro_v2"),
+            ("Muon", "orbit_vs_muon"),
+            ("NorMuon", "orbit_vs_normuon"),
+        ):
+            eff = horizon[key]
+            lines.append(
+                f"\\newcommand{{\\HorizonVs{stem}}}{{{eff['mean_delta']:.4f}}}"
+            )
+
+    scale = results.get("scale_transfer")
+    if scale:
+        for stem, key in (
+            ("Astro", "orbit_vs_astro_v2"),
+            ("Muon", "orbit_vs_muon"),
+            ("NorMuon", "orbit_vs_normuon"),
+        ):
+            eff = scale[key]
+            lines.append(
+                f"\\newcommand{{\\ScaleVs{stem}}}{{{eff['mean_delta']:.4f}}}"
+            )
+
+    broad = results.get("broad_independently_tuned_context")
+    if broad:
+        sm = broad["summary"]
+        lines += [
+            f"\\newcommand{{\\BroadAstroLoss}}{{{sm['astro_v2']['mean_val_loss']:.4f}}}",
+            f"\\newcommand{{\\BroadOrbitLoss}}{{{sm['orbit']['mean_val_loss']:.4f}}}",
+            f"\\newcommand{{\\BroadMuonLoss}}{{{sm['muon']['mean_val_loss']:.4f}}}",
+            f"\\newcommand{{\\BroadNorMuonLoss}}{{{sm['normuon']['mean_val_loss']:.4f}}}",
+        ]
+
+    generated.joinpath("macros.tex").write_text("\\n".join(lines) + "\\n")
 
 
 def write_matched_table(results: dict, generated: Path) -> None:
