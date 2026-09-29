@@ -20,7 +20,11 @@ from __future__ import annotations
 import importlib
 
 import pytest
-import torch
+
+try:
+    import torch
+except ModuleNotFoundError:  # lightweight paper-only CI does not require PyTorch
+    torch = None
 
 
 _FROZEN_LEGACY_XFAILS = {
@@ -54,6 +58,8 @@ def isolate_test_protocols(request: pytest.FixtureRequest, monkeypatch: pytest.M
             )
 
     if request.node.name == "test_unknown_schedule_is_rejected":
+        if torch is None:
+            pytest.skip("PyTorch is not installed in the lightweight paper-only CI job")
         # This unit test is about argument validation, not corpus availability.
         # CI intentionally does not download benchmark corpora, so provide the
         # minimum in-memory corpus needed to reach the schedule guard.
