@@ -12,6 +12,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import orbit_paper_artifacts as paper  # noqa: E402
+import orbit_build_paper as build_paper  # noqa: E402
 
 
 ENV = {
@@ -153,3 +154,16 @@ def test_paper_facing_astRO_name_is_clean():
     for path in paths:
         text = path.read_text()
         assert "ASTRO-v2" not in text, f"public ASTRO-v2 label leaked into {path}"
+
+
+def test_generated_macros_define_then_override(tmp_path):
+    build_fixture(tmp_path)
+    results, _ = paper.build(tmp_path)
+    generated = tmp_path / "generated"
+    generated.mkdir(parents=True, exist_ok=True)
+    build_paper.write_macros(results, generated)
+    text = (generated / "macros.tex").read_text()
+    assert r"\newcommand{\MatchedMuonLoss}{--}" in text
+    assert r"\renewcommand{\MatchedMuonLoss}{" in text
+    assert r"\newcommand{\AblIdentityDelta}{--}" in text
+    assert r"\renewcommand{\AblIdentityDelta}{" in text
