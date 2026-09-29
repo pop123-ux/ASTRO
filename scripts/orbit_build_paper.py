@@ -35,7 +35,7 @@ def display_name(name: str) -> str:
         "adamuon_ref": "AdaMuon",
         "muon": "Muon",
         "normuon": "NorMuon",
-        "astro_v2": "ASTRO-v2",
+        "astro_v2": "ASTRO",
         "orbit": "ORBIT",
         "orbit_identity": "Identity",
         "orbit_norope": "No-RoPE",
@@ -290,9 +290,9 @@ def write_claim_ledger(results: dict, manifest: dict, artifact_dir: Path) -> Non
         lines += [
             "",
             "## Secondary transfer evidence",
-            f"- 124M/2700: ORBIT - ASTRO-v2 = "
+            f"- 124M/2700: ORBIT - ASTRO = "
             f"{horizon['orbit_vs_astro_v2']['mean_delta']:.6f} over n=2 paired seeds.",
-            f"- 355M/900: ORBIT - ASTRO-v2 = "
+            f"- 355M/900: ORBIT - ASTRO = "
             f"{scale['orbit_vs_astro_v2']['mean_delta']:.6f}; one seed favors each method.",
             "- Treat both as transfer evidence, not high-powered significance tests.",
         ]
@@ -302,7 +302,7 @@ def write_claim_ledger(results: dict, manifest: dict, artifact_dir: Path) -> Non
         "## Explicit non-claims",
         "- Do not claim the original ~0.14 ORBIT-vs-Muon gap is entirely algorithmic.",
         "- Do not claim off-diagonal 2x2 phase coupling is necessary.",
-        "- Do not claim ORBIT beats ASTRO-v2 at 355M.",
+        "- Do not claim ORBIT beats ASTRO at 355M.",
         "- Do not claim the advantage grows with model scale; the 355M batch/token regime differs.",
         "- Do not convert the n=2 horizon/scale intervals into strong inferential claims.",
         "",
