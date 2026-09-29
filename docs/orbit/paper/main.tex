@@ -1,6 +1,7 @@
 \documentclass[10pt]{article}
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath,amssymb,booktabs,graphicx,microtype,hyperref}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
 \usepackage{placeins}
 \usepackage{siunitx}
 \usepackage{xcolor}
@@ -88,7 +89,7 @@ This work makes four contributions:
   providing evidence beyond the primary 124M/900-step setting.
 \end{enumerate}
 
-\section{Related Work and Novelty Boundary}
+\section{Related Work}
 \paragraph{Matrix and spectral optimization.}
 Muon replaces a raw matrix-gradient step with a momentum-smoothed, approximately
 orthogonalized direction~\cite{jordan2024muon}; later work showed that weight decay and
@@ -125,7 +126,7 @@ representation of the RoPE-softmax forward pass~\cite{huang2026ropegradient}. Th
 analyze or modify the attention function, but do not use its relative-position rotation to
 precondition Q/K parameter updates during pretraining.
 
-\paragraph{Novelty boundary.}
+\paragraph{Positioning.}
 The literature audit did not identify prior work introducing a training optimizer whose Q/K
 preconditioner is derived from the RoPE-conditioned relative-position bilinear interaction
 and implemented with per-frequency $2\times2$ statistics. ORBIT's novelty is therefore
@@ -304,7 +305,7 @@ competitive with ASTRO. These results position ORBIT as a practical geometry-awa
 extension to Muon-family optimization whose effect is visible under matched hyperparameters
 and persists across additional training regimes.
 
-\section{Scope and Future Work}
+\paragraph{Scope and future work.}
 The present study evaluates RoPE-modified GPT-2-style decoders with multi-head attention.
 The transfer experiments use two seeds and the 355M setting uses a smaller batch size than
 the 124M setting. Extending the evaluation to grouped-query attention, QK normalization,
