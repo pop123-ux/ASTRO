@@ -42,21 +42,18 @@ path. Embeddings and the tied language-model head use the auxiliary AdamW path w
 decay, while biases and LayerNorm parameters use the auxiliary AdamW path without decay.
 The auxiliary learning rate is a tuned scalar multiple of the matrix learning rate.
 
-\subsection{ASTRO baseline naming and provenance}
-The paper uses the name \textbf{ASTRO} throughout. In the experiment code, the frozen ASTRO
-baseline is identified internally as \texttt{astro\_v2}; that implementation label is not a
-separate public method name. It was selected before the ORBIT campaign from the preceding
-ASTRO development study. In those historical experiments, the final recipe had the best
-mean margin against Muon across three targeted 124M/900-step configurations, while an
-ASTRO-Muon-Betas variant was effectively tied with it at one shared configuration. Earlier
-plain ASTRO variants also produced negative results. We therefore treat ASTRO as a frozen
-external baseline for the ORBIT study rather than retuning or choosing among ASTRO
-development variants after seeing ORBIT results. Historical ASTRO development measurements
-are summarized in the appendix and are not pooled with ORBIT's confirmatory statistics.
+\subsection{ASTRO baseline provenance}
+ASTRO enters the ORBIT campaign as a pre-existing frozen baseline selected during the
+preceding ASTRO development study, before any ORBIT result was observed. The selected
+recipe had the strongest mean margin against Muon across three targeted 124M/900-step
+configurations, while an ASTRO-Muon-Betas variant was numerically close at one shared
+configuration. No ASTRO variant was retuned or selected after the ORBIT campaign began.
+Historical ASTRO development measurements are summarized in the appendix and are not
+pooled with ORBIT's confirmatory statistics.
 
 \section{Materials and Methods}
 \subsection{Model architecture}
-All paper-facing comparisons use the same decoder implementation within a given size. The
+All reported comparisons use the same decoder implementation within a given size. The
 124M model has 12 layers, 12 attention heads, width 768, and approximately 124M parameters.
 The 355M model has 24 layers, 16 heads, width 1024, and uses gradient checkpointing. Both
 use context length 512, GPT-2 token embeddings with tied input/output weights, pre-norm
@@ -101,7 +98,7 @@ That frozen configuration is then reused in the matched confirmation and expande
 ablation.
 
 \subsection{Experiment matrix}
-Table~\ref{tab:protocol} records every paper-facing training stage. The chronological
+Table~\ref{tab:protocol} records every reported training stage. The chronological
 campaign contains 188 successful optimizer tasks when all final merged artifacts are
 present.
 
@@ -152,8 +149,9 @@ of the smaller batch size required on a 16GB T4.
 
 \subsection{Statistical analysis}
 The primary estimand is the paired per-seed validation-loss difference, ORBIT minus the
-comparison method. We report the paired mean, sample standard deviation, seed-wise win
-count, and a two-sided 95\% Student-$t$ confidence interval for the mean paired difference.
+comparison method. Reported statistics include the paired mean, sample standard deviation,
+seed-wise win count, and a two-sided 95\% Student-$t$ confidence interval for the mean
+paired difference.
 The matched Muon--ORBIT comparison is the primary confirmatory contrast. The three
 mechanism ablations are interpreted as mechanistic follow-ups rather than independent
 headline efficacy tests. The 2700-step and 355M experiments contain only two paired seeds;
