@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -162,6 +163,20 @@ def test_paper_facing_astro_name_is_clean():
         ROOT / "scripts" / "orbit_build_paper.py",
     ):
         assert "ASTRO-v2" not in path.read_text()
+
+
+
+def test_paper_method_contains_orbit_algorithm_and_no_direct_address():
+    methods = (ROOT / "docs" / "orbit" / "paper" / "methods.tex").read_text()
+    assert r"\begin{algorithm}" in methods
+    assert r"\label{alg:orbit}" in methods
+    assert "ORBIT update for a RoPE query--key projection pair" in methods
+
+    paper_text = "\n".join(
+        (ROOT / "docs" / "orbit" / "paper" / name).read_text()
+        for name in ("main.tex", "methods.tex", "astro_provenance.tex")
+    )
+    assert not re.search(r"\b(?:you|your|we|our)\b", paper_text, flags=re.IGNORECASE)
 
 
 def test_generated_macros_define_then_override(tmp_path):
