@@ -215,7 +215,7 @@ def write_xconfig_table(results: dict, generated: Path) -> None:
         f"{sm['orbit_at_orbit_config']['mean_val_loss']:.4f} $\\pm$ "
         f"{sm['orbit_at_orbit_config']['sd_val_loss']:.4f}" + ROW_END,
         "\\midrule",
-        f"ORBIT $-$ Muon & {muon_recipe['mean_delta']:.4f} "
+        f"ORBIT $-$ Muon (95\\% CI) & {muon_recipe['mean_delta']:.4f} "
         f"{ci(muon_recipe)} & {orbit_recipe['mean_delta']:.4f} {ci(orbit_recipe)}" + ROW_END,
         "\\bottomrule",
         "\\end{tabular}",
