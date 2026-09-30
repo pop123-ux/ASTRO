@@ -157,76 +157,86 @@ held-out matched-confirmation seed was evaluated. That selected setting is reuse
 the matched confirmation and expanded ORBIT ablation.
 
 \subsection{Evaluation protocol}
-Table~\ref{tab:protocol} summarizes the reported training stages. The chronological
-campaign contains 188 successful optimizer tasks across discovery, confirmation, ablation,
-cross-configuration, long-horizon, and scale-transfer stages.
+The evaluation is organized into complementary study blocks rather than a single benchmark:
+broad optimizer context, matched mechanism isolation, component ablations, and transfer
+across training horizon and model size. Table~\ref{tab:protocol} summarizes the design.
 
 \begin{table*}[t]
 \centering
-\caption{Complete experiment matrix. ``Frozen'' means the configuration was selected before
-the listed evaluation seeds were inspected.}
+\caption{Summary of the ORBIT evaluation protocol. Replication counts refer to independent
+training runs used for the reported comparison; hyperparameter-selection runs are listed
+separately where relevant.}
 \label{tab:protocol}
 \footnotesize
-\setlength{\tabcolsep}{4pt}
-\renewcommand{\arraystretch}{1.12}
+\setlength{\tabcolsep}{4.5pt}
+\renewcommand{\arraystretch}{1.14}
 \begin{tabular}{@{}
->{\raggedright\arraybackslash}p{1.75cm}
->{\raggedright\arraybackslash}p{3.35cm}
->{\centering\arraybackslash}p{0.9cm}
->{\centering\arraybackslash}p{0.75cm}
->{\raggedright\arraybackslash}p{1.95cm}
->{\raggedright\arraybackslash}p{4.35cm}
+>{\raggedright\arraybackslash}p{2.25cm}
+>{\raggedright\arraybackslash}p{4.15cm}
+>{\centering\arraybackslash}p{1.05cm}
+>{\centering\arraybackslash}p{1.25cm}
+>{\raggedright\arraybackslash}p{2.55cm}
+>{\raggedright\arraybackslash}p{3.55cm}
 @{}}
 \toprule
-Stage & Purpose & Model & Steps & Seeds / trials & Optimizers or controls \\
+Study block & Objective & Model & Training budget & Replication / selection & Methods \\
 \midrule
-Discovery & Equal-budget broad hyperparameter selection & 124M & 300 &
-5 trials; seed 0 & AdamW, Muon, NorMuon, AdaMuon, ASTRO, ORBIT \\
-Broad confirmation & Independently frozen recipe comparison & 124M & 900 &
-100--104 & Same six methods \\
-Preliminary ablation & Early mechanism check motivating the expanded ablation & 124M & 900 &
-200--202 & ORBIT, no-RoPE, diagonal, identity \\
-Cross-configuration & Separate optimizer mechanism from recipe choice & 124M & 900 &
-100--104 & Muon and ORBIT crossed with both frozen recipes \\
-Matched tuning & Remove independent-search luck & 124M & 900 &
-10 shared trials; seed 0 & Muon, ORBIT \\
-Matched confirmation & Primary mechanism-isolated comparison & 124M & 900 &
-500--509 & Muon, ORBIT; shared frozen winner \\
-Expanded ablation & Higher-powered mechanism attribution & 124M & 900 &
-600--609 & ORBIT, no-RoPE, diagonal, identity; shared ORBIT config \\
-Long horizon & Test persistence at longer training horizon & 124M & 2700 &
-400--401 & Muon, NorMuon, ORBIT, ASTRO \\
-Scale transfer & Test transfer to a larger model & 355M & 900 &
-300--301 & Muon, NorMuon, ORBIT, ASTRO \\
+Broad optimizer benchmark &
+Compare independently selected optimizer recipes &
+124M & 900 steps &
+5 discovery candidates per method; 5 evaluation runs &
+AdamW, AdaMuon, Muon, NorMuon, ASTRO, ORBIT \\
+
+Cross-configuration analysis &
+Separate update-rule effects from frozen recipe effects &
+124M & 900 steps &
+5 paired runs per factorial cell &
+Muon and ORBIT under both frozen recipes \\
+
+Matched confirmation &
+Evaluate Muon and ORBIT under an identical selected configuration &
+124M & 900 steps &
+10 shared candidates; 10 held-out paired runs &
+Muon, ORBIT \\
+
+Mechanism ablation &
+Attribute gains to functional conditioning, RoPE rotation, and pair coupling &
+124M & 900 steps &
+3-run pilot followed by 10 paired runs per control &
+ORBIT, identity, no-RoPE, diagonal \\
+
+Long-horizon transfer &
+Test persistence under substantially longer optimization &
+124M & 2700 steps &
+2 paired runs per method &
+Muon, NorMuon, ASTRO, ORBIT \\
+
+Model-scale transfer &
+Evaluate transfer to a larger decoder &
+355M & 900 steps &
+2 paired runs per method &
+Muon, NorMuon, ASTRO, ORBIT \\
 \bottomrule
 \end{tabular}
 \end{table*}
 
-At 124M, 300, 900, and 2700 steps correspond to 1.23M, 3.69M, and 11.06M sampled training
-tokens respectively. At 355M, 900 steps correspond to 1.84M sampled training tokens because
-of the smaller batch size required on a 16GB T4.
+At 124M, 300, 900, and 2700 optimizer steps correspond to approximately 1.23M, 3.69M,
+and 11.06M sampled training tokens for the discovery, primary, and long-horizon regimes.
+The 355M transfer uses 1.84M sampled training tokens at 900 steps because of its smaller
+batch size.
 
 \paragraph{Statistical analysis.}
-The primary estimand is the paired per-seed validation-loss difference, ORBIT minus the
+The primary estimand is the paired per-run validation-loss difference, ORBIT minus the
 comparison method. Reported statistics include the paired mean, sample standard deviation,
 seed-wise win count, and a two-sided 95\% Student-$t$ confidence interval for the mean
-paired difference.
-The matched Muon--ORBIT comparison is the primary confirmatory contrast. The three
-mechanism ablations are interpreted as mechanistic follow-ups rather than independent
-headline efficacy tests. The 2700-step and 355M experiments contain only two paired seeds;
-their individual seed values are therefore shown explicitly and treated as transfer evidence
-rather than as high-powered inferential tests. Wall-clock time and peak CUDA allocation are
-reported alongside loss.
+paired difference. The matched Muon--ORBIT comparison is the primary confirmatory contrast;
+ablations provide mechanism attribution, while the long-horizon and 355M experiments assess
+transfer. Wall-clock time and peak GPU-memory allocation are reported alongside loss.
 
-\subsection{Compute and reproducibility}
-All experiments were run on NVIDIA Tesla T4 GPUs using PyTorch with CUDA mixed precision.
-The reported campaign uses the same frozen implementation across the final comparisons. Run-level
-records preserve the optimizer settings, random seed, hardware/software environment,
-wall-clock duration, validation loss, peak GPU memory allocation, and training trajectory.
-
-Runs are written independently to persistent storage and merged only after consistency
-checks pass. Before any manuscript table, figure, or numerical macro is generated, the
-artifact pipeline verifies the expected run counts and seeds, the shared matched
-selected setting, finite metrics, and consistency of the implementation and software environment.
-Exact software versions and run metadata are retained in the reproducibility artifacts rather
-than exposed in the manuscript.
+All final comparisons use the same frozen implementation and a consistent run-record format.
+Optimizer settings, random seeds, environment metadata, validation metrics, runtime,
+memory use, and training trajectories are retained with each run. Results are merged only
+after automated consistency checks verify the expected experiment structure, matched
+configuration, finite metrics, and a common implementation/software state. Exact
+environment details and run metadata are retained in the accompanying reproducibility
+artifacts.
