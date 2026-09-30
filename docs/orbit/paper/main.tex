@@ -269,20 +269,28 @@ than a high-powered significance test.}
 \label{fig:scale}
 \end{figure}}{}
 
-\subsection{Independently tuned baselines provide context, not the causal estimate}
-The broad 124M confirmation places ORBIT among the stronger recipes in the campaign.
-ASTRO reaches mean validation loss \BroadAstroLoss{}, ORBIT \BroadOrbitLoss{}, NorMuon
-\BroadNorMuonLoss{}, and Muon \BroadMuonLoss{}. ORBIT and ASTRO are therefore numerically close at this horizon under their independently
-selected recipes, while both outperform the original Muon recipe by a much larger margin.
+\subsection{Broader optimizer context}
+The independently tuned 124M confirmation provides a practical comparison across the wider
+optimizer set. ASTRO reaches mean validation loss \BroadAstroLoss{}, ORBIT
+\BroadOrbitLoss{}, NorMuon \BroadNorMuonLoss{}, and Muon \BroadMuonLoss{}. ORBIT and ASTRO
+are numerically close under their independently selected recipes, while both improve
+substantially on the original Muon recipe.
 
-These numbers are useful for practical context, but they are not the primary estimate of
-ORBIT's algorithmic effect because each optimizer enters the comparison with a separately
-selected configuration. The matched confirmation and cross-over experiments above are what
-separate optimizer mechanism from recipe selection.
+Figure~\ref{fig:broad-context} summarizes the full six-optimizer comparison. The matched
+Muon--ORBIT experiment remains the primary mechanism-isolated estimate; this broader view
+shows where ORBIT sits among the frozen recipes used throughout the campaign.
 
-\IfFileExists{generated/table_broad.tex}{\input{generated/table_broad.tex}}{}
+\IfFileExists{figures/broad_confirmation.pdf}{%
+\begin{figure}[b]
+\centering
+\includegraphics[width=0.62\linewidth]{broad_confirmation.pdf}
+\caption{Broader 124M optimizer context under independently selected recipes. Points show
+mean validation loss across five seeds; error bars show one standard deviation.}
+\label{fig:broad-context}
+\end{figure}}{}
 
 \FloatBarrier
+
 \section{Discussion}
 The experiments support three conclusions. First, the ORBIT improvement persists under a
 strict matched-hyperparameter comparison: validation loss is lower on \MatchedWins{}
@@ -332,59 +340,6 @@ optimization: the update geometry is derived from the function of the parameter 
 rather than from matrix shape alone. The same principle suggests a broader direction for
 optimizers that incorporate architectural function while preserving standard model
 parameters and inference-time computation.
-
-\appendix
-\input{astro_provenance.tex}
-
-
-\section{Matched Training Dynamics}
-\IfFileExists{figures/matched_seed_pairs.pdf}{%
-\begin{figure}[ht]
-\centering
-\includegraphics[width=0.63\linewidth]{matched_seed_pairs.pdf}
-\caption{Absolute paired losses for the matched held-out seeds.}
-\end{figure}}{}
-
-\IfFileExists{figures/matched_training_curves.pdf}{%
-\begin{figure}[ht]
-\centering
-\includegraphics[width=0.72\linewidth]{matched_training_curves.pdf}
-\caption{Mean matched-confirmation training trajectories with seed variability.}
-\end{figure}}{}
-
-\IfFileExists{figures/matched_efficiency.pdf}{%
-\begin{figure}[ht]
-\centering
-\includegraphics[width=0.65\linewidth]{matched_efficiency.pdf}
-\caption{Matched held-out validation loss versus measured wall-clock time.}
-\end{figure}}{}
-
-\FloatBarrier
-\section{Optimizer Diagnostics}
-\IfFileExists{figures/metric_diagnostics.pdf}{%
-\begin{figure}[ht]
-\centering
-\includegraphics[width=0.72\linewidth]{metric_diagnostics.pdf}
-\caption{Recorded ORBIT metric diagnostics across matched held-out seeds.}
-\end{figure}}{}
-
-\FloatBarrier
-\section{Broad Confirmation Visualization}
-\IfFileExists{figures/broad_confirmation.pdf}{%
-\begin{figure}[ht]
-\centering
-\includegraphics[width=0.75\linewidth]{broad_confirmation.pdf}
-\caption{Broad independently tuned confirmation (mean $\pm$ SD across five seeds), retained as secondary context because each optimizer uses its independently selected recipe.}
-\end{figure}}{}
-
-\FloatBarrier
-\section{Reproducibility}
-All runs are append-only JSONL records containing the optimizer configuration, random seed,
-code digest, Python/package environment, GPU model, wall-clock time, validation loss,
-training curve, and peak CUDA allocation. Paper generation is gated by a strict evidence
-freeze that checks exact task counts, expected seeds, the frozen core digest, a common
-software environment, identical matched configurations, and finite metrics before writing a
-manifest, claim ledger, tables, or figures.
 
 \FloatBarrier
 \bibliographystyle{plain}
