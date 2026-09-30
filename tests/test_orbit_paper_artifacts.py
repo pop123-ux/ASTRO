@@ -209,6 +209,29 @@ def test_paper_avoids_internal_identifiers():
         assert token not in paper_text, f"internal identifier leaked into manuscript: {token}"
 
 
+
+def test_manuscript_uses_publication_facing_names_only():
+    main = (ROOT / "docs" / "orbit" / "paper" / "main.tex").read_text()
+    methods = (ROOT / "docs" / "orbit" / "paper" / "methods.tex").read_text()
+    paper_text = main + "\n" + methods
+
+    assert "Independent Researcher" in main
+    assert "alexandrupp55@gmail.com" in main
+    assert "FineWeb-Edu" in paper_text
+
+    forbidden = (
+        "HuggingFaceFW/fineweb-edu",
+        "sample-10BT",
+        "shared-04",
+        "de8b994a734276871770c6c67648117d3613d0954f3ae90d7e7b69246308c200",
+        "astro_v2",
+        r"astro\_v2",
+        "ASTRO-v2",
+    )
+    for token in forbidden:
+        assert token not in paper_text, f"implementation-facing token leaked into paper: {token}"
+
+
 def test_generated_macros_define_then_override(tmp_path):
     build_fixture(tmp_path)
     results, _ = paper.build(tmp_path)
