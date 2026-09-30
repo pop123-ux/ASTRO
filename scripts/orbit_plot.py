@@ -11,6 +11,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from matplotlib.patches import FancyBboxPatch
 
 from orbit_paper_artifacts import build as freeze_evidence
 from orbit_paper_artifacts import grouped, load_jsonl
@@ -49,6 +50,55 @@ def mean_sd(values: list[float]) -> tuple[float, float]:
     )
 
 
+def plot_orbit_overview(out: Path) -> None:
+    """Compact vector schematic of the ORBIT update path."""
+    fig, ax = plt.subplots(figsize=(10.6, 3.15))
+    ax.set_xlim(0, 12.2)
+    ax.set_ylim(0, 4.0)
+    ax.axis("off")
+
+    def box(x, y, w, h, title, subtitle=None, *, lw=1.2):
+        patch = FancyBboxPatch(
+            (x, y), w, h,
+            boxstyle="round,pad=0.035,rounding_size=0.08",
+            linewidth=lw,
+            facecolor="white",
+            edgecolor="0.25",
+        )
+        ax.add_patch(patch)
+        ax.text(x + w / 2, y + h * 0.61, title, ha="center", va="center",
+                fontsize=9.4, fontweight="bold")
+        if subtitle:
+            ax.text(x + w / 2, y + h * 0.30, subtitle, ha="center", va="center",
+                    fontsize=8.0, color="0.30")
+        return (x, y, w, h)
+
+    def arrow(a, b, *, yfrac=0.5):
+        x1=a[0]+a[2]; y1=a[1]+a[3]*yfrac
+        x2=b[0]; y2=b[1]+b[3]*yfrac
+        ax.annotate("", xy=(x2-0.08,y2), xytext=(x1+0.08,y1),
+                    arrowprops=dict(arrowstyle="->", lw=1.25, color="0.35"))
+
+    b1=box(0.20,2.00,1.65,1.15,"Muon candidate","Q/K gradients + momentum")
+    b2=box(2.20,2.00,1.70,1.15,"Q/K statistics","EMA 2×2 covariances")
+    b3=box(4.25,2.00,1.80,1.15,"RoPE transport","relative offsets Δ")
+    b4=box(6.40,2.00,1.75,1.15,"Local metric","per-frequency 2×2")
+    b5=box(8.50,2.00,1.75,1.15,"Precondition","analytic M⁻¹ᐟ²")
+    b6=box(10.60,2.00,1.40,1.15,"Restore","joint Q+K norm")
+    for a,b in zip((b1,b2,b3,b4,b5),(b2,b3,b4,b5,b6)):
+        arrow(a,b)
+
+    ax.text(6.10,3.62,"ORBIT: RoPE-conditioned function-space update",
+            ha="center",va="center",fontsize=11.1,fontweight="bold")
+    ax.text(6.10,0.38,
+            "Other hidden matrices → standard Muon     •     embeddings / biases / norms → auxiliary AdamW     •     inference graph unchanged",
+            ha="center",va="center",fontsize=8.7,color="0.28")
+    ax.annotate("", xy=(11.30,1.72), xytext=(11.30,1.18),
+                arrowprops=dict(arrowstyle="->",lw=1.15,color="0.35"))
+    ax.text(11.30,0.93,"parameter update",ha="center",va="center",fontsize=8.5)
+    save(fig, out, "orbit_overview")
+
+
 def plot_matched_effect(results: dict, out: Path) -> None:
     effect = results["matched_confirmation"]["orbit_vs_muon"]
     per_seed = {int(k): float(v) for k, v in effect["per_seed"].items()}
@@ -57,23 +107,23 @@ def plot_matched_effect(results: dict, out: Path) -> None:
     mean = float(effect["mean_delta"])
     lo, hi = effect["ci95"]
 
-    fig, ax = plt.subplots(figsize=(7.2, 4.4))
-    ax.axhline(0.0, linewidth=1.0, linestyle="--", color="0.35")
-    ax.scatter(seeds, vals, zorder=3)
-    ax.axhspan(lo, hi, alpha=0.12)
-    ax.axhline(mean, linewidth=2.2)
-    ax.set_xticks(seeds)
-    ax.set_xlabel("Held-out seed")
-    ax.set_ylabel("Validation-loss difference (ORBIT − Muon)")
-    ax.set_title("Matched hyperparameters: seed-wise ORBIT effect")
-    ax.text(
-        0.02,
-        0.04,
-        f"mean Δ = {mean:.4f}   95% CI [{lo:.4f}, {hi:.4f}]   "
-        f"wins {effect['a_wins']}/{effect['n']}",
-        transform=ax.transAxes,
-        va="bottom",
+    x = list(range(len(seeds)))
+    mean_x = len(seeds) + 0.75
+    fig, ax = plt.subplots(figsize=(7.0, 3.45))
+    ax.axhline(0.0, linewidth=1.0, linestyle="--", color="0.45")
+    ax.scatter(x, vals, zorder=3, s=34)
+    ax.errorbar(
+        [mean_x], [mean],
+        yerr=[[mean - lo], [hi - mean]],
+        fmt="D", capsize=5, markersize=6.5, linewidth=1.8,
+        label="paired mean ± 95% CI",
     )
+    ax.set_xticks(x + [mean_x], [str(s) for s in seeds] + ["Mean"])
+    ax.set_xlim(-0.55, mean_x + 0.65)
+    ax.set_xlabel("Held-out run")
+    ax.set_ylabel("Δ validation loss (ORBIT − Muon)")
+    ax.set_title("Matched ORBIT–Muon effect across held-out runs")
+    ax.legend(frameon=False, loc="lower left")
     save(fig, out, "matched_effect")
 
 
