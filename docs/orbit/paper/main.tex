@@ -148,8 +148,9 @@ evaluated. Under that shared configuration, Muon reached mean validation loss
 (Table~\ref{tab:matched}).
 
 The paired ORBIT-minus-Muon difference was \MatchedDelta{} nats, with a 95\% confidence
-interval of [\MatchedCILow{}, \MatchedCIHigh{}]. ORBIT obtained the lower validation loss
-on \MatchedWins{} seeds (Figure~\ref{fig:matched}). This matched estimate directly isolates the optimizer contribution from independent recipe
+interval of [\MatchedCILow{}, \MatchedCIHigh{}].
+\textbf{ORBIT obtained the lower validation loss on \MatchedWins{} held-out runs}
+(Figure~\ref{fig:matched}). This matched estimate directly isolates the optimizer contribution from independent recipe
 selection. The improvement therefore persists when both methods share the same
 hyperparameters and is not explained solely by a more favorable ORBIT recipe.
 
@@ -163,10 +164,10 @@ a measurable training-time overhead.
 \IfFileExists{figures/matched_effect.pdf}{%
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.82\linewidth]{matched_effect.pdf}
-\caption{Primary matched-hyperparameter result. Each point is the paired validation-loss
-difference between ORBIT and Muon on one unseen seed. The horizontal line is the paired
-mean and the shaded band is its 95\% confidence interval.}
+\includegraphics[width=0.78\linewidth]{matched_effect.pdf}
+\caption{Primary matched-hyperparameter result. Circles show paired held-out run
+differences; the diamond shows the paired mean with its 95\% confidence interval. Negative
+values favor ORBIT.}
 \label{fig:matched}
 \end{figure}}{}
 
@@ -183,99 +184,74 @@ Recipe choice itself has a larger effect than the matched mechanism contrast. Mo
 from its own discovery recipe to the ORBIT-selected recipe changes validation loss by
 \XConfigRecipeMuon{} nats, while the analogous change for ORBIT is
 \XConfigRecipeOrbit{} nats. The cross-over shows that the larger independently tuned ORBIT--Muon gap combines both
-update-rule and recipe effects. Across both frozen recipes, however, ORBIT retains the lower
-validation loss on every paired seed.
-
-\IfFileExists{generated/table_xconfig.tex}{\input{generated/table_xconfig.tex}}{}
-
-\IfFileExists{figures/xconfig_interaction.pdf}{%
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.76\linewidth]{xconfig_interaction.pdf}
-\caption{Cross-over experiment separating optimizer mechanism from hyperparameter recipe.
-Points show cell means; error bars are one sample standard deviation across the five paired
-seeds.}
-\label{fig:xconfig}
-\end{figure}}{}
+update-rule and recipe effects. \textbf{Across both frozen recipes, ORBIT retains the lower
+validation loss on every paired run} (Figure~\ref{fig:mechanism}a).
 
 \subsection{Ablations identify functional Q/K conditioning and RoPE-aware rotation}
 The expanded ten-seed ablation tests which pieces of ORBIT are responsible for the matched
-effect. The identity control removes the functional preconditioner while preserving the
+effect. The \textbf{identity control} removes the functional preconditioner while preserving the
 same matched recipe and ORBIT update path. Full ORBIT improves on this control by
 \AblIdentityDelta{} nats, with 95\% CI
 [\AblIdentityCILow{}, \AblIdentityCIHigh{}], and wins \AblIdentityWins{} seeds. The
 magnitude is close to the independent matched Muon comparison, providing a second
 mechanism-focused estimate on a different seed set.
 
-Removing the RoPE rotations while retaining generic Q/K functional adaptation weakens the
-optimizer further: full ORBIT improves on the no-RoPE control by
+The \textbf{no-RoPE control}, which retains generic Q/K functional adaptation while
+removing the relative-position rotations, weakens the optimizer further: full ORBIT improves on the no-RoPE control by
 \AblNoRoPEDelta{} nats, with 95\% CI
 [\AblNoRoPECILow{}, \AblNoRoPECIHigh{}], and wins \AblNoRoPEWins{} seeds. This comparison
 supports the claim that relative-position-aware conditioning contributes beyond generic
 Q/K covariance adaptation in the tested architecture.
 
-Full ORBIT also improves on the diagonal control by \AblDiagDelta{} nats, with 95\% CI
+Full ORBIT also improves on the \textbf{diagonal control} by \AblDiagDelta{} nats, with 95\% CI
 [\AblDiagCILow{}, \AblDiagCIHigh{}], and wins \AblDiagWins{} seeds. This smaller contrast
 indicates an additional contribution from the full frequency-pair metric beyond diagonal
 per-frequency scaling.
 
-\IfFileExists{generated/table_ablation.tex}{\input{generated/table_ablation.tex}}{}
-
-\IfFileExists{figures/ablation_effects.pdf}{%
+\IfFileExists{figures/mechanism_summary.pdf}{%
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.79\linewidth]{ablation_effects.pdf}
-\caption{Paired ablation effects with 95\% confidence intervals. Negative values favor full
-ORBIT; right-side annotations report seed-wise wins for full ORBIT.}
-\label{fig:ablation}
+\includegraphics[width=0.98\linewidth]{mechanism_summary.pdf}
+\caption{Mechanism isolation. \textbf{(a)} Crossed optimizer--recipe experiment: ORBIT
+retains lower loss under both frozen recipes. \textbf{(b)} Paired mechanism ablations with
+95\% confidence intervals; negative values favor full ORBIT.}
+\label{fig:mechanism}
 \end{figure}}{}
 
 \subsection{ORBIT transfers across training horizon and model size}
 The transfer experiments preserve each optimizer's independently frozen recipe and evaluate
 whether the observed advantage extends beyond the primary 124M/900-step setting.
 
-At 124M and 2700 steps, ORBIT remains below each comparison recipe in both tested seeds.
+At 124M and 2700 steps, \textbf{ORBIT remains below every comparison recipe in both tested
+runs}.
 Its mean paired differences are \HorizonVsMuon{} nats versus Muon,
 \HorizonVsNorMuon{} versus NorMuon, and \HorizonVsAstro{} versus ASTRO. The two
 ORBIT--ASTRO seed differences are closely aligned in sign and magnitude. The two paired seeds show that the advantage persists over a substantially longer training
 horizon in this transfer setting.
 
-At 355M and 900 steps, ORBIT again beats the Muon and NorMuon recipes on both tested
-seeds, with mean
+At 355M and 900 steps, \textbf{ORBIT again outperforms the Muon and NorMuon recipes in
+both tested runs}, with mean
 paired differences of \ScaleVsMuon{} and \ScaleVsNorMuon{} nats respectively. The ASTRO
 comparison is mixed across the two seeds: the mean ORBIT-minus-ASTRO difference is
 \ScaleVsAstro{} nats, with one seed favoring each method. The larger model uses a smaller
 batch size and hence a different sampled-token budget per optimizer step; the experiment
 therefore demonstrates transfer to 355M rather than a controlled scaling law.
 
-\IfFileExists{generated/table_transfer.tex}{\input{generated/table_transfer.tex}}{}
-
-\IfFileExists{figures/transfer_horizon.pdf}{%
+\IfFileExists{figures/transfer_summary.pdf}{%
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.72\linewidth]{transfer_horizon.pdf}
-\caption{124M long-horizon transfer. Individual seed outcomes and their mean are shown
-because each optimizer has only $n=2$ paired seeds; this panel is treated as transfer
-evidence rather than a high-powered significance test.}
-\label{fig:horizon}
-\end{figure}}{}
-
-\IfFileExists{figures/transfer_scale.pdf}{%
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.72\linewidth]{transfer_scale.pdf}
-\caption{355M transfer. Individual seed outcomes and their mean are shown because each
-optimizer has only $n=2$ paired seeds; this panel is treated as transfer evidence rather
-than a high-powered significance test.}
-\label{fig:scale}
+\includegraphics[width=0.96\linewidth]{transfer_summary.pdf}
+\caption{Transfer beyond the primary setting. \textbf{(a)} 124M model at 2700 steps.
+\textbf{(b)} 355M model at 900 steps. Points show individual runs; horizontal segments show
+the method mean.}
+\label{fig:transfer}
 \end{figure}}{}
 
 \subsection{Broader optimizer context}
 The independently tuned 124M confirmation provides a practical comparison across the wider
 optimizer set. ASTRO reaches mean validation loss \BroadAstroLoss{}, ORBIT
-\BroadOrbitLoss{}, NorMuon \BroadNorMuonLoss{}, and Muon \BroadMuonLoss{}. ORBIT and ASTRO
-are numerically close under their independently selected recipes, while both improve
-substantially on the original Muon recipe.
+\BroadOrbitLoss{}, NorMuon \BroadNorMuonLoss{}, and Muon \BroadMuonLoss{}. ORBIT and ASTRO are numerically close under their independently selected recipes, while
+\textbf{both substantially outperform the original Muon recipe}.
 
 Figure~\ref{fig:broad-context} summarizes the full six-optimizer comparison. The matched
 Muon--ORBIT experiment remains the primary mechanism-isolated estimate; this broader view
