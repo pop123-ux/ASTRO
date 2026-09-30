@@ -114,8 +114,8 @@ def plot_orbit_overview(out: Path) -> None:
     ax.text(
         6.10,
         0.42,
-        r"Other hidden matrices $\\rightarrow$ standard Muon   $\\bullet$   "
-        r"embeddings / biases / norms $\\rightarrow$ auxiliary AdamW"
+        r"Other hidden matrices $\rightarrow$ standard Muon   $\bullet$   "
+        r"embeddings / biases / norms $\rightarrow$ auxiliary AdamW"
         "\nInference graph unchanged",
         ha="center",
         va="center",
