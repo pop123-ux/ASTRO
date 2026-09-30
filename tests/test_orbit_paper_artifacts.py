@@ -234,6 +234,35 @@ def test_manuscript_uses_publication_facing_names_only():
         assert token not in paper_text, f"implementation-facing token leaked into paper: {token}"
 
 
+
+def test_paper_presentation_contract():
+    main = (ROOT / "docs" / "orbit" / "paper" / "main.tex").read_text()
+    methods = (ROOT / "docs" / "orbit" / "paper" / "methods.tex").read_text()
+
+    assert "Independent Researcher" in main
+    assert "alexandrupp55@gmail.com" in main
+    assert "mechanism_summary.pdf" in main
+    assert "transfer_summary.pdf" in main
+    assert "orbit_overview.pdf" in methods
+
+    paper_text = main + "\n" + methods
+    for token in (
+        "HuggingFaceFW/fineweb-edu",
+        "sample-10BT",
+        "shared-04",
+        "de8b994a",
+    ):
+        assert token not in paper_text
+
+    for ambiguous_phrase in (
+        "Knight studies",
+        "Singh similarly",
+        "Vashisht and Ramaswamy",
+        "Huang et al.",
+    ):
+        assert ambiguous_phrase not in main
+
+
 def test_generated_macros_define_then_override(tmp_path):
     build_fixture(tmp_path)
     results, _ = paper.build(tmp_path)
