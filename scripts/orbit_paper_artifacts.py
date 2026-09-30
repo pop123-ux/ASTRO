@@ -7,7 +7,7 @@ figures/tables. It intentionally validates the *final* experimental hierarchy:
 1. matched Muon-vs-ORBIT confirmation (primary causal comparison);
 2. cross-configuration isolation (hyperparameter confound);
 3. expanded mechanism ablation;
-4. long-horizon and 355M transfer including ASTRO-v2;
+4. long-horizon and 355M transfer including ASTRO;
 5. broad independently tuned confirmation (secondary context).
 
 The script writes a compact paper_results.json plus a provenance manifest. Paper
@@ -21,6 +21,8 @@ import hashlib
 import json
 import math
 import statistics
+import subprocess
+import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Iterable
@@ -302,7 +304,60 @@ def interaction(phases: dict[str, list[dict]]) -> dict:
     }
 
 
+
+POSTSCALE_REPAIR = {
+    "xconfig": "xconfig",
+    "matched_tune": "matched_tune",
+    "matched_confirm": "matched_confirm",
+    "ablation_ext": "ablation_ext",
+    "horizon_with_astro": "astro_horizon",
+    "scale_with_astro": "astro_scale",
+}
+
+
+def repair_missing_postscale_merges(work_dir: Path) -> None:
+    """Reconstruct missing merged artifacts from completed shard records.
+
+    Fresh notebook sessions occasionally expose the persistent shard files before a
+    previously generated merged JSONL appears through the Drive mount. Re-merging is
+    deterministic and performs no training, so the evidence freeze can safely repair
+    these derived files before validation.
+    """
+    shard_root = work_dir / "shards"
+    merged = work_dir / "merged"
+    merge_script = Path(__file__).with_name("orbit_postscale_merge.py")
+
+    for target_phase, source_phase in POSTSCALE_REPAIR.items():
+        target = merged / EXPECTED[target_phase]["path"]
+        if target.exists():
+            continue
+        sources = list(shard_root.glob(f"shard-*/{source_phase}.jsonl"))
+        if not sources:
+            continue
+        print(
+            f"repairing missing merged artifact {target.name} "
+            f"from {len(sources)} persisted shard file(s)"
+        )
+        try:
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(merge_script),
+                    "--work-dir",
+                    str(work_dir),
+                    "--phase",
+                    source_phase,
+                ],
+                check=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            raise SystemExit(
+                f"Could not reconstruct {target.name} from persisted shard records."
+            ) from exc
+
+
 def build(work_dir: Path, *, allow_incomplete: bool = False) -> tuple[dict, dict]:
+    repair_missing_postscale_merges(work_dir)
     merged = work_dir / "merged"
     artifact_dir = work_dir / "paper_artifacts"
     artifact_dir.mkdir(parents=True, exist_ok=True)
