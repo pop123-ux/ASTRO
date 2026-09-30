@@ -187,9 +187,10 @@ def test_paper_ends_without_appendix_scaffolding():
     assert r"\section{Matched Training Dynamics}" not in main
     assert r"\section{Optimizer Diagnostics}" not in main
     assert r"\section{Broad Confirmation Visualization}" not in main
-    assert r"\subsection{Compute and reproducibility}" in (
-        ROOT / "docs" / "orbit" / "paper" / "methods.tex"
-    ).read_text()
+    methods = (ROOT / "docs" / "orbit" / "paper" / "methods.tex").read_text()
+    assert r"\subsection{Compute and reproducibility}" not in methods
+    assert "reproducibility artifacts" in methods
+    assert "automated consistency checks" in methods
 
 
 
