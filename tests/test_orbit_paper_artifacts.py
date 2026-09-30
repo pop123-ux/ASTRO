@@ -190,7 +190,8 @@ def test_paper_ends_without_appendix_scaffolding():
     methods = (ROOT / "docs" / "orbit" / "paper" / "methods.tex").read_text()
     assert r"\subsection{Compute and reproducibility}" not in methods
     normalized = " ".join(methods.split())
-    assert "reproducibility artifacts" in normalized
+    assert "experiment records used for this study" in normalized
+    assert "reproducibility artifacts" not in normalized
     assert "automated consistency checks" in normalized
 
 
@@ -241,6 +242,9 @@ def test_paper_presentation_contract():
 
     assert "Independent Researcher" in main
     assert "alexandrupp55@gmail.com" in main
+    assert r"\usepackage{fontawesome5}" in main
+    assert r"\href{https://github.com/pop123-ux}{\faGithub}" in main
+    assert r"\href{https://github.com/pop123-ux/ORBIT}{\faGithub}" in main
     assert "mechanism_summary.pdf" in main
     assert "transfer_summary.pdf" in main
     assert "orbit_overview.pdf" in methods

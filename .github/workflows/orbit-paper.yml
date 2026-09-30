@@ -57,7 +57,7 @@ jobs:
       - name: Install LaTeX and minimal Python dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y latexmk texlive-latex-base texlive-latex-extra texlive-fonts-recommended texlive-science
+          sudo apt-get install -y latexmk texlive-latex-base texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra texlive-science
           pip install -e . "matplotlib>=3.8"
       - name: Build manuscript skeleton
         run: |
