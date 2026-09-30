@@ -4,6 +4,7 @@
 \usepackage[ruled,vlined,linesnumbered]{algorithm2e}
 \usepackage{placeins}
 \usepackage{needspace}
+\usepackage{tabularx}
 \usepackage{siunitx}
 \usepackage{xcolor}
 \graphicspath{{figures/}}
@@ -100,30 +101,31 @@ of rotary Q/K interactions.
 
 \paragraph{Optimization under architectural geometry.}
 Recent work increasingly argues that optimizers should respect invariances or induced
-weight-space geometry. Knight studies Riemannian optimization of rank-factored attention
-parameters and explicitly treats QK/VO products as low-rank optimization
-objects~\cite{knight2026}. DDC constructs gauge-equivariant conditioners for architectural
-symmetries, including a per-head attention rotation matched to RoPE, and can compose with a
-Muon base~\cite{shirodkar2026ddc}. Singh similarly shows that optimizer behavior can depend
-on arbitrary factor bases even when the loss does not, with Q/K products serving as
-attention invariants~\cite{singh2026lossbasis}. In parameter-efficient adaptation,
-LoRA-TSD and ISO-LoRA optimize the induced tangent-space weight update rather than treating
-low-rank factors independently~\cite{andriianov2026loratsd,zhu2026isolora}. ORBIT is
-complementary: it does not optimize a low-rank factor manifold or quotient symmetry, but
-constructs a local training metric from the actual RoPE-conditioned Q/K bilinear function.
+weight-space geometry. \emph{Riemannian Gradient Descent for Low-Rank
+Architectures}~\cite{knight2026} treats QK/VO products as low-rank optimization objects.
+\emph{Dead-Direction Conditioners}~\cite{shirodkar2026ddc} develops gauge-equivariant
+conditioners for architectural symmetries, including a per-head attention rotation matched
+to RoPE. \emph{The Loss Does Not See the Basis, but Adam Does}~\cite{singh2026lossbasis}
+shows that optimizer behavior can depend on arbitrary factor bases even when the represented
+function is unchanged, with Q/K products serving as attention invariants. In
+parameter-efficient adaptation, LoRA-TSD and ISO-LoRA optimize the induced tangent-space
+weight update rather than treating low-rank factors independently
+~\cite{andriianov2026loratsd,zhu2026isolora}. ORBIT is complementary: it constructs a local
+training metric directly from the RoPE-conditioned Q/K bilinear function.
 
 \paragraph{Query--key and RoPE structure.}
-Vashisht and Ramaswamy show that the relative learning speed of QK and OV circuits changes
-attention concentration~\cite{vashisht2026fasterqk}, reinforcing that QK optimization has
-a distinct functional role. QK Product Steering directly edits singular modes of the
-query--key product, but as a training-free post-hoc intervention for VLM
-hallucination~\cite{tiwari2026qksteering}. On the positional side, RoFormer introduced the
-rotation structure that converts absolute Q/K rotations into relative-position
-interactions~\cite{su2021roformer}; LeRoPE makes the rotation frequencies themselves
-learnable~\cite{karypis2026lerope}; and Huang et al. derive an exact gradient-step
-representation of the RoPE-softmax forward pass~\cite{huang2026ropegradient}. These works
-analyze or modify the attention function, but do not use its relative-position rotation to
-precondition Q/K parameter updates during pretraining.
+\emph{Faster Query-Key Learning Sharpens Attention}~\cite{vashisht2026fasterqk} shows
+that the relative learning speed of QK and OV circuits changes attention concentration,
+reinforcing the distinct functional role of QK optimization. \emph{Spectral Query-Key
+Product Weight Steering}~\cite{tiwari2026qksteering} directly edits singular modes of the
+query--key product as a training-free intervention. RoFormer introduced the rotation
+structure that turns absolute Q/K rotations into relative-position interactions
+~\cite{su2021roformer}; LeRoPE makes those frequencies learnable
+~\cite{karypis2026lerope}; and \emph{RoPE Attention Is an Exact Forward-Pass Gradient Step
+with Softmax Intact}~\cite{huang2026ropegradient} derives an exact gradient-step
+representation of the RoPE-softmax forward pass. These works analyze or modify attention
+geometry, but do not use the relative-position rotation itself to precondition Q/K
+parameter updates during pretraining.
 
 \paragraph{Positioning.}
 The literature audit did not identify prior work introducing a training optimizer whose Q/K
