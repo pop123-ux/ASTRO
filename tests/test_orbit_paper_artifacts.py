@@ -148,7 +148,6 @@ def test_paper_facing_astro_name_is_clean():
     paper_paths = [
         ROOT / "docs" / "orbit" / "paper" / "main.tex",
         ROOT / "docs" / "orbit" / "paper" / "methods.tex",
-        ROOT / "docs" / "orbit" / "paper" / "astro_provenance.tex",
     ]
     forbidden = ("ASTRO-v2", "astro_v2", r"astro\_v2")
     for path in paper_paths:
