@@ -208,6 +208,77 @@ def plot_ablation_effects(results: dict, out: Path) -> None:
     save(fig, out, "ablation_effects")
 
 
+
+def plot_mechanism_summary(results: dict, out: Path) -> None:
+    """Two-panel summary of recipe interaction and mechanism ablations."""
+    fig, axes = plt.subplots(1, 2, figsize=(10.4, 3.55), gridspec_kw={"wspace": 0.34})
+    ax = axes[0]
+    sm = results["cross_configuration_isolation"]["summary"]
+    x = [0, 1]
+    labels = ["Muon recipe", "ORBIT recipe"]
+    series = {
+        "Muon": ["muon_at_muon_config", "muon_at_orbit_config"],
+        "ORBIT": ["orbit_at_muon_config", "orbit_at_orbit_config"],
+    }
+    for name, keys in series.items():
+        means = [sm[k]["mean_val_loss"] for k in keys]
+        sds = [sm[k]["sd_val_loss"] for k in keys]
+        ax.errorbar(x, means, yerr=sds, marker="o", capsize=4, label=name)
+    ax.set_xticks(x, labels)
+    ax.set_ylabel("Validation loss")
+    ax.set_title("Optimizer × recipe")
+    ax.legend(frameon=False)
+    ax.text(-0.14, 1.04, "a", transform=ax.transAxes, fontweight="bold", fontsize=11)
+
+    ax = axes[1]
+    ab = results["mechanism_ablation"]
+    comparisons = [
+        ("Identity", ab["orbit_vs_identity"]),
+        ("No-RoPE", ab["orbit_vs_norope"]),
+        ("Diagonal", ab["orbit_vs_diag"]),
+    ]
+    ax.axvline(0.0, linewidth=1.0, linestyle="--", color="0.45")
+    for yi, (label, effect) in enumerate(comparisons):
+        mean = float(effect["mean_delta"])
+        lo, hi = effect["ci95"]
+        ax.errorbar(
+            mean, yi,
+            xerr=[[mean - lo], [hi - mean]],
+            fmt="o", capsize=4,
+        )
+    ax.set_yticks(range(len(comparisons)), [x[0] for x in comparisons])
+    ax.invert_yaxis()
+    ax.set_xlabel("Δ validation loss (ORBIT − control)")
+    ax.set_title("Mechanism ablations")
+    ax.text(-0.14, 1.04, "b", transform=ax.transAxes, fontweight="bold", fontsize=11)
+    save(fig, out, "mechanism_summary")
+
+
+def plot_transfer_summary(horizon_rows: list[dict], scale_rows: list[dict], out: Path) -> None:
+    """Compact two-panel transfer figure."""
+    fig, axes = plt.subplots(1, 2, figsize=(10.2, 3.45), gridspec_kw={"wspace": 0.30})
+    order = ["muon", "normuon", "astro_v2", "orbit"]
+    display = {"muon": "Muon", "normuon": "NorMuon", "astro_v2": "ASTRO", "orbit": "ORBIT"}
+
+    for ax, rows, title, panel in (
+        (axes[0], horizon_rows, "124M · 2700 steps", "a"),
+        (axes[1], scale_rows, "355M · 900 steps", "b"),
+    ):
+        by = grouped(rows, "optimizer")
+        for xi, name in enumerate(order):
+            vals = [float(x["val_loss"]) for x in sorted(by[name], key=lambda r: r["seed"])]
+            offsets = [-0.055, 0.055] if len(vals) == 2 else [0.0] * len(vals)
+            ax.scatter([xi + o for o in offsets], vals, s=32, zorder=3)
+            mean = statistics.fmean(vals)
+            ax.plot([xi - 0.14, xi + 0.14], [mean, mean], linewidth=2.0)
+        ax.set_xticks(range(len(order)), [display[x] for x in order])
+        ax.set_title(title)
+        ax.text(-0.13, 1.04, panel, transform=ax.transAxes, fontweight="bold", fontsize=11)
+    axes[0].set_ylabel("Validation loss")
+    save(fig, out, "transfer_summary")
+
+
+
 def plot_transfer(rows: list[dict], out: Path, *, stem: str, title: str) -> None:
     by = grouped(rows, "optimizer")
     order = ["muon", "normuon", "astro_v2", "orbit"]
