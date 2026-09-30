@@ -179,6 +179,20 @@ def test_paper_method_contains_orbit_algorithm_and_no_direct_address():
     assert not re.search(r"\b(?:you|your|we|our)\b", paper_text, flags=re.IGNORECASE)
 
 
+
+def test_paper_ends_without_appendix_scaffolding():
+    main = (ROOT / "docs" / "orbit" / "paper" / "main.tex").read_text()
+    assert r"\appendix" not in main
+    assert "astro_provenance.tex" not in main
+    assert r"\section{Reproducibility}" not in main
+    assert r"\section{Matched Training Dynamics}" not in main
+    assert r"\section{Optimizer Diagnostics}" not in main
+    assert r"\section{Broad Confirmation Visualization}" not in main
+    assert r"\subsection{Compute and reproducibility}" in (
+        ROOT / "docs" / "orbit" / "paper" / "methods.tex"
+    ).read_text()
+
+
 def test_generated_macros_define_then_override(tmp_path):
     build_fixture(tmp_path)
     results, _ = paper.build(tmp_path)
