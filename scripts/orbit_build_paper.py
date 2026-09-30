@@ -154,8 +154,8 @@ def write_matched_table(results: dict, generated: Path) -> None:
     lines = [
         "\\begin{table}[t]",
         "\\centering",
-        "\\caption{Primary matched-hyperparameter confirmation on 10 held-out seeds. "
-        "Both optimizers use the same frozen configuration. Lower validation loss is better.}",
+        "\\caption{Primary matched-hyperparameter confirmation across 10 held-out paired runs. "
+        "Both optimizers use the same selected configuration. Lower validation loss is better.}",
         "\\label{tab:matched}",
         "\\begin{tabular}{lrrrrr}",
         "\\toprule",
@@ -187,40 +187,40 @@ def write_xconfig_table(results: dict, generated: Path) -> None:
         generated.joinpath("table_xconfig.tex").write_text("% unavailable\n")
         return
     sm = x["summary"]
+    muon_recipe = x["mechanism_at_muon_config"]
+    orbit_recipe = x["mechanism_at_orbit_config"]
     lines = [
         "\\begin{table}[t]",
         "\\centering",
-        "\\caption{Optimizer-by-configuration cross-over. The same five seeds are used "
-        "in every cell.}",
+        "\\caption{Cross-configuration analysis separating the update rule from the "
+        "frozen training recipe. Entries are mean validation loss $\\pm$ one standard "
+        "deviation across five paired runs. The final row reports the paired "
+        "ORBIT-minus-Muon effect for each recipe.}",
         "\\label{tab:xconfig}",
-        "\\begin{tabular}{lrr}",
+        "\\small",
+        "\\setlength{\\tabcolsep}{8pt}",
+        "\\renewcommand{\\arraystretch}{1.15}",
+        "\\begin{tabular}{lcc}",
         "\\toprule",
-        "Optimizer & Muon config & ORBIT config" + ROW_END,
+        " & \\multicolumn{2}{c}{Frozen training recipe}" + ROW_END,
+        "\\cmidrule(lr){2-3}",
+        "Update rule & Muon-selected & ORBIT-selected" + ROW_END,
         "\\midrule",
-        f"Muon & {sm['muon_at_muon_config']['mean_val_loss']:.4f} & "
-        f"{sm['muon_at_orbit_config']['mean_val_loss']:.4f}" + ROW_END,
-        f"ORBIT & {sm['orbit_at_muon_config']['mean_val_loss']:.4f} & "
-        f"{sm['orbit_at_orbit_config']['mean_val_loss']:.4f}" + ROW_END,
+        f"Muon & {sm['muon_at_muon_config']['mean_val_loss']:.4f} $\\pm$ "
+        f"{sm['muon_at_muon_config']['sd_val_loss']:.4f} & "
+        f"{sm['muon_at_orbit_config']['mean_val_loss']:.4f} $\\pm$ "
+        f"{sm['muon_at_orbit_config']['sd_val_loss']:.4f}" + ROW_END,
+        f"ORBIT & {sm['orbit_at_muon_config']['mean_val_loss']:.4f} $\\pm$ "
+        f"{sm['orbit_at_muon_config']['sd_val_loss']:.4f} & "
+        f"{sm['orbit_at_orbit_config']['mean_val_loss']:.4f} $\\pm$ "
+        f"{sm['orbit_at_orbit_config']['sd_val_loss']:.4f}" + ROW_END,
+        "\\midrule",
+        f"ORBIT $-$ Muon & {muon_recipe['mean_delta']:.4f} "
+        f"{ci(muon_recipe)} & {orbit_recipe['mean_delta']:.4f} {ci(orbit_recipe)}" + ROW_END,
         "\\bottomrule",
         "\\end{tabular}",
-        "\\vspace{2pt}",
-        "\\begin{tabular}{lrrr}",
-        "\\toprule",
-        "Paired contrast & Mean $\\Delta$ & 95\\% CI & Wins" + ROW_END,
-        "\\midrule",
+        "\\end{table}",
     ]
-    contrasts = [
-        ("Mechanism @ Muon config", x["mechanism_at_muon_config"]),
-        ("Mechanism @ ORBIT config", x["mechanism_at_orbit_config"]),
-        ("Recipe effect on Muon", x["recipe_effect_on_muon"]),
-        ("Recipe effect on ORBIT", x["recipe_effect_on_orbit"]),
-    ]
-    for label, effect in contrasts:
-        lines.append(
-            f"{label} & {effect['mean_delta']:.4f} & {ci(effect)} & "
-            f"{effect['a_wins']}/{effect['n']}" + ROW_END
-        )
-    lines += ["\\bottomrule", "\\end{tabular}", "\\end{table}"]
     generated.joinpath("table_xconfig.tex").write_text("\n".join(lines) + "\n")
 
 
