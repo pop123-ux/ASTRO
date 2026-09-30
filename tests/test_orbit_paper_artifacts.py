@@ -190,7 +190,8 @@ def test_paper_ends_without_appendix_scaffolding():
     methods = (ROOT / "docs" / "orbit" / "paper" / "methods.tex").read_text()
     assert r"\subsection{Compute and reproducibility}" not in methods
     normalized = " ".join(methods.split())
-    assert "reproducibility artifacts" in normalized
+    assert "experiment records used for this study" in normalized
+    assert "reproducibility artifacts" not in normalized
     assert "automated consistency checks" in normalized
 
 
