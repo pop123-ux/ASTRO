@@ -23,8 +23,13 @@ plt.rcParams.update(
         "savefig.dpi": 240,
         "pdf.fonttype": 42,
         "ps.fonttype": 42,
+        # Match the paper's LaTeX typography instead of Matplotlib's default sans face.
+        "font.family": "cmr10",
+        "mathtext.fontset": "cm",
+        "axes.formatter.use_mathtext": True,
         "font.size": 10.5,
         "axes.titlesize": 11.5,
+        "axes.titleweight": "regular",
         "axes.labelsize": 10.5,
         "legend.fontsize": 9,
         "axes.spines.top": False,
@@ -52,7 +57,7 @@ def mean_sd(values: list[float]) -> tuple[float, float]:
 
 def plot_orbit_overview(out: Path) -> None:
     """Compact vector schematic of the ORBIT update path."""
-    fig, ax = plt.subplots(figsize=(10.6, 3.15))
+    fig, ax = plt.subplots(figsize=(10.8, 3.35))
     ax.set_xlim(0, 12.2)
     ax.set_ylim(0, 4.0)
     ax.axis("off")
@@ -66,11 +71,27 @@ def plot_orbit_overview(out: Path) -> None:
             edgecolor="0.25",
         )
         ax.add_patch(patch)
-        ax.text(x + w / 2, y + h * 0.61, title, ha="center", va="center",
-                fontsize=9.4, fontweight="bold")
+        ax.text(
+            x + w / 2,
+            y + h * 0.66,
+            title,
+            ha="center",
+            va="center",
+            fontsize=9.2,
+            fontweight="bold",
+            linespacing=1.0,
+        )
         if subtitle:
-            ax.text(x + w / 2, y + h * 0.30, subtitle, ha="center", va="center",
-                    fontsize=8.0, color="0.30")
+            ax.text(
+                x + w / 2,
+                y + h * 0.28,
+                subtitle,
+                ha="center",
+                va="center",
+                fontsize=7.6,
+                color="0.30",
+                linespacing=1.1,
+            )
         return (x, y, w, h)
 
     def arrow(a, b, *, yfrac=0.5):
@@ -79,23 +100,32 @@ def plot_orbit_overview(out: Path) -> None:
         ax.annotate("", xy=(x2-0.08,y2), xytext=(x1+0.08,y1),
                     arrowprops=dict(arrowstyle="->", lw=1.25, color="0.35"))
 
-    b1=box(0.20,2.00,1.65,1.15,"Muon candidate","Q/K gradients + momentum")
-    b2=box(2.20,2.00,1.70,1.15,"Q/K statistics","EMA 2×2 covariances")
-    b3=box(4.25,2.00,1.80,1.15,"RoPE transport","relative offsets Δ")
-    b4=box(6.40,2.00,1.75,1.15,"Local metric","per-frequency 2×2")
-    b5=box(8.50,2.00,1.75,1.15,"Precondition","analytic M⁻¹ᐟ²")
-    b6=box(10.60,2.00,1.40,1.15,"Restore","joint Q+K norm")
+    b1 = box(0.20, 1.95, 1.65, 1.25, "Muon candidate", "Q/K gradients\n+ momentum")
+    b2 = box(2.20, 1.95, 1.70, 1.25, "Q/K statistics", "EMA $2\\times2$\ncovariances")
+    b3 = box(4.25, 1.95, 1.80, 1.25, "RoPE transport", "relative offsets\n$\\Delta$")
+    b4 = box(6.40, 1.95, 1.75, 1.25, "Local metric", "per-frequency\n$2\\times2$")
+    b5 = box(8.50, 1.95, 1.75, 1.25, "Precondition", r"analytic $M^{-1/2}$")
+    b6 = box(10.60, 1.95, 1.40, 1.25, "Restore", "joint Q+K\nnorm")
     for a,b in zip((b1,b2,b3,b4,b5),(b2,b3,b4,b5,b6)):
         arrow(a,b)
 
     ax.text(6.10,3.62,"ORBIT: RoPE-conditioned function-space update",
             ha="center",va="center",fontsize=11.1,fontweight="bold")
-    ax.text(6.10,0.38,
-            "Other hidden matrices → standard Muon     •     embeddings / biases / norms → auxiliary AdamW     •     inference graph unchanged",
-            ha="center",va="center",fontsize=8.7,color="0.28")
-    ax.annotate("", xy=(11.30,1.72), xytext=(11.30,1.18),
-                arrowprops=dict(arrowstyle="->",lw=1.15,color="0.35"))
-    ax.text(11.30,0.93,"parameter update",ha="center",va="center",fontsize=8.5)
+    ax.text(
+        6.10,
+        0.42,
+        r"Other hidden matrices $\rightarrow$ standard Muon   $\bullet$   "
+        r"embeddings / biases / norms $\rightarrow$ auxiliary AdamW"
+        "\nInference graph unchanged",
+        ha="center",
+        va="center",
+        fontsize=8.3,
+        color="0.28",
+        linespacing=1.2,
+    )
+    ax.annotate("", xy=(11.30, 1.68), xytext=(11.30, 1.14),
+                arrowprops=dict(arrowstyle="->", lw=1.15, color="0.35"))
+    ax.text(11.30, 0.90, "parameter update", ha="center", va="center", fontsize=8.4)
     save(fig, out, "orbit_overview")
 
 
@@ -109,21 +139,26 @@ def plot_matched_effect(results: dict, out: Path) -> None:
 
     x = list(range(len(seeds)))
     mean_x = len(seeds) + 0.75
-    fig, ax = plt.subplots(figsize=(7.0, 3.45))
+    fig, ax = plt.subplots(figsize=(7.0, 3.60))
     ax.axhline(0.0, linewidth=1.0, linestyle="--", color="0.45")
     ax.scatter(x, vals, zorder=3, s=34)
     ax.errorbar(
         [mean_x], [mean],
         yerr=[[mean - lo], [hi - mean]],
         fmt="D", capsize=5, markersize=6.5, linewidth=1.8,
-        label="paired mean ± 95% CI",
+        label=r"paired mean $\pm$ 95% CI",
     )
     ax.set_xticks(x + [mean_x], [str(s) for s in seeds] + ["Mean"])
     ax.set_xlim(-0.55, mean_x + 0.65)
     ax.set_xlabel("Held-out run")
-    ax.set_ylabel("Δ validation loss (ORBIT − Muon)")
-    ax.set_title("Matched ORBIT–Muon effect across held-out runs")
-    ax.legend(frameon=False, loc="lower left")
+    ax.set_ylabel(r"$\Delta$ validation loss (ORBIT $-$ Muon)")
+    ax.set_title("Matched ORBIT-Muon effect across held-out runs")
+    ax.legend(
+        frameon=False,
+        loc="upper left",
+        borderaxespad=0.25,
+        handletextpad=0.6,
+    )
     save(fig, out, "matched_effect")
 
 
@@ -168,7 +203,7 @@ def plot_xconfig(results: dict, out: Path) -> None:
         ax.errorbar(x, means, yerr=sds, marker="o", capsize=4, label=name)
     ax.set_xticks(x, labels)
     ax.set_ylabel("Validation loss")
-    ax.set_title("Optimizer × hyperparameter-recipe cross-over")
+    ax.set_title(r"Optimizer $\times$ hyperparameter-recipe cross-over")
     ax.legend(frameon=False)
     save(fig, out, "xconfig_interaction")
 
@@ -203,7 +238,7 @@ def plot_ablation_effects(results: dict, out: Path) -> None:
         )
     ax.set_yticks(y, [x[0] for x in comparisons])
     ax.invert_yaxis()
-    ax.set_xlabel("Validation-loss difference (full ORBIT − control)")
+    ax.set_xlabel(r"Validation-loss difference (full ORBIT $-$ control)")
     ax.set_title("Mechanism ablation: paired effects with 95% CIs")
     save(fig, out, "ablation_effects")
 
@@ -226,7 +261,7 @@ def plot_mechanism_summary(results: dict, out: Path) -> None:
         ax.errorbar(x, means, yerr=sds, marker="o", capsize=4, label=name)
     ax.set_xticks(x, labels)
     ax.set_ylabel("Validation loss")
-    ax.set_title("Optimizer × recipe")
+    ax.set_title(r"Optimizer $\times$ recipe")
     ax.legend(frameon=False)
     ax.text(-0.14, 1.04, "a", transform=ax.transAxes, fontweight="bold", fontsize=11)
 
@@ -248,7 +283,7 @@ def plot_mechanism_summary(results: dict, out: Path) -> None:
         )
     ax.set_yticks(range(len(comparisons)), [x[0] for x in comparisons])
     ax.invert_yaxis()
-    ax.set_xlabel("Δ validation loss (ORBIT − control)")
+    ax.set_xlabel(r"$\Delta$ validation loss (ORBIT $-$ control)")
     ax.set_title("Mechanism ablations")
     ax.text(-0.14, 1.04, "b", transform=ax.transAxes, fontweight="bold", fontsize=11)
     save(fig, out, "mechanism_summary")
@@ -261,8 +296,8 @@ def plot_transfer_summary(horizon_rows: list[dict], scale_rows: list[dict], out:
     display = {"muon": "Muon", "normuon": "NorMuon", "astro_v2": "ASTRO", "orbit": "ORBIT"}
 
     for ax, rows, title, panel in (
-        (axes[0], horizon_rows, "124M · 2700 steps", "a"),
-        (axes[1], scale_rows, "355M · 900 steps", "b"),
+        (axes[0], horizon_rows, "124M / 2700 steps", "a"),
+        (axes[1], scale_rows, "355M / 900 steps", "b"),
     ):
         by = grouped(rows, "optimizer")
         for xi, name in enumerate(order):
@@ -318,7 +353,7 @@ def plot_broad_confirmation(rows: list[dict], out: Path) -> None:
     for yi, (mean, sd, name) in enumerate(stats):
         ax.errorbar(mean, yi, xerr=sd, fmt="o", capsize=4)
     ax.set_yticks(range(len(stats)), [display.get(x[2], x[2]) for x in stats])
-    ax.set_xlabel("Validation loss (mean ± SD)")
+    ax.set_xlabel(r"Validation loss (mean $\pm$ SD)")
     ax.set_title("Broad 124M optimizer context")
     save(fig, out, "broad_confirmation")
 
