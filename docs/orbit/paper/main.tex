@@ -76,18 +76,15 @@ selected winner on unseen paired seeds. This mechanism-isolated comparison ancho
 subsequent ablations and longer-horizon/model-scale transfer experiments.
 
 \paragraph{Contributions.}
-This work makes four contributions:
-\begin{enumerate}
-  \item A RoPE-conditioned local metric for Q/K optimization is derived directly from the
-  relative-position bilinear attention interaction and implemented using frequency-local
-  $2\times2$ statistics with no inference-time modification.
-  \item Optimizer mechanism is isolated from hyperparameter recipe using a
-  cross-configuration experiment and a ten-seed matched-hyperparameter confirmation.
-  \item Identity, no-RoPE, and diagonal controls identify the contributions of functional
-  Q/K conditioning, RoPE-aware rotation, and full frequency-pair coupling.
-  \item Longer-horizon and 355M transfer are reported alongside runtime and memory costs,
-  providing evidence beyond the primary 124M/900-step setting.
-\end{enumerate}
+The main contributions are:
+\textbf{(1) RoPE-conditioned Q/K geometry}, a frequency-local functional metric derived
+from the relative-position attention interaction;
+\textbf{(2) matched optimizer evaluation}, separating the ORBIT update from recipe
+selection across unseen seeds;
+\textbf{(3) mechanism ablations}, isolating functional conditioning, RoPE-aware rotation,
+and full frequency-pair coupling; and
+\textbf{(4) transfer evidence}, extending the evaluation to a longer training horizon and
+a 355M model with measured runtime and memory cost.
 
 \section{Related Work}
 \paragraph{Matrix and spectral optimization.}
