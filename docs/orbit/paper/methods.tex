@@ -120,10 +120,9 @@ Transformer blocks, GELU MLPs with $4d$ hidden width, and zero dropout. Learned 
 position embeddings are replaced by RoPE with base 10,000. Attention uses separate
 $q_{\mathrm{proj}}$, $k_{\mathrm{proj}}$, and $v_{\mathrm{proj}}$ matrices.
 
-The corpus is \texttt{HuggingFaceFW/fineweb-edu}, configuration \texttt{sample-10BT},
-revision \texttt{v1.0.0}. Text is tokenized with the GPT-2 tokenizer. A single cached stream
-of exactly 12.4M tokens is used across sessions: the first 400,000 tokens form the fixed
-validation pool and the next 12,000,000 tokens form the training pool. Every training step
+The corpus is FineWeb-Edu, using the sample-10BT release. Text is tokenized with the GPT-2
+tokenizer. A fixed stream of 12.4M tokens is shared across runs: the first 400,000 tokens
+form the validation pool and the next 12,000,000 tokens form the training pool. Every training step
 samples random contiguous 512-token windows from that pool with a seeded generator;
 evaluation always uses a separate generator with seed 777 and averages 20 validation
 batches. Thus every optimizer in a paired setting sees the same validation windows.
@@ -153,10 +152,9 @@ auxiliary-rate policy. Five discovery trials are used per optimizer in the broad
 
 The primary Muon--ORBIT causal comparison uses a stricter matched policy: ten deterministic
 900-step candidate configurations are generated once from the Muon search space and
-presented identically to both methods. Both methods independently selected the same
-candidate, \texttt{shared-04}, before any held-out matched-confirmation seed was evaluated.
-That frozen configuration is then reused in the matched confirmation and expanded ORBIT
-ablation.
+presented identically to both methods. Both methods independently selected the same candidate from the shared grid before any
+held-out matched-confirmation seed was evaluated. That frozen configuration is reused in
+the matched confirmation and expanded ORBIT ablation.
 
 \subsection{Evaluation protocol}
 Table~\ref{tab:protocol} summarizes the reported training stages. The chronological
@@ -221,14 +219,14 @@ rather than as high-powered inferential tests. Wall-clock time and peak CUDA all
 reported alongside loss.
 
 \subsection{Compute and reproducibility}
-The recorded campaign runs use NVIDIA Tesla T4 GPUs with CUDA 12.8, Python 3.13.15,
-PyTorch 2.11.0+cu128, Transformers 4.57.6, and Datasets 4.8.5. Each JSONL record stores
-the random seed, optimizer configuration, code digest, environment fingerprint, GPU label,
-wall-clock duration, peak CUDA allocation, validation loss, and logged training trajectory.
-The frozen core implementation digest is
-\texttt{de8b994a734276871770c6c67648117d3613d0954f3ae90d7e7b69246308c200}.
-Four logical shards write independently to persistent storage; merging rejects missing
-expected task IDs, mixed core digests, and mixed software environments. Paper generation is
-gated by the same evidence freeze: exact task counts, expected seeds, the frozen core
-digest, matched configurations, finite metrics, and environment consistency are validated
-before tables, figures, and manuscript macros are generated.
+All experiments were run on NVIDIA Tesla T4 GPUs using PyTorch with CUDA mixed precision.
+The reported campaign uses one frozen code revision across the final comparisons. Run-level
+records preserve the optimizer configuration, random seed, hardware/software environment,
+wall-clock duration, validation loss, peak GPU memory allocation, and training trajectory.
+
+Runs are written independently to persistent storage and merged only after consistency
+checks pass. Before any manuscript table, figure, or numerical macro is generated, the
+artifact pipeline verifies the expected run counts and seeds, the shared matched
+configuration, finite metrics, and consistency of the code and software environment. Exact
+package versions, run identifiers, and implementation fingerprints are retained in the
+reproducibility artifacts rather than exposed in the manuscript.
