@@ -408,34 +408,25 @@ def main() -> None:
     out = args.out_dir or (args.work_dir / "paper_artifacts" / "figures")
     out.mkdir(parents=True, exist_ok=True)
 
+    plot_orbit_overview(out)
+
     if "matched_confirmation" in results:
-        rows = load_jsonl(merged / "matched_confirm.jsonl")
         plot_matched_effect(results, out)
-        plot_matched_pairs(rows, out)
-        plot_training_curves(rows, out)
-        plot_efficiency(rows, out)
-        plot_metric_diagnostics(rows, out)
 
-    if "cross_configuration_isolation" in results:
-        plot_xconfig(results, out)
+    if (
+        "cross_configuration_isolation" in results
+        and "mechanism_ablation" in results
+    ):
+        plot_mechanism_summary(results, out)
 
-    if "mechanism_ablation" in results:
-        plot_ablation_effects(results, out)
-
-    if "long_horizon_transfer" in results:
-        plot_transfer(
+    if (
+        "long_horizon_transfer" in results
+        and "scale_transfer" in results
+    ):
+        plot_transfer_summary(
             load_jsonl(merged / "horizon_with_astro.jsonl"),
-            out,
-            stem="transfer_horizon",
-            title="Long-horizon transfer: 124M, 2700 steps",
-        )
-
-    if "scale_transfer" in results:
-        plot_transfer(
             load_jsonl(merged / "scale_with_astro.jsonl"),
             out,
-            stem="transfer_scale",
-            title="Scale transfer: 355M, 900 steps",
         )
 
     if "broad_independently_tuned_context" in results:
