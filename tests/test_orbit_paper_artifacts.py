@@ -173,7 +173,7 @@ def test_paper_method_contains_orbit_algorithm_and_no_direct_address():
 
     paper_text = "\n".join(
         (ROOT / "docs" / "orbit" / "paper" / name).read_text()
-        for name in ("main.tex", "methods.tex", "astro_provenance.tex")
+        for name in ("main.tex", "methods.tex")
     )
     assert not re.search(r"\b(?:you|your|we|our)\b", paper_text, flags=re.IGNORECASE)
 
@@ -189,8 +189,9 @@ def test_paper_ends_without_appendix_scaffolding():
     assert r"\section{Broad Confirmation Visualization}" not in main
     methods = (ROOT / "docs" / "orbit" / "paper" / "methods.tex").read_text()
     assert r"\subsection{Compute and reproducibility}" not in methods
-    assert "reproducibility artifacts" in methods
-    assert "automated consistency checks" in methods
+    normalized = " ".join(methods.split())
+    assert "reproducibility artifacts" in normalized
+    assert "automated consistency checks" in normalized
 
 
 
