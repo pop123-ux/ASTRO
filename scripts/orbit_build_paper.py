@@ -463,31 +463,28 @@ def generate_plots(work_dir: Path, allow_incomplete: bool) -> None:
     out = work_dir / "paper_artifacts" / "figures"
     out.mkdir(parents=True, exist_ok=True)
 
+    # Method overview is data-independent and is always generated with the paper.
+    orbit_plot.plot_orbit_overview(out)
+
     if "matched_confirmation" in results:
-        rows = orbit_plot.load_jsonl(merged / "matched_confirm.jsonl")
         orbit_plot.plot_matched_effect(results, out)
-        orbit_plot.plot_matched_pairs(rows, out)
-        orbit_plot.plot_training_curves(rows, out)
-        orbit_plot.plot_efficiency(rows, out)
-        orbit_plot.plot_metric_diagnostics(rows, out)
-    if "cross_configuration_isolation" in results:
-        orbit_plot.plot_xconfig(results, out)
-    if "mechanism_ablation" in results:
-        orbit_plot.plot_ablation_effects(results, out)
-    if "long_horizon_transfer" in results:
-        orbit_plot.plot_transfer(
+
+    if (
+        "cross_configuration_isolation" in results
+        and "mechanism_ablation" in results
+    ):
+        orbit_plot.plot_mechanism_summary(results, out)
+
+    if (
+        "long_horizon_transfer" in results
+        and "scale_transfer" in results
+    ):
+        orbit_plot.plot_transfer_summary(
             orbit_plot.load_jsonl(merged / "horizon_with_astro.jsonl"),
-            out,
-            stem="transfer_horizon",
-            title="Long-horizon transfer: 124M, 2700 steps",
-        )
-    if "scale_transfer" in results:
-        orbit_plot.plot_transfer(
             orbit_plot.load_jsonl(merged / "scale_with_astro.jsonl"),
             out,
-            stem="transfer_scale",
-            title="Scale transfer: 355M, 900 steps",
         )
+
     if "broad_independently_tuned_context" in results:
         orbit_plot.plot_broad_confirmation(
             orbit_plot.load_jsonl(merged / "confirm.jsonl"), out
