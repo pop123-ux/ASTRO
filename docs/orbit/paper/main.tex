@@ -292,10 +292,14 @@ and persists across additional training regimes.
 
 \paragraph{Scope and future work.}
 The present study evaluates RoPE-modified GPT-2-style decoders with multi-head attention.
-The transfer experiments use two seeds and the 355M setting uses a smaller batch size than
+The transfer experiments use two seeds, and the 355M setting uses a smaller batch size than
 the 124M setting. Extending the evaluation to grouped-query attention, QK normalization,
-mixture-of-experts models, larger pretraining budgets, and lower-overhead implementations is
-a direct direction for future work.
+mixture-of-experts models, larger pretraining budgets, lower-overhead implementations, and
+controlled scaling studies on substantially larger-parameter models is a direct direction
+for future work. We encourage independent replication and extension of these experiments
+across broader architectures and compute regimes, using the accompanying implementation
+and reproducibility artifacts as a basis for further investigation of function-space
+conditioning.
 
 \section{Conclusion}
 ORBIT introduces a training-time function-space preconditioner for rotary query--key
