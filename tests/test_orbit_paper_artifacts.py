@@ -192,6 +192,23 @@ def test_paper_ends_without_appendix_scaffolding():
     ).read_text()
 
 
+
+def test_paper_avoids_internal_identifiers():
+    paper_text = "\n".join(
+        (ROOT / "docs" / "orbit" / "paper" / name).read_text()
+        for name in ("main.tex", "methods.tex")
+    )
+    forbidden = (
+        "HuggingFaceFW/",
+        "shared-04",
+        "de8b994a734276871770c6c67648117d3613d0954f3ae90d7e7b69246308c200",
+        "environment fingerprint",
+        "JSONL",
+    )
+    for token in forbidden:
+        assert token not in paper_text, f"internal identifier leaked into manuscript: {token}"
+
+
 def test_generated_macros_define_then_override(tmp_path):
     build_fixture(tmp_path)
     results, _ = paper.build(tmp_path)
