@@ -193,12 +193,12 @@ def plot_broad_confirmation(rows: list[dict], out: Path) -> None:
         stats.append((mean, sd, name))
     stats.sort(reverse=True)
 
-    fig, ax = plt.subplots(figsize=(7.2, 4.7))
+    fig, ax = plt.subplots(figsize=(5.2, 3.1))
     for yi, (mean, sd, name) in enumerate(stats):
         ax.errorbar(mean, yi, xerr=sd, fmt="o", capsize=4)
     ax.set_yticks(range(len(stats)), [display.get(x[2], x[2]) for x in stats])
     ax.set_xlabel("Validation loss (mean ± SD)")
-    ax.set_title("Broad independently tuned confirmation")
+    ax.set_title("Broad 124M optimizer context")
     save(fig, out, "broad_confirmation")
 
 
