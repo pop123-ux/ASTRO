@@ -64,9 +64,23 @@ A single joint restoration factor then preserves the total Q/K update budget:
 The functional metric therefore changes the direction of the joint Q/K update without
 increasing its aggregate Frobenius norm.
 
-Algorithm~\ref{alg:orbit} summarizes the complete Q/K path for one attention layer.
-Standard Muon and auxiliary AdamW updates proceed unchanged for the remaining parameter
-classes.
+Figure~\ref{fig:orbit-overview} summarizes the data flow of the optimizer before the
+step-by-step specification in Algorithm~\ref{alg:orbit}.
+
+\IfFileExists{figures/orbit_overview.pdf}{%
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\linewidth]{orbit_overview.pdf}
+\caption{ORBIT update pathway. Muon candidate directions are reshaped using Q/K covariance
+statistics transported through RoPE relative-position rotations, producing frequency-local
+$2\times2$ metrics. Analytic inverse-square-root preconditioning is followed by joint
+Frobenius-norm restoration before the parameter update. Other parameter classes retain
+their standard Muon or auxiliary AdamW path.}
+\label{fig:orbit-overview}
+\end{figure}}{}
+
+Algorithm~\ref{alg:orbit} gives the corresponding update for one attention layer. Standard
+Muon and auxiliary AdamW updates proceed unchanged for the remaining parameter classes.
 
 \begin{algorithm}[t]
 \caption{ORBIT update for a RoPE query--key projection pair}
@@ -124,8 +138,8 @@ The corpus is FineWeb-Edu. Text is tokenized with the GPT-2
 tokenizer. A fixed stream of 12.4M tokens is shared across runs: the first 400,000 tokens
 form the validation pool and the next 12,000,000 tokens form the training pool. Every training step
 samples random contiguous 512-token windows from that pool with a seeded generator;
-evaluation always uses a separate generator with seed 777 and averages 20 validation
-batches. Thus every optimizer in a paired setting sees the same validation windows.
+evaluation uses a fixed, separate generator and averages 20 validation batches. Thus every
+optimizer in a paired setting sees the same validation windows.
 
 \subsection{Training setup}
 \label{sec:training-setup}
@@ -161,64 +175,63 @@ The evaluation is organized into complementary study blocks rather than a single
 broad optimizer context, matched mechanism isolation, component ablations, and transfer
 across training horizon and model size. Table~\ref{tab:protocol} summarizes the design.
 
-\begin{table*}[t]
+\begin{table}[t]
 \centering
-\caption{Summary of the ORBIT evaluation protocol. Replication counts refer to independent
-training runs used for the reported comparison; hyperparameter-selection runs are listed
-separately where relevant.}
+\caption{Experimental design. The primary estimate is the matched Muon--ORBIT comparison;
+the remaining experiments test recipe interaction, mechanism attribution, or transfer.}
 \label{tab:protocol}
-\footnotesize
-\setlength{\tabcolsep}{4.5pt}
-\renewcommand{\arraystretch}{1.14}
-\begin{tabular}{@{}
->{\raggedright\arraybackslash}p{2.25cm}
->{\raggedright\arraybackslash}p{4.15cm}
->{\centering\arraybackslash}p{1.05cm}
->{\centering\arraybackslash}p{1.25cm}
->{\raggedright\arraybackslash}p{2.55cm}
->{\raggedright\arraybackslash}p{3.55cm}
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.12}
+\begin{tabularx}{\textwidth}{@{}
+>{\raggedright\arraybackslash}p{2.05cm}
+>{\raggedright\arraybackslash}X
+>{\centering\arraybackslash}p{0.95cm}
+>{\centering\arraybackslash}p{0.85cm}
+>{\centering\arraybackslash}p{1.35cm}
+>{\raggedright\arraybackslash}p{3.1cm}
 @{}}
 \toprule
-Study block & Objective & Model & Training budget & Replication / selection & Methods \\
+Experiment & Scientific purpose & Model & Steps & Replication & Compared methods \\
 \midrule
-Broad optimizer benchmark &
-Compare independently selected optimizer recipes &
-124M & 900 steps &
-5 discovery candidates per method; 5 evaluation runs &
+Broad benchmark &
+Frozen-recipe optimizer comparison &
+124M & 900 & $n=5$ &
 AdamW, AdaMuon, Muon, NorMuon, ASTRO, ORBIT \\
 
-Cross-configuration analysis &
-Separate update-rule effects from frozen recipe effects &
-124M & 900 steps &
-5 paired runs per factorial cell &
-Muon and ORBIT under both frozen recipes \\
-
-Matched confirmation &
-Evaluate Muon and ORBIT under an identical selected configuration &
-124M & 900 steps &
-10 shared candidates; 10 held-out paired runs &
+Crossed recipes &
+Separate update-rule and recipe effects &
+124M & 900 & $n=5$/cell &
 Muon, ORBIT \\
 
-Mechanism ablation &
-Attribute gains to functional conditioning, RoPE rotation, and pair coupling &
-124M & 900 steps &
-3-run pilot followed by 10 paired runs per control &
+Matched confirmation &
+Mechanism-isolated primary comparison &
+124M & 900 & $n=10$ paired &
+Muon, ORBIT \\
+
+Ablation &
+Attribute the functional, RoPE, and pair-coupling components &
+124M & 900 & $n=10$/control &
 ORBIT, identity, no-RoPE, diagonal \\
 
 Long-horizon transfer &
-Test persistence under substantially longer optimization &
-124M & 2700 steps &
-2 paired runs per method &
+Test persistence under longer optimization &
+124M & 2700 & $n=2$ &
 Muon, NorMuon, ASTRO, ORBIT \\
 
-Model-scale transfer &
-Evaluate transfer to a larger decoder &
-355M & 900 steps &
-2 paired runs per method &
+Scale transfer &
+Test transfer to a larger decoder &
+355M & 900 & $n=2$ &
 Muon, NorMuon, ASTRO, ORBIT \\
 \bottomrule
-\end{tabular}
-\end{table*}
+\end{tabularx}
+
+\vspace{0.35em}
+\footnotesize
+Broad hyperparameter selection used five discovery candidates per optimizer. The matched
+comparison used ten shared candidate configurations selected before the held-out runs. The
+final ablation followed a three-run pilot and used ten paired runs per control.
+\end{table}
 
 At 124M, 300, 900, and 2700 optimizer steps correspond to approximately 1.23M, 3.69M,
 and 11.06M sampled training tokens for the discovery, primary, and long-horizon regimes.
