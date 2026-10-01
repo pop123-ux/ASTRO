@@ -20,6 +20,7 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import statistics
 import subprocess
 import sys
@@ -339,6 +340,15 @@ def repair_missing_postscale_merges(work_dir: Path) -> None:
             f"from {len(sources)} persisted shard file(s)"
         )
         try:
+            repo_root = Path(__file__).resolve().parents[1]
+            env = os.environ.copy()
+            src_path = str(repo_root / "src")
+            current_pythonpath = env.get("PYTHONPATH")
+            env["PYTHONPATH"] = (
+                src_path
+                if not current_pythonpath
+                else src_path + os.pathsep + current_pythonpath
+            )
             subprocess.run(
                 [
                     sys.executable,
@@ -349,6 +359,7 @@ def repair_missing_postscale_merges(work_dir: Path) -> None:
                     source_phase,
                 ],
                 check=True,
+                env=env,
             )
         except subprocess.CalledProcessError as exc:
             raise SystemExit(
