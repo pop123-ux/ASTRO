@@ -245,6 +245,12 @@ def test_paper_presentation_contract():
     assert r"\usepackage{fontawesome5}" in main
     assert r"\href{https://github.com/pop123-ux}{\faGithub}" in main
     assert r"\href{https://github.com/pop123-ux/ORBIT}{\faGithub}" in main
+    assert "Toward Function-Aware Optimization" in main
+    assert r"\emph{function-aware optimization}" in main
+    assert "Additional development baseline" in main
+    assert "post-polar direction" in main
+    normalized_main = " ".join(main.split())
+    assert "not as a separate research contribution" in normalized_main
     assert "mechanism_summary.pdf" in main
     assert "transfer_summary.pdf" in main
     assert "orbit_overview.pdf" in methods
