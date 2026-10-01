@@ -249,7 +249,8 @@ def test_paper_presentation_contract():
     assert r"\emph{function-aware optimization}" in main
     assert "Additional development baseline" in main
     assert "post-polar direction" in main
-    assert "not as a separate research contribution" in main
+    normalized_main = " ".join(main.split())
+    assert "not as a separate research contribution" in normalized_main
     assert "mechanism_summary.pdf" in main
     assert "transfer_summary.pdf" in main
     assert "orbit_overview.pdf" in methods
