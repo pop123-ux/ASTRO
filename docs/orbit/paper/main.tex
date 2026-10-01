@@ -17,8 +17,8 @@
 \hypersetup{
   pdftitle={ORBIT: Function-Space Optimization for Rotary Query--Key Interactions},
   pdfauthor={Alexandru Pop},
-  pdfsubject={RoPE-aware query--key optimization for language-model training},
-  pdfkeywords={ORBIT, Muon, RoPE, optimization, attention, language models}
+  pdfsubject={Function-aware optimization for rotary query--key interactions},
+  pdfkeywords={ORBIT, Muon, RoPE, function-aware optimization, function-space optimization, attention, language models}
 }
 
 \IfFileExists{generated/macros.tex}{\input{generated/macros.tex}}{}
@@ -314,9 +314,7 @@ ORBIT introduces a training-time function-space preconditioner for rotary query-
 interactions. By constructing frequency-local metrics from Q/K statistics transported
 through RoPE relative-position rotations, ORBIT adapts Muon's matrix update to the
 computation performed by attention while leaving the model architecture and inference graph
-unchanged. In this sense, ORBIT is a concrete example of function-aware optimization:
-optimizer geometry is derived from the computation induced by the parameters, not only from
-the representation in which those parameters are stored.
+unchanged.
 
 Under identical hyperparameters selected from the same search grid, ORBIT lowers validation
 loss on \MatchedWins{} unseen seeds with a paired mean difference of \MatchedDelta{} nats
@@ -326,11 +324,11 @@ ablations attribute the effect to functional Q/K conditioning, RoPE-aware rotati
 persists at a longer training horizon and transfers to the 355M setting against Muon and
 NorMuon in the tested seeds.
 
-These results establish ORBIT as a concrete example of computation-aware matrix
-optimization: the update geometry is derived from the function of the parameter block
-rather than from matrix shape alone. The same principle suggests a broader direction for
-optimizers that incorporate architectural function while preserving standard model
-parameters and inference-time computation.
+Taken together, these results motivate \emph{function-aware optimization} as a broader
+design direction: optimizer geometry may be derived from the computation performed by a
+parameter block, not only from tensor shape or generic gradient statistics. ORBIT provides
+one concrete instantiation of this principle for rotary Q/K interactions while preserving
+standard model parameters and inference-time computation.
 
 \FloatBarrier
 \bibliographystyle{plain}
