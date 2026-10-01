@@ -10,7 +10,7 @@
 \usepackage{xcolor}
 \graphicspath{{figures/}}
 
-\title{ORBIT: Function-Space Optimization for Rotary Query--Key Interactions}
+\title{ORBIT: Function-Space Optimization for Rotary Query--Key Interactions\\[0.35em]\large\itshape Toward Function-Aware Optimization}
 \author{Alexandru Pop\\[-0.1em]\small Independent Researcher\\[-0.1em]\small \href{mailto:alexandrupp55@gmail.com}{alexandrupp55@gmail.com}\\[-0.15em]\small \href{https://github.com/pop123-ux}{\faGithub}}
 \date{}
 
@@ -43,6 +43,9 @@ recipes while revealing substantial sensitivity to recipe choice. Expanded ablat
 identify contributions from functional Q/K conditioning and RoPE-aware rotation.
 Longer-horizon and 355M experiments further show transfer beyond the primary setting
 against Muon and NorMuon in the tested seeds. ORBIT changes no inference-time computation.
+More broadly, the results motivate \emph{function-aware optimization} as a design principle:
+optimizer geometry can be derived from the computation performed by a parameter, not only
+from its tensor shape or gradient history.
 \end{abstract}
 
 \section{Introduction}
@@ -70,7 +73,10 @@ compact metric derived from the covariance of the opposite circuit after transpo
 fixed distribution of relative-position rotations. A single joint Frobenius restoration
 prevents this conditioning from winning merely by increasing the total Q/K step norm. The
 result is an optimizer-only modification whose unique operations are local $2\times2$
-matrix functions.
+matrix functions. This provides a concrete instance of \emph{function-aware optimization}:
+the optimizer uses the known computation in which Q/K parameters participate to define a
+local update geometry, rather than relying only on generic parameter shape or gradient
+statistics.
 
 Optimizer comparisons are unusually sensitive to tuning policy, making experimental design
 part of the contribution. The evaluation first crosses the frozen Muon and ORBIT recipes,
@@ -297,16 +303,20 @@ The transfer experiments use two seeds, and the 355M setting uses a smaller batc
 the 124M setting. Extending the evaluation to grouped-query attention, QK normalization,
 mixture-of-experts models, larger pretraining budgets, lower-overhead implementations, and
 controlled scaling studies on substantially larger-parameter models is a direct direction
-for future work. Independent replication and extension across broader architectures and
-compute regimes are encouraged, using the accompanying implementation as a basis for
-further investigation of function-space conditioning.
+for future work. More generally, ORBIT suggests a research program in which optimizer
+geometry is specialized to architectural computations whenever an inexpensive local
+functional metric can be derived. Independent replication and extension across broader
+architectures and compute regimes are encouraged, using the accompanying implementation as
+a basis for further investigation of function-space conditioning.
 
 \section{Conclusion}
 ORBIT introduces a training-time function-space preconditioner for rotary query--key
 interactions. By constructing frequency-local metrics from Q/K statistics transported
 through RoPE relative-position rotations, ORBIT adapts Muon's matrix update to the
 computation performed by attention while leaving the model architecture and inference graph
-unchanged.
+unchanged. In this sense, ORBIT is a concrete example of function-aware optimization:
+optimizer geometry is derived from the computation induced by the parameters, not only from
+the representation in which those parameters are stored.
 
 Under identical hyperparameters selected from the same search grid, ORBIT lowers validation
 loss on \MatchedWins{} unseen seeds with a paired mean difference of \MatchedDelta{} nats
