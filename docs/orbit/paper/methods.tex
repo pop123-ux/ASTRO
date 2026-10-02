@@ -103,38 +103,38 @@ their standard Muon or auxiliary AdamW path.}
 \label{fig:orbit-overview}
 \end{figure}}{}
 
-Algorithm~\ref{alg:orbit} gives the corresponding update for one attention layer. Standard
-Muon and auxiliary AdamW updates proceed unchanged for the remaining parameter classes.
+Algorithm~\ref{alg:orbit} gives the corresponding Q/K-pair update. Here
+$\epsilon=10^{-5}$ and $\mathcal D=\{1,2,4,8,16,32,64,128\}$ in the reported experiments.
 
 \begin{algorithm}[t]
 \caption{ORBIT update for a RoPE query--key projection pair}
 \label{alg:orbit}
-\DontPrintSemicolon
-\KwIn{$W_Q,W_K$; gradients $G_Q,G_K$; momentum $m_Q,m_K$; second moments $S_Q,S_K$;
-learning rate $\eta$; weight decay $\lambda$; momentum $\mu$; EMA $\beta$;
-displacements $\mathcal{D}$}
-\textbf{Forward statistics:} update $S_Q,S_K$ from current unrotated Q/K activations
-with EMA coefficient $\beta$\;
-$m_Q \leftarrow \mu m_Q+G_Q$;\quad $m_K \leftarrow \mu m_K+G_K$\;
-$U_Q \leftarrow \operatorname{MuonCandidate}(G_Q+\mu m_Q)$;\quad
-$U_K \leftarrow \operatorname{MuonCandidate}(G_K+\mu m_K)$\;
-\ForEach{attention head $h$ and RoPE frequency pair $f$}{
-  $M_{Q,f}\leftarrow |\mathcal{D}|^{-1}\sum_{\Delta\in\mathcal{D}}
-  R_f(-\Delta)S_{K,f}R_f(-\Delta)^\top + 10^{-5}I$\;
-  $M_{K,f}\leftarrow |\mathcal{D}|^{-1}\sum_{\Delta\in\mathcal{D}}
-  R_f(-\Delta)^\top S_{Q,f}R_f(-\Delta) + 10^{-5}I$\;
-  $T_{Q,f}\leftarrow \operatorname{InvSqrt}_{2\times2}(M_{Q,f})$;\quad
-  $T_{K,f}\leftarrow \operatorname{InvSqrt}_{2\times2}(M_{K,f})$\;
-  $\widehat U_{Q,f}\leftarrow T_{Q,f}U_{Q,f}$;\quad
-  $\widehat U_{K,f}\leftarrow T_{K,f}U_{K,f}$\;
-}
-$\rho\leftarrow
-\sqrt{(\|U_Q\|_F^2+\|U_K\|_F^2)/
-(\|\widehat U_Q\|_F^2+\|\widehat U_K\|_F^2)}$\;
-$\widetilde U_Q\leftarrow\rho\widehat U_Q$;\quad
-$\widetilde U_K\leftarrow\rho\widehat U_K$\;
-$W_Q\leftarrow(1-\eta\lambda)W_Q-\eta\widetilde U_Q$;\quad
-$W_K\leftarrow(1-\eta\lambda)W_K-\eta\widetilde U_K$\;
+\begin{algorithmic}[1]
+\Require Weights $W_Q,W_K$; gradients $G_Q,G_K$; unrotated activations $q,k$
+\Require State $m_Q,m_K,S_Q,S_K$; hyperparameters $\eta,\lambda,\mu,\beta,\epsilon,\mathcal D$
+\Ensure Updated $W_Q,W_K$ and state $m_Q,m_K,S_Q,S_K$
+\State $S_Q,S_K \gets \operatorname{EMASecondMoments}(S_Q,S_K;q,k;\beta)$
+\State $m_Q \gets \mu m_Q + G_Q$; \quad $m_K \gets \mu m_K + G_K$
+\State $U_Q \gets \operatorname{MuonCandidate}(G_Q+\mu m_Q)$
+\State $U_K \gets \operatorname{MuonCandidate}(G_K+\mu m_K)$
+\For{each attention head $h$ and RoPE frequency pair $f$}
+    \State $M_{Q,f} \gets |\mathcal D|^{-1}\!\sum_{\Delta\in\mathcal D}
+    R_f(-\Delta)S_{K,f}R_f(-\Delta)^\top+\epsilon I$
+    \State $M_{K,f} \gets |\mathcal D|^{-1}\!\sum_{\Delta\in\mathcal D}
+    R_f(-\Delta)^\top S_{Q,f}R_f(-\Delta)+\epsilon I$
+    \State $T_{Q,f} \gets \operatorname{InvSqrt}_{2\times2}(M_{Q,f})$
+    \State $T_{K,f} \gets \operatorname{InvSqrt}_{2\times2}(M_{K,f})$
+    \State $\widehat U_{Q,f} \gets T_{Q,f}U_{Q,f}$; \quad
+    $\widehat U_{K,f} \gets T_{K,f}U_{K,f}$
+\EndFor
+\State $\rho \gets
+\sqrt{\dfrac{\|U_Q\|_F^2+\|U_K\|_F^2}
+{\|\widehat U_Q\|_F^2+\|\widehat U_K\|_F^2}}$
+\State $\widetilde U_Q \gets \rho\widehat U_Q$; \quad
+$\widetilde U_K \gets \rho\widehat U_K$
+\State $W_Q \gets (1-\eta\lambda)W_Q-\eta\widetilde U_Q$
+\State $W_K \gets (1-\eta\lambda)W_K-\eta\widetilde U_K$
+\end{algorithmic}
 \end{algorithm}
 
 \subsection{Cost and ablation variants}
