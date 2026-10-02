@@ -83,6 +83,10 @@ def main() -> None:
             fail(f"missing source manifest for {phase}")
         if int(source.get("rows", -1)) != expected_rows:
             fail(f"{phase} has {source.get('rows')} rows, expected {expected_rows}")
+        if source.get("accepted") is not True:
+            fail(f"{phase} was not accepted by the strict evidence freeze")
+        if int(source.get("accepted_rows", -1)) != expected_rows:
+            fail(f"{phase} accepted {source.get('accepted_rows')} rows, expected {expected_rows}")
         if source.get("code_digests") != [digest]:
             fail(f"{phase} contains evidence from another implementation digest")
 
