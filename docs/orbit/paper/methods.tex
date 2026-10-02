@@ -31,13 +31,13 @@ and $R_f(j)$ to the key, so orthogonality of the RoPE rotations gives
 For an unrotated query perturbation $\delta q_f$,
 $\delta s_f=\delta q_f^\top R_f(-\Delta)k_f$. Therefore the expected squared score
 movement is a quadratic form whose metric depends on the opposite-side second moment. Let
-$C_{Q,f}$ and $C_{K,f}$ denote exponential-moving-average $2\times2$ uncentered second-moment matrices of the
+$S_{Q,f}$ and $S_{K,f}$ denote exponential-moving-average $2\times2$ uncentered second-moment matrices of the
 unrotated query and key coordinates. ORBIT defines
 \begin{align}
 M_{Q,f} &= \mathbb{E}_{\Delta}\!\left[
-R_f(-\Delta)C_{K,f}R_f(-\Delta)^\top\right],\\
+R_f(-\Delta)S_{K,f}R_f(-\Delta)^\top\right],\\
 M_{K,f} &= \mathbb{E}_{\Delta}\!\left[
-R_f(-\Delta)^\top C_{Q,f}R_f(-\Delta)\right].
+R_f(-\Delta)^\top S_{Q,f}R_f(-\Delta)\right].
 \label{eq:orbit-metrics}
 \end{align}
 The expectation is evaluated on the causal-distance grid
@@ -99,19 +99,19 @@ Muon and auxiliary AdamW updates proceed unchanged for the remaining parameter c
 \caption{ORBIT update for a RoPE query--key projection pair}
 \label{alg:orbit}
 \DontPrintSemicolon
-\KwIn{$W_Q,W_K$; gradients $G_Q,G_K$; momentum $m_Q,m_K$; second moments $C_Q,C_K$;
+\KwIn{$W_Q,W_K$; gradients $G_Q,G_K$; momentum $m_Q,m_K$; second moments $S_Q,S_K$;
 learning rate $\eta$; weight decay $\lambda$; momentum $\mu$; EMA $\beta$;
 displacements $\mathcal{D}$}
-\textbf{Forward statistics:} update $C_Q,C_K$ from current unrotated Q/K activations
+\textbf{Forward statistics:} update $S_Q,S_K$ from current unrotated Q/K activations
 with EMA coefficient $\beta$\;
 $m_Q \leftarrow \mu m_Q+G_Q$;\quad $m_K \leftarrow \mu m_K+G_K$\;
 $U_Q \leftarrow \operatorname{MuonCandidate}(G_Q+\mu m_Q)$;\quad
 $U_K \leftarrow \operatorname{MuonCandidate}(G_K+\mu m_K)$\;
 \ForEach{attention head $h$ and RoPE frequency pair $f$}{
   $M_{Q,f}\leftarrow |\mathcal{D}|^{-1}\sum_{\Delta\in\mathcal{D}}
-  R_f(-\Delta)C_{K,f}R_f(-\Delta)^\top + 10^{-5}I$\;
+  R_f(-\Delta)S_{K,f}R_f(-\Delta)^\top + 10^{-5}I$\;
   $M_{K,f}\leftarrow |\mathcal{D}|^{-1}\sum_{\Delta\in\mathcal{D}}
-  R_f(-\Delta)^\top C_{Q,f}R_f(-\Delta) + 10^{-5}I$\;
+  R_f(-\Delta)^\top S_{Q,f}R_f(-\Delta) + 10^{-5}I$\;
   $T_{Q,f}\leftarrow \operatorname{InvSqrt}_{2\times2}(M_{Q,f})$;\quad
   $T_{K,f}\leftarrow \operatorname{InvSqrt}_{2\times2}(M_{K,f})$\;
   $\widehat U_{Q,f}\leftarrow T_{Q,f}U_{Q,f}$;\quad
