@@ -202,67 +202,17 @@ Muon-selected setting is reused in the expanded ORBIT ablation.
 \subsection{Evaluation protocol}
 The evaluation is organized into complementary study blocks rather than a single benchmark:
 broad optimizer context, matched mechanism isolation, component ablations, and transfer
-across training horizon and model size. Table~\ref{tab:protocol} summarizes the design.
+across training horizon and model size. Figure~\ref{fig:protocol} summarizes the design.
 
-\begin{table}[t]
+\IfFileExists{figures/protocol_design.pdf}{%
+\begin{figure}[!t]
 \centering
-\caption{Experimental design. The primary estimate is the matched Muon--ORBIT comparison;
-the remaining experiments test recipe interaction, mechanism attribution, or transfer.}
-\label{tab:protocol}
-\small
-\setlength{\tabcolsep}{4pt}
-\renewcommand{\arraystretch}{1.12}
-\begin{tabularx}{\textwidth}{@{}
->{\raggedright\arraybackslash}p{2.05cm}
->{\raggedright\arraybackslash}X
->{\centering\arraybackslash}p{0.95cm}
->{\centering\arraybackslash}p{0.85cm}
->{\centering\arraybackslash}p{1.35cm}
->{\raggedright\arraybackslash}p{3.1cm}
-@{}}
-\toprule
-Experiment & Scientific purpose & Model & Steps & Replication & Compared methods \\
-\midrule
-Broad benchmark &
-Frozen-recipe optimizer comparison &
-124M & 900 & $n=5$ &
-AdamW, AdaMuon, Muon, NorMuon, ASTRO, ORBIT \\
-
-Crossed recipes &
-Separate update-rule and recipe effects &
-124M & 900 & $n=5$/cell &
-Muon, ORBIT \\
-
-\textbf{Matched confirmation} &
-\textbf{Mechanism-isolated primary comparison} &
-\textbf{124M} & \textbf{900} & \textbf{$n=10$ paired} &
-\textbf{Muon, ORBIT} \\
-
-Ablation &
-Attribute the functional, RoPE, and pair-coupling components &
-124M & 900 & $n=10$/control &
-ORBIT, identity, no-RoPE, diagonal \\
-
-Long-horizon transfer &
-Probe longer-horizon behavior &
-124M & 2700 & $n=2$ &
-Muon, NorMuon, ASTRO, ORBIT \\
-
-Scale transfer &
-Test transfer to a larger decoder &
-355M & 900 & $n=2$ &
-Muon, NorMuon, ASTRO, ORBIT \\
-\bottomrule
-\end{tabularx}
-
-\vspace{0.35em}
-\footnotesize
-Broad hyperparameter selection used five discovery candidates per optimizer. The matched
-comparison tuned Muon over ten deterministic candidate configurations on one fixed tuning
-seed; the lowest-loss Muon recipe was frozen before the held-out runs and then applied
-unchanged to both methods. The final ablation followed a
-three-run pilot and used ten paired runs per control.
-\end{table}
+\includegraphics[width=0.99\linewidth]{protocol_design.pdf}
+\caption{Experimental design and evidence hierarchy. The matched Muon--ORBIT comparison is
+the primary confirmatory analysis; the remaining studies provide contextual, mechanistic,
+or transfer evidence.}
+\label{fig:protocol}
+\end{figure}}{}%
 
 At 124M, 300, 900, and 2700 optimizer steps correspond to approximately 1.23M, 3.69M,
 and 11.06M sampled training tokens for the discovery, primary, and long-horizon regimes.
