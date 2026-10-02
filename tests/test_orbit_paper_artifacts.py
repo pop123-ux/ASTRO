@@ -294,6 +294,21 @@ def test_paper_presentation_contract():
         assert ambiguous_phrase not in main
 
 
+def test_manuscript_does_not_prejudge_corrected_result_direction():
+    main = (ROOT / "docs" / "orbit" / "paper" / "main.tex").read_text()
+    forbidden = (
+        "reproducible ORBIT effect",
+        "ORBIT improves on Muon",
+        "ORBIT update improves the objective",
+        "support the claim that relative-position-aware",
+        "ORBIT remains lower-loss",
+        "observed advantage",
+        "ORBIT improvement persists",
+    )
+    for phrase in forbidden:
+        assert phrase not in main, f"manuscript prejudges corrected evidence: {phrase}"
+
+
 def test_generated_macros_define_then_override(tmp_path):
     build_fixture(tmp_path)
     results, _ = paper.build(tmp_path)
