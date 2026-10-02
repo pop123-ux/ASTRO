@@ -244,9 +244,8 @@ auxiliary-rate policy. Five discovery trials are used per optimizer in the broad
 
 The primary Muon--ORBIT comparison uses ten deterministic 900-step candidate
 configurations drawn once from the Muon search space and evaluated for Muon on one fixed
-tuning seed. The lowest-loss Muon candidate, \MatchedSharedConfigID{}, is frozen before
-the ten held-out matched-confirmation seeds are evaluated and is then applied unchanged to
-both Muon and ORBIT. The same setting is reused in the expanded ORBIT ablation. Thus the
+tuning seed. The lowest-loss Muon candidate is frozen before the ten held-out matched-confirmation
+seeds are evaluated and is then applied unchanged to both Muon and ORBIT. The same setting is reused in the expanded ORBIT ablation. Thus the
 held-out comparison is an identical-recipe test in which ORBIT outcomes do not influence
 the primary recipe; its confidence interval remains conditional on the preceding Muon
 selection step.
@@ -318,7 +317,7 @@ Muon, NorMuon, ASTRO, ORBIT \\
 \vspace{0.35em}
 \begin{minipage}{0.98\linewidth}
 \small
-The Muon-selected configuration (\MatchedSharedConfigID{}) uses matrix learning rate
+The Muon-selected configuration uses matrix learning rate
 \MatchedSharedLR{}, weight decay \MatchedSharedWeightDecay{}, and auxiliary AdamW
 multiplier \MatchedSharedAuxMult{} (auxiliary learning rate \MatchedSharedAuxLR{}).
 Paired runs use the same run seed and therefore the same sampled training-window sequence;
