@@ -49,6 +49,22 @@ def test_rope_score_and_metric_use_same_causal_sign():
     assert torch.allclose(mk[0, 0], r.T @ q_cov @ r, atol=1e-6, rtol=1e-6)
 
 
+
+def test_autograd_query_score_gradient_matches_causal_rotation():
+    attn = RotaryAttention(tiny_config(n_embd=2), layer_idx=0)
+    q = torch.zeros(1, 1, 9, 2, requires_grad=True)
+    k = torch.zeros(1, 1, 9, 2)
+    with torch.no_grad():
+        q[0, 0, 8] = torch.tensor([0.8, -1.1])
+        k[0, 0, 0] = torch.tensor([1.7, 0.4])
+
+    score = attn._apply_rope(q)[0, 0, 8] @ attn._apply_rope(k)[0, 0, 0]
+    (grad_q,) = torch.autograd.grad(score, q)
+
+    r = attn._causal_relative_rotation(8)[0, 0]
+    expected = r @ k[0, 0, 0]
+    assert torch.allclose(grad_q[0, 0, 8], expected, atol=1e-6, rtol=1e-6)
+
 def test_negative_relative_distance_is_rejected():
     attn = RotaryAttention(tiny_config(n_embd=2), layer_idx=0)
     with pytest.raises(ValueError, match="causal distances"):
