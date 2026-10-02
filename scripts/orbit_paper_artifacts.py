@@ -283,6 +283,15 @@ def validate_matched_configs(merged: Path, phases: dict[str, list[dict]]) -> dic
     if best.get("selection_rule") != "muon_winner_from_shared_grid":
         raise ValueError("matched primary config was not frozen by the Muon-only selection rule")
 
+    for optimizer in ("muon", "orbit"):
+        record = best[optimizer]
+        if record.get("code_digest") != CORE_DIGEST:
+            raise ValueError(f"matched config for {optimizer} was frozen under a stale core digest")
+        if record.get("orchestration_digest") != POSTSCALE_DIGEST:
+            raise ValueError(
+                f"matched config for {optimizer} was frozen under a stale paper protocol"
+            )
+
     muon_cfg = best["muon"]["config"]
     orbit_cfg = best["orbit"]["config"]
     if muon_cfg != orbit_cfg:
