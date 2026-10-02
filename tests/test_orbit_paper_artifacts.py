@@ -272,9 +272,10 @@ def test_paper_ends_without_appendix_scaffolding():
     methods = (ROOT / "docs" / "orbit" / "paper" / "methods.tex").read_text()
     assert r"\subsection{Compute and reproducibility}" not in methods
     normalized = " ".join(methods.split())
-    assert "experiment records used for this study" in normalized
+    assert "experiment records used for this study" not in normalized
     assert "reproducibility artifacts" not in normalized
-    assert "automated consistency checks" in normalized
+    assert "automated consistency checks" not in normalized
+    assert "run-record format" not in normalized
 
 
 
@@ -303,10 +304,10 @@ def test_manuscript_uses_publication_facing_names_only():
     assert "Independent Researcher" in main
     assert "alexandrupp55@gmail.com" in main
     assert "FineWeb-Edu" in paper_text
+    assert "sample-10BT" in paper_text
 
     forbidden = (
         "HuggingFaceFW/fineweb-edu",
-        "sample-10BT",
         "shared-04",
         "de8b994a734276871770c6c67648117d3613d0954f3ae90d7e7b69246308c200",
         "astro_v2",
@@ -332,36 +333,36 @@ def test_paper_presentation_contract():
 
     assert "Independent Researcher" in main
     assert "alexandrupp55@gmail.com" in main
-    assert r"\usepackage{fontawesome5}" in main
-    assert r"\href{https://github.com/pop123-ux}{\faGithub}" in main
-    assert r"\href{https://github.com/pop123-ux/ORBIT}{\faGithub}" in main
+    assert r"\usepackage{fontawesome5}" not in main
+    assert r"\faGithub" not in main
     assert "Toward Function-Aware Optimization" in main
     assert r"\emph{function-aware optimization}" in main
     assert r"R_f(-\Delta)" in main
     assert r"R_f(-\Delta)" in methods
     assert r"R_f(\Delta)C_{K,f}" not in methods
-    assert "inference-time computation" not in main
-    assert "inference graph" not in main
-    assert "inference graph" not in methods
-    assert "Additional development baseline" in main
-    assert "post-polar direction" in main
-    normalized_main = " ".join(main.split())
-    assert "not as a separate research contribution" in normalized_main
-    assert "mechanism_attribution.pdf" in main
-    assert "long_horizon_transfer.pdf" in main
-    assert "scale_transfer.pdf" in main
-    assert "mechanism_summary.pdf" not in main
-    assert "transfer_summary.pdf" not in main
+    assert "Additional development baseline" not in main
+    assert "mechanism_summary.pdf" in main
+    assert "transfer_summary.pdf" in main
+    assert "broad_confirmation.pdf" in main
+    assert "mechanism_attribution.pdf" not in main
+    assert "long_horizon_transfer.pdf" not in main
+    assert "scale_transfer.pdf" not in main
     assert "orbit_overview.pdf" in methods
 
     paper_text = main + "\n" + methods
     for token in (
         "HuggingFaceFW/fineweb-edu",
-        "sample-10BT",
         "shared-04",
         "de8b994a",
+        "JSONL",
     ):
         assert token not in paper_text
+
+    assert "FineWeb-Edu" in paper_text
+    assert "sample-10BT" in paper_text
+    assert "Muon alone is tuned" in main
+    assert "Muon discovery recipe" in main
+    assert "ORBIT discovery recipe" in main
 
     for ambiguous_phrase in (
         "Knight studies",
