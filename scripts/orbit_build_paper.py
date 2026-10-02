@@ -351,6 +351,29 @@ def write_broad_table(results: dict, generated: Path) -> None:
     generated.joinpath("table_broad.tex").write_text("\n".join(lines) + "\n")
 
 
+def write_status(manifest: dict, generated: Path) -> None:
+    path = generated / "status.tex"
+    if manifest.get("status") == "paper_ready" and not manifest.get("warnings") and not manifest.get("missing"):
+        path.write_text("% AUTO-GENERATED. Strict evidence freeze passed.\n")
+        return
+
+    details = []
+    if manifest.get("missing"):
+        details.append("required experiment artifacts are missing")
+    if manifest.get("warnings"):
+        details.append("invalid or stale experiment phases were excluded")
+    suffix = "; ".join(details) if details else "strict evidence freeze is incomplete"
+    path.write_text(
+        "\\begin{center}\n"
+        "\\fbox{\\begin{minipage}{0.94\\linewidth}\\small\\textbf{"
+        "DRAFT --- corrected evidence incomplete.} "
+        "Invalid or stale experiment phases were excluded from release claims; "
+        + suffix.replace("_", "\\_")
+        + ".\\end{minipage}}\n"
+        "\\end{center}\n"
+    )
+
+
 def write_claim_ledger(results: dict, manifest: dict, artifact_dir: Path) -> None:
     lines = [
         "# ORBIT paper claim ledger",
@@ -358,17 +381,17 @@ def write_claim_ledger(results: dict, manifest: dict, artifact_dir: Path) -> Non
         f"Evidence freeze status: **{manifest['status']}**",
         f"Core experiment digest: `{manifest['core_digest']}`",
         "",
-        "## Primary supported claim",
+        "## Primary comparison",
     ]
     mc = results.get("matched_confirmation")
     if mc:
         e = mc["orbit_vs_muon"]
         lines += [
-            f"- Under the same frozen hyperparameter configuration, ORBIT beats Muon on "
-            f"{e['a_wins']}/{e['n']} held-out seeds.",
-            f"- Paired mean validation-loss difference: **{e['mean_delta']:.6f}**; "
+            f"- ORBIT-minus-Muon validation-loss difference: **{e['mean_delta']:.6f}**; "
             f"95% CI **[{e['ci95'][0]:.6f}, {e['ci95'][1]:.6f}]**.",
-            f"- Mean wall-clock overhead: **{100*mc['runtime_overhead_fraction']:.1f}%**; "
+            f"- ORBIT has lower loss on **{e['a_wins']}/{e['n']}** paired held-out seeds; "
+            f"Muon has lower loss on **{e['b_wins']}/{e['n']}**.",
+            f"- Mean wall-clock difference: **{100*mc['runtime_overhead_fraction']:.1f}%**; "
             f"peak-memory difference: **{100*mc['memory_overhead_fraction']:.1f}%**.",
         ]
 
@@ -376,52 +399,48 @@ def write_claim_ledger(results: dict, manifest: dict, artifact_dir: Path) -> Non
     if x:
         lines += [
             "",
-            "## Hyperparameter-confound finding",
-            f"- ORBIT vs Muon at Muon config: {x['mechanism_at_muon_config']['mean_delta']:.6f}.",
-            f"- ORBIT vs Muon at ORBIT config: {x['mechanism_at_orbit_config']['mean_delta']:.6f}.",
-            "- The original independently tuned gap must not be presented as a pure "
-            "algorithmic effect; optimizer and recipe interact.",
+            "## Crossed discovery recipes",
+            f"- ORBIT-minus-Muon at the Muon discovery recipe: "
+            f"{x['mechanism_at_muon_config']['mean_delta']:.6f}.",
+            f"- ORBIT-minus-Muon at the ORBIT discovery recipe: "
+            f"{x['mechanism_at_orbit_config']['mean_delta']:.6f}.",
+            f"- Optimizer-by-recipe interaction: "
+            f"{x['optimizer_by_config_interaction']['mean_interaction']:.6f}.",
         ]
 
     ab = results.get("mechanism_ablation")
     if ab:
-        lines += [
-            "",
-            "## Mechanism claims",
-            f"- Full vs identity: Delta={ab['orbit_vs_identity']['mean_delta']:.6f}, "
-            f"wins {ab['orbit_vs_identity']['a_wins']}/{ab['orbit_vs_identity']['n']}.",
-            f"- Full vs no-RoPE: Delta={ab['orbit_vs_norope']['mean_delta']:.6f}, "
-            f"wins {ab['orbit_vs_norope']['a_wins']}/{ab['orbit_vs_norope']['n']}.",
-            f"- Full vs diagonal: Delta={ab['orbit_vs_diag']['mean_delta']:.6f}, "
-            f"95% CI {ab['orbit_vs_diag']['ci95']}.",
-            "- Functional Q/K conditioning is supported; RoPE-aware conditioning has "
-            "additional support; necessity of full off-diagonal coupling is not established.",
-        ]
+        lines += ["", "## Mechanism ablations"]
+        for label, key in (
+            ("identity", "orbit_vs_identity"),
+            ("no-RoPE", "orbit_vs_norope"),
+            ("diagonal", "orbit_vs_diag"),
+        ):
+            e = ab[key]
+            lines.append(
+                f"- Full ORBIT minus {label}: {e['mean_delta']:.6f}; "
+                f"95% CI [{e['ci95'][0]:.6f}, {e['ci95'][1]:.6f}]; "
+                f"ORBIT lower on {e['a_wins']}/{e['n']} pairs."
+            )
 
     horizon = results.get("long_horizon_transfer")
     scale = results.get("scale_transfer")
-    if horizon and scale:
-        lines += [
-            "",
-            "## Secondary transfer evidence",
-            f"- 124M/2700: ORBIT - ASTRO = "
-            f"{horizon['orbit_vs_astro_v2']['mean_delta']:.6f} over n=2 paired seeds.",
-            f"- 355M/900: ORBIT - ASTRO = "
-            f"{scale['orbit_vs_astro_v2']['mean_delta']:.6f}; one seed favors each method.",
-            "- Treat both as transfer evidence, not high-powered significance tests.",
-        ]
+    if horizon or scale:
+        lines += ["", "## Descriptive transfer checks"]
+    if horizon:
+        lines.append(
+            f"- 124M/2700 ORBIT-minus-ASTRO: "
+            f"{horizon['orbit_vs_astro_v2']['mean_delta']:.6f} over n=2 paired seeds."
+        )
+    if scale:
+        lines.append(
+            f"- 355M/900 ORBIT-minus-ASTRO: "
+            f"{scale['orbit_vs_astro_v2']['mean_delta']:.6f} over n=2 paired seeds."
+        )
+    if horizon or scale:
+        lines.append("- These are descriptive transfer checks, not high-powered inferential tests.")
 
-    lines += [
-        "",
-        "## Explicit non-claims",
-        "- Do not claim the original ~0.14 ORBIT-vs-Muon gap is entirely algorithmic.",
-        "- Do not claim off-diagonal 2x2 phase coupling is necessary.",
-        "- Do not claim ORBIT beats ASTRO at 355M.",
-        "- Do not claim the advantage grows with model scale; the 355M batch/token regime differs.",
-        "- Do not convert the n=2 horizon/scale intervals into strong inferential claims.",
-        "",
-        "## Manuscript evidence order",
-    ]
+    lines += ["", "## Manuscript evidence order"]
     for idx, item in enumerate(results.get("evidence_order", []), start=1):
         lines.append(f"{idx}. {item.replace('_', ' ')}")
     artifact_dir.joinpath("claim_ledger.md").write_text("\n".join(lines) + "\n")
@@ -436,6 +455,7 @@ def write_generated(results: dict, paper_dir: Path, artifact_dir: Path, manifest
     write_ablation_table(results, generated)
     write_transfer_table(results, generated)
     write_broad_table(results, generated)
+    write_status(manifest, generated)
     write_claim_ledger(results, manifest, artifact_dir)
 
     compatibility = [
