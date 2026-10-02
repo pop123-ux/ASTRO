@@ -247,6 +247,12 @@ def test_paper_presentation_contract():
     assert r"\href{https://github.com/pop123-ux/ORBIT}{\faGithub}" in main
     assert "Toward Function-Aware Optimization" in main
     assert r"\emph{function-aware optimization}" in main
+    assert r"R_f(-\Delta)" in main
+    assert r"R_f(-\Delta)" in methods
+    assert r"R_f(\Delta)C_{K,f}" not in methods
+    assert "inference-time computation" not in main
+    assert "inference graph" not in main
+    assert "inference graph" not in methods
     assert "Additional development baseline" in main
     assert "post-polar direction" in main
     normalized_main = " ".join(main.split())
