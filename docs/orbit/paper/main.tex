@@ -166,7 +166,7 @@ reached mean validation loss
 The paired ORBIT-minus-Muon difference was \MatchedDelta{} nats, with a 95\% confidence
 interval of [\MatchedCILow{}, \MatchedCIHigh{}].
 ORBIT has the lower validation loss on \MatchedWins{} of the ten held-out paired runs
-(Figure~\ref{fig:matched}). Because the two methods use the same Muon-selected frozen configuration, this contrast
+(Figure~\ref{fig:matched-summary}). Because the two methods use the same Muon-selected frozen configuration, this contrast
 estimates the update-rule difference without allowing ORBIT's tuning outcomes to influence
 the primary recipe.
 
@@ -183,15 +183,7 @@ descriptive statistics from the paired ORBIT-minus-Muon effect estimate.}
 \label{fig:matched-summary}
 \end{figure}}{}%
 
-\IfFileExists{figures/matched_effect.pdf}{%
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.78\linewidth]{matched_effect.pdf}
-\caption{Primary matched-hyperparameter result. Circles show paired held-out run
-differences; the diamond shows the paired mean with its 95\% confidence interval. Negative
-values favor ORBIT.}
-\label{fig:matched}
-\end{figure}}{}
+
 
 \subsection{Hyperparameter recipe accounts for a substantial part of the broad gap}
 The optimizer-by-configuration cross-over makes the tuning confound explicit. When both
