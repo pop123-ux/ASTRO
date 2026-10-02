@@ -154,8 +154,9 @@ optimizer in a paired setting sees the same validation windows.
 \label{sec:training-setup}
 All optimizers use the same warmup--cosine multiplier. The first 10\% of steps are warmup;
 the remaining schedule follows a cosine decay ending at $0.1$ times the peak learning rate.
-The same multiplier is applied to every learning-rate field, including the auxiliary AdamW
-path. Global gradient norm is clipped at 1.0. Training uses CUDA autocast in float16 with
+For ORBIT, the auxiliary AdamW rate is stored as a fixed ratio to the matrix learning rate,
+so scheduling the matrix rate applies the identical multiplier to both paths. Global gradient
+norm is clipped at 1.0. Training uses CUDA autocast in float16 with
 gradient scaling. The 124M model uses batch size 8 (4,096 sampled tokens per optimizer
 step); the 355M model uses batch size 4 (2,048 sampled tokens per step). The latter
 difference is disclosed because it prevents interpreting the 355M result as a pure
