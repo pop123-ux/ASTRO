@@ -343,10 +343,10 @@ def test_paper_presentation_contract():
     assert "inference-time computation" not in main
     assert "inference graph" not in main
     assert "inference graph" not in methods
-    assert "Additional development baseline" in main
+    assert r"\paragraph{ASTRO development baseline.}" in main
     assert "post-polar direction" in main
     normalized_main = " ".join(main.split())
-    assert "not as a separate research contribution" in normalized_main
+    assert "is not presented as a separate research contribution" in normalized_main
     assert "mechanism_summary.pdf" in main
     assert "transfer_summary.pdf" in main
     assert "orbit_overview.pdf" in methods
@@ -403,6 +403,48 @@ def test_generated_claim_ledger_is_outcome_neutral(tmp_path):
 
     assert "ORBIT-minus-Muon validation-loss difference" in ledger
     assert "descriptive transfer checks" in ledger
+
+
+def test_paper_method_and_protocol_contract_are_explicit():
+    main = (ROOT / "docs" / "orbit" / "paper" / "main.tex").read_text()
+    methods = (ROOT / "docs" / "orbit" / "paper" / "methods.tex").read_text()
+    paper_text = main + "\n" + methods
+
+    # Mathematical convention: causal distance Delta=i-j>=0 implies R(-Delta).
+    assert r"R_f(-\Delta)" in methods
+    assert r"R_f(\Delta)C_{K,f}" not in methods
+    assert "uncentered second-moment" in methods
+
+    # Scope of the approximation: the 2x2 factor is not presented as a complete
+    # parameter-space pullback or exact second-order metric.
+    assert "output-coordinate factors" in methods
+    assert "not complete" in methods
+    assert "parameter-space pullbacks" in methods
+    assert "input activation" in methods
+    assert "not a full-model Fisher" in methods
+
+    # Primary confirmatory recipe selection is baseline-only and frozen before
+    # any held-out ORBIT comparison.
+    normalized = " ".join(paper_text.split())
+    assert "Muon alone is tuned over a predeclared ten-candidate grid" in normalized
+    assert "lowest-loss Muon candidate is frozen" in normalized
+    assert "ORBIT outcomes therefore do not influence the primary recipe" in normalized
+
+    # main.tex is typeset before methods.tex, where Table 1 lives. Keeping the
+    # ASTRO definition in main.tex guarantees it is introduced before that table.
+    assert r"\paragraph{ASTRO development baseline.}" in main
+    assert "ASTRO is a frozen Muon-family development baseline" in main
+    assert r"\label{tab:protocol}" in methods
+
+    # Transfer cells stay secondary; the paper must not hard-code success language.
+    assert "transfer evaluation" in main
+    for phrase in (
+        "transfer evidence",
+        "observed advantage",
+        "ORBIT improves on Muon",
+        "ORBIT remains lower-loss",
+    ):
+        assert phrase not in main
 
 
 def test_generated_macros_define_then_override(tmp_path):
