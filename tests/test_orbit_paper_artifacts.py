@@ -119,6 +119,7 @@ def build_fixture(tmp_path: Path) -> None:
             "config": dict(CFG),
             "config_id": "shared-04",
             "code_digest": paper.CORE_DIGEST,
+            "orchestration_digest": paper.POSTSCALE_DIGEST,
             "selected_by": "muon",
         },
     }
