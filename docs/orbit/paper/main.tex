@@ -321,13 +321,12 @@ interactions. By constructing frequency-local metrics from Q/K statistics transp
 through causal RoPE relative-position rotations, ORBIT adapts Muon's matrix update to the
 computation performed by attention.
 
-Under identical hyperparameters selected from the same search grid, ORBIT lowers validation
-loss on \MatchedWins{} unseen seeds with a paired mean difference of \MatchedDelta{} nats
-and a 95\% confidence interval of [\MatchedCILow{}, \MatchedCIHigh{}]. Cross-configuration
-experiments show that the improvement is present under both frozen recipes, and the expanded
-ablations attribute the effect to functional Q/K conditioning, RoPE-aware rotation, and an additional contribution from full frequency-pair coupling. The advantage also
-persists at a longer training horizon and transfers to the 355M setting against Muon and
-NorMuon in the tested seeds.
+Under identical hyperparameters selected from the same search grid, the primary experiment
+measures the paired ORBIT--Muon effect on ten held-out seeds. Cross-configuration and
+ablation experiments separate recipe sensitivity from the contributions of functional Q/K
+conditioning, RoPE-aware transport, and full frequency-pair coupling. Longer-horizon and
+355M cells are retained as secondary transfer checks rather than as extensions of the
+primary effect-size estimate.
 
 Taken together, these results motivate \emph{function-aware optimization} as a broader
 design direction: optimizer geometry may be derived from the computation performed by a
