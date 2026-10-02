@@ -161,7 +161,7 @@ held-out comparison. The lowest-loss Muon candidate is frozen and then applied u
 both Muon and ORBIT on the held-out paired seeds. Under that shared configuration, Muon
 reached mean validation loss
 \MatchedMuonLoss{} and ORBIT reached \MatchedOrbitLoss{} across ten new paired seeds
-(Table~\ref{tab:matched}).
+(Figure~\ref{fig:matched-summary}).
 
 The paired ORBIT-minus-Muon difference was \MatchedDelta{} nats, with a 95\% confidence
 interval of [\MatchedCILow{}, \MatchedCIHigh{}].
@@ -173,7 +173,15 @@ the primary recipe.
 The mean wall-clock-time difference is \MatchedRuntimeOverhead{} relative to Muon, and
 the recorded peak CUDA-allocation difference is \MatchedMemoryOverhead{}.
 
-\IfFileExists{generated/table_matched.tex}{\input{generated/table_matched.tex}}{}
+\IfFileExists{figures/primary_results_panel.pdf}{%
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.98\linewidth]{primary_results_panel.pdf}
+\caption{Primary matched-hyperparameter confirmation on ten held-out paired runs. Both
+optimizers use the same Muon-selected configuration. The panel separates optimizer-level
+descriptive statistics from the paired ORBIT-minus-Muon effect estimate.}
+\label{fig:matched-summary}
+\end{figure}}{}%
 
 \IfFileExists{figures/matched_effect.pdf}{%
 \begin{figure}[t]
