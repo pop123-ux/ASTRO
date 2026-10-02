@@ -472,10 +472,12 @@ def generate_plots(work_dir: Path, allow_incomplete: bool) -> None:
     out = work_dir / "paper_artifacts" / "figures"
     out.mkdir(parents=True, exist_ok=True)
 
-    # Method overview is data-independent and is always generated with the paper.
+    # Data-independent visual summaries generated with every paper build.
     orbit_plot.plot_orbit_overview(out)
+    orbit_plot.plot_protocol_design(out)
 
     if "matched_confirmation" in results:
+        orbit_plot.plot_primary_results_panel(results, out)
         orbit_plot.plot_matched_effect(results, out)
 
     if (
