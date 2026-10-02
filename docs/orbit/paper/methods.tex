@@ -44,7 +44,14 @@ The expectation is approximated by a uniform average over the fixed log-spaced
 causal-distance grid
 $\mathcal{D}=\{1,2,4,8,16,32,64,128\}$. This is a design approximation rather than an
 empirical estimate of the token-pair distance distribution: activation second moments are
-estimated over tokens, then transported across the chosen distance grid. Second moments are
+estimated over tokens, then transported across the chosen distance grid.
+
+The resulting $M_{Q,f}$ and $M_{K,f}$ are output-coordinate factors, not complete
+parameter-space pullbacks. For example, $\delta q_f=\delta W_{Q,f}x$ means an exact
+quadratic metric on $\delta W_{Q,f}$ would also contain statistics of the input activation
+$x$. ORBIT deliberately keeps only the frequency-local $2\times2$ output-side factor and
+applies it as a left preconditioner. This is the tractable local approximation evaluated in
+the experiments. Second moments are
 updated once per logical training step with EMA coefficient $\beta=0.95$ after the first
 observation. In the 355M runs, gradient-checkpoint recomputation is excluded from statistics
 collection so that checkpointing does not change the EMA cadence.
