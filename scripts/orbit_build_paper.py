@@ -166,7 +166,7 @@ def write_matched_table(results: dict, generated: Path) -> None:
         "\\begin{table}[H]",
         "\\centering",
         "\\caption{Primary matched-hyperparameter confirmation on ten held-out paired runs. "
-        "The same configuration was the lowest-loss shared-grid candidate for both optimizers.}",
+        "The configuration was selected by Muon and then applied unchanged to both optimizers.}",
         "\\label{tab:matched}",
         "\\small",
         "\\setlength{\\tabcolsep}{6pt}",
@@ -207,7 +207,7 @@ def write_matched_table(results: dict, generated: Path) -> None:
         "\\footnotesize",
         "Wall time includes training and the fixed 20-batch validation pass. "
         "Peak CUDA allocation is reported in GiB. The confidence interval is conditional "
-        "on the selected shared recipe and does not include recipe-selection uncertainty.",
+        "on the selected Muon recipe and does not include recipe-selection uncertainty.",
         "\\end{minipage}",
         "\\end{table}",
     ]
