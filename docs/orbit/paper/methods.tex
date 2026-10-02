@@ -44,7 +44,14 @@ The expectation is approximated by a uniform average over the fixed log-spaced
 causal-distance grid
 $\mathcal{D}=\{1,2,4,8,16,32,64,128\}$. This is a design approximation rather than an
 empirical estimate of the token-pair distance distribution: activation second moments are
-estimated over tokens, then transported across the chosen distance grid. Second moments are
+estimated over tokens, then transported across the chosen distance grid.
+
+The resulting $M_{Q,f}$ and $M_{K,f}$ are output-coordinate factors, not complete
+parameter-space pullbacks. For example, $\delta q_f=\delta W_{Q,f}x$ means an exact
+quadratic metric on $\delta W_{Q,f}$ would also contain statistics of the input activation
+$x$. ORBIT deliberately keeps only the frequency-local $2\times2$ output-side factor and
+applies it as a left preconditioner. This is the tractable local approximation evaluated in
+the experiments. Second moments are
 updated once per logical training step with EMA coefficient $\beta=0.95$ after the first
 observation. In the 355M runs, gradient-checkpoint recomputation is excluded from statistics
 collection so that checkpointing does not change the EMA cadence.
@@ -187,7 +194,8 @@ auxiliary-rate policy. Five discovery trials are used per optimizer in the broad
 
 The primary Muon--ORBIT comparison uses a stricter baseline-selected policy: ten
 deterministic 900-step candidate configurations are generated once from the Muon search
-space and evaluated for Muon only. The lowest-loss Muon candidate is frozen before any
+space and evaluated for Muon on one fixed tuning seed. The lowest-loss Muon candidate is
+frozen before any
 held-out matched-confirmation seed is evaluated, then applied unchanged to both Muon and
 ORBIT. ORBIT outcomes therefore do not influence the primary recipe. The same
 Muon-selected setting is reused in the expanded ORBIT ablation.
@@ -237,7 +245,7 @@ Attribute the functional, RoPE, and pair-coupling components &
 ORBIT, identity, no-RoPE, diagonal \\
 
 Long-horizon transfer &
-Test persistence under longer optimization &
+Probe longer-horizon behavior &
 124M & 2700 & $n=2$ &
 Muon, NorMuon, ASTRO, ORBIT \\
 
@@ -251,8 +259,9 @@ Muon, NorMuon, ASTRO, ORBIT \\
 \vspace{0.35em}
 \footnotesize
 Broad hyperparameter selection used five discovery candidates per optimizer. The matched
-comparison tuned Muon over ten deterministic candidate configurations; the lowest-loss
-Muon recipe was frozen before the held-out runs and then applied unchanged to both methods. The final ablation followed a
+comparison tuned Muon over ten deterministic candidate configurations on one fixed tuning
+seed; the lowest-loss Muon recipe was frozen before the held-out runs and then applied
+unchanged to both methods. The final ablation followed a
 three-run pilot and used ten paired runs per control.
 \end{table}
 
@@ -265,9 +274,11 @@ batch size.
 The primary estimand is the paired per-run validation-loss difference, ORBIT minus the
 comparison method. Reported statistics include the paired mean, sample standard deviation,
 paired-run win count, and a two-sided 95\% Student-$t$ confidence interval for the mean
-paired difference. The matched Muon--ORBIT comparison is the primary confirmatory contrast;
-ablations provide mechanism attribution, while the long-horizon and 355M experiments assess
-transfer. Wall-clock time and peak GPU-memory allocation are reported alongside loss.
+paired difference. The matched Muon--ORBIT comparison is the sole primary confirmatory contrast.
+Ablation intervals are secondary mechanism analyses and are reported without multiplicity
+adjustment; the long-horizon and 355M cells are descriptive transfer checks rather than
+high-powered inferential tests. Wall-clock time and peak GPU-memory allocation are reported
+alongside loss.
 
 All final comparisons use the same frozen implementation and a consistent run-record format.
 Optimizer settings, random seeds, environment metadata, validation metrics, runtime,

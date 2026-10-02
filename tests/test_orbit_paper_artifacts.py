@@ -359,6 +359,27 @@ def test_manuscript_does_not_prejudge_corrected_result_direction():
         assert phrase not in main, f"manuscript prejudges corrected evidence: {phrase}"
 
 
+def test_generated_claim_ledger_is_outcome_neutral(tmp_path):
+    build_fixture(tmp_path)
+    results, manifest = paper.build(tmp_path)
+    build_paper.write_claim_ledger(results, manifest, tmp_path)
+
+    ledger = (tmp_path / "claim_ledger.md").read_text()
+    forbidden = (
+        "ORBIT beats Muon",
+        "one seed favors each method",
+        "Functional Q/K conditioning is supported",
+        "ORBIT beats ASTRO",
+        "advantage grows with model scale",
+        "original ~0.14",
+    )
+    for phrase in forbidden:
+        assert phrase not in ledger
+
+    assert "ORBIT-minus-Muon validation-loss difference" in ledger
+    assert "descriptive transfer checks" in ledger
+
+
 def test_generated_macros_define_then_override(tmp_path):
     build_fixture(tmp_path)
     results, _ = paper.build(tmp_path)
