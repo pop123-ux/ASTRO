@@ -202,6 +202,55 @@ def test_standard_scheduler_scales_auxiliary_path():
     assert optimizer.auxiliary_lr() == pytest.approx(before * 0.1)
 
 
+
+
+def test_paper_lr_schedule_scales_orbit_matrix_and_auxiliary_paths_together():
+    model = OrbitGPT(tiny_config())
+    optimizer = Orbit(model, lr=0.02, adamw_lr=0.004)
+    paper_campaign.schedule_optimizer_lrs(optimizer, 0.25)
+
+    assert optimizer.param_groups[0]["lr"] == pytest.approx(0.005)
+    assert optimizer.auxiliary_lr() == pytest.approx(0.001)
+
+
+def test_identity_matches_paper_muon_under_the_paper_lr_schedule():
+    config = tiny_config(n_head=1, n_embd=16, bias=False)
+    torch.manual_seed(41)
+    orbit_model = OrbitGPT(config)
+    muon_model = OrbitGPT(config)
+    muon_model.load_state_dict(orbit_model.state_dict())
+
+    recipe = {"lr": 0.01, "scalar_lr_mult": 0.1, "weight_decay": 0.02}
+    orbit_opt = Orbit(
+        orbit_model,
+        variant="orbit_identity",
+        lr=recipe["lr"],
+        adamw_lr=recipe["lr"] * recipe["scalar_lr_mult"],
+        weight_decay=recipe["weight_decay"],
+    )
+    muon_opt = paper_campaign.paper_build_optimizer("muon", muon_model, recipe)
+
+    generator = torch.Generator().manual_seed(43)
+    for step in range(5):
+        factor = 0.2 + 0.15 * step
+        paper_campaign.schedule_optimizer_lrs(orbit_opt, factor)
+        paper_campaign.schedule_optimizer_lrs(muon_opt, factor)
+
+        x = torch.randint(0, config.vocab_size, (2, 12), generator=generator)
+        orbit_loss = orbit_model(x, labels=x).loss
+        muon_loss = muon_model(x, labels=x).loss
+        assert torch.equal(orbit_loss, muon_loss)
+
+        orbit_loss.backward()
+        muon_loss.backward()
+        orbit_opt.step()
+        muon_opt.step()
+        orbit_opt.zero_grad(set_to_none=True)
+        muon_opt.zero_grad(set_to_none=True)
+
+    for orbit_param, muon_param in zip(orbit_model.parameters(), muon_model.parameters()):
+        assert torch.equal(orbit_param, muon_param)
+
 def _ddp_worker(rank: int, world_size: int, port: int) -> None:
     dist.init_process_group(
         "gloo",
