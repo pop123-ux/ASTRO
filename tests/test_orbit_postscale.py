@@ -34,6 +34,14 @@ def write_matched_best(tmp_path: Path) -> None:
     (merged / "matched_best_configs.json").write_text(json.dumps(best))
 
 
+def test_matched_candidate_grid_snapshot():
+    assert post.matched_candidate(0) == {
+        "lr": 0.002510810677061948,
+        "weight_decay": 0.09862407335797245,
+        "scalar_lr_mult": 0.028701450292747916,
+    }
+
+
 def test_matched_tune_uses_ten_muon_candidates_only(tmp_path):
     tasks = post.make_tasks("matched_tune", work_dir=tmp_path)
     assert len(tasks) == 10
