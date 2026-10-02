@@ -167,7 +167,7 @@ def write_matched_table(results: dict, generated: Path) -> None:
         "\\begin{table}[H]",
         "\\centering",
         "\\caption{Primary matched-hyperparameter confirmation on ten held-out paired runs. "
-        "Both optimizers use the same frozen shared-grid winner.}",
+        "Both optimizers use the same configuration selected from the shared tuning grid.}",
         "\\label{tab:matched}",
         "\\small",
         "\\setlength{\\tabcolsep}{6pt}",
@@ -192,7 +192,7 @@ def write_matched_table(results: dict, generated: Path) -> None:
         "\\end{tabular}",
         "\\vspace{0.55em}",
         "",
-        "\\begin{tabular}{l c S[table-format=-1.4] S[table-format=1.4] c c}",
+        "\\begin{tabular}{l c S[table-format=+1.4] S[table-format=1.4] c c}",
         "\\toprule",
         "\\multicolumn{6}{l}{\\textit{Paired contrast}} \\\\",
         "\\addlinespace[0.2em]",
@@ -206,7 +206,8 @@ def write_matched_table(results: dict, generated: Path) -> None:
         "",
         "\\begin{minipage}{0.96\\linewidth}",
         "\\footnotesize",
-        f"Shared recipe ({tex_escape(mc['shared_config_id'])}): matrix learning rate "
+        f"Both methods selected {tex_escape(mc['shared_config_id'])} from the same 10-candidate tuning grid. "
+        f"The frozen shared recipe uses matrix learning rate "
         f"{cfg['lr']:.6g}, weight decay {cfg['weight_decay']:.6g}, and auxiliary AdamW "
         f"multiplier {cfg['scalar_lr_mult']:.6g} (auxiliary learning rate "
         f"{cfg['lr'] * cfg['scalar_lr_mult']:.6g}). Wall time includes training and the "
