@@ -153,8 +153,9 @@ class RotaryAttention(nn.Module):
 
             q_i^T R(j-i) k_j = q_i^T R(-delta) k_j.
 
-        A Q perturbation therefore sees R(-delta) C_k R(-delta)^T, while a K
-        perturbation sees R(-delta)^T C_q R(-delta).
+        A Q perturbation therefore sees R(-delta) S_k R(-delta)^T, while a K
+        perturbation sees R(-delta)^T S_q R(-delta), where S denotes the
+        uncentered second moment of the opposite-side activation pair.
         """
         q_second_moment = self.orbit_q_second_moment.float()
         k_second_moment = self.orbit_k_second_moment.float()
