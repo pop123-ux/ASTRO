@@ -194,7 +194,8 @@ auxiliary-rate policy. Five discovery trials are used per optimizer in the broad
 
 The primary Muon--ORBIT comparison uses a stricter baseline-selected policy: ten
 deterministic 900-step candidate configurations are generated once from the Muon search
-space and evaluated for Muon only. The lowest-loss Muon candidate is frozen before any
+space and evaluated for Muon on one fixed tuning seed. The lowest-loss Muon candidate is
+frozen before any
 held-out matched-confirmation seed is evaluated, then applied unchanged to both Muon and
 ORBIT. ORBIT outcomes therefore do not influence the primary recipe. The same
 Muon-selected setting is reused in the expanded ORBIT ablation.
@@ -244,7 +245,7 @@ Attribute the functional, RoPE, and pair-coupling components &
 ORBIT, identity, no-RoPE, diagonal \\
 
 Long-horizon transfer &
-Test persistence under longer optimization &
+Probe longer-horizon behavior &
 124M & 2700 & $n=2$ &
 Muon, NorMuon, ASTRO, ORBIT \\
 
@@ -258,8 +259,9 @@ Muon, NorMuon, ASTRO, ORBIT \\
 \vspace{0.35em}
 \footnotesize
 Broad hyperparameter selection used five discovery candidates per optimizer. The matched
-comparison tuned Muon over ten deterministic candidate configurations; the lowest-loss
-Muon recipe was frozen before the held-out runs and then applied unchanged to both methods. The final ablation followed a
+comparison tuned Muon over ten deterministic candidate configurations on one fixed tuning
+seed; the lowest-loss Muon recipe was frozen before the held-out runs and then applied
+unchanged to both methods. The final ablation followed a
 three-run pilot and used ten paired runs per control.
 \end{table}
 
