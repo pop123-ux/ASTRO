@@ -147,9 +147,9 @@ geometry, but do not use the relative-position rotation itself to precondition Q
 parameter updates during pretraining.
 
 \paragraph{Positioning.}
-To our knowledge, prior work has not introduced a training optimizer whose Q/K
-preconditioner is derived directly from the RoPE-conditioned relative-position bilinear
-interaction and implemented with per-frequency $2\times2$ statistics. ORBIT's contribution
+The cited prior work does not introduce a training optimizer whose Q/K preconditioner
+is derived directly from the RoPE-conditioned relative-position bilinear interaction and
+implemented with per-frequency $2\times2$ statistics. ORBIT's contribution
 is this training-time metric and the controlled experiments used to isolate its effect,
 rather than spectral descent, QK-product optimization, architecture-aware optimization,
 RoPE geometry, or gauge-equivariant conditioning.
