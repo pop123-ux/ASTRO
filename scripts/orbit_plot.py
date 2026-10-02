@@ -101,7 +101,7 @@ def plot_orbit_overview(out: Path) -> None:
                     arrowprops=dict(arrowstyle="->", lw=1.25, color="0.35"))
 
     b1 = box(0.20, 1.95, 1.65, 1.25, "Muon candidate", "Q/K gradients\n+ momentum")
-    b2 = box(2.20, 1.95, 1.70, 1.25, "Q/K statistics", "EMA $2\\times2$\ncovariances")
+    b2 = box(2.20, 1.95, 1.70, 1.25, "Q/K statistics", "EMA $2\\times2$\nsecond moments")
     b3 = box(4.25, 1.95, 1.80, 1.25, "RoPE transport", "relative offsets\n$\\Delta$")
     b4 = box(6.40, 1.95, 1.75, 1.25, "Local metric", "per-frequency\n$2\\times2$")
     b5 = box(8.50, 1.95, 1.75, 1.25, "Precondition", r"analytic $M^{-1/2}$")
