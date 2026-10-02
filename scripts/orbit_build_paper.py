@@ -177,7 +177,7 @@ def write_matched_table(results: dict, generated: Path) -> None:
         "\\toprule",
         "\\multicolumn{6}{l}{\\textit{Descriptive statistics}} \\\\",
         "\\addlinespace[0.2em]",
-        "Method & {$n$} & {Validation loss} & {SD} & {Wall time (min)} & {Peak alloc. (GiB)} \\\\",
+        "Method & {$n$} & {Val. loss (nats)} & {SD} & {Wall time (min)} & {Peak CUDA (GiB)} \\\\",
         "\\midrule",
     ]
     for name in ("muon", "orbit"):
