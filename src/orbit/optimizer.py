@@ -50,7 +50,7 @@ def inverse_metric_power(
     a = m[..., 0, 0]
     b = m[..., 0, 1]
     d = m[..., 1, 1]
-    # Normalise before the quadratic formula so very large but finite covariance
+    # Normalise before the quadratic formula so very large but finite second-moment
     # statistics do not overflow when squared.
     scale = torch.maximum(a.abs() + b.abs(), d.abs() + b.abs()).clamp_min(eps)
     an, bn, dn = a / scale, b / scale, d / scale
@@ -87,7 +87,7 @@ def inverse_metric_power(
     isotropic = (0.5 * (f_lo + f_hi))[..., None, None] * eye
     transform = torch.where(repeated[..., None, None], isotropic, transform)
 
-    # A non-finite covariance statistic means the auxiliary metric is invalid,
+    # A non-finite second-moment statistic means the auxiliary metric is invalid,
     # not that the parameter update itself is invalid. The safest local fallback
     # is therefore identity preconditioning for that pair.
     transform = torch.where(finite[..., None, None], transform, eye)
@@ -109,7 +109,7 @@ class Orbit(torch.optim.Optimizer):
 
     Variants are intentionally first-class for falsification:
       orbit          full RoPE-rotated 2x2 metric
-      orbit_norope   same covariance metric without relative-position rotations
+      orbit_norope   same second-moment metric without relative-position rotations
       orbit_diag     remove the 2x2 phase/off-diagonal coupling
       orbit_identity disable the functional preconditioner (Muon control)
     """
@@ -154,7 +154,7 @@ class Orbit(torch.optim.Optimizer):
         )
         self.model = model
         # Statistics are opt-in so baseline wall-clock measurements do not pay
-        # ORBIT's forward-pass covariance cost. All ORBIT ablations keep the
+        # ORBIT's forward-pass second-moment cost. All ORBIT ablations keep the
         # collection path enabled, including identity, to isolate update rules.
         model.set_orbit_stat_collection(True)
         self.functional_power = float(functional_power)
