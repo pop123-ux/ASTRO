@@ -511,20 +511,23 @@ def generate_plots(work_dir: Path, allow_incomplete: bool) -> None:
     if "matched_confirmation" in results:
         orbit_plot.plot_matched_effect(results, out)
 
-    if (
-        "cross_configuration_isolation" in results
-        and "mechanism_ablation" in results
-    ):
-        orbit_plot.plot_mechanism_summary(results, out)
+    if "mechanism_ablation" in results:
+        orbit_plot.plot_mechanism_attribution(results, out)
 
-    if (
-        "long_horizon_transfer" in results
-        and "scale_transfer" in results
-    ):
-        orbit_plot.plot_transfer_summary(
+    if "long_horizon_transfer" in results:
+        orbit_plot.plot_transfer_panel(
             orbit_plot.load_jsonl(merged / "horizon_with_astro.jsonl"),
+            out,
+            stem="long_horizon_transfer",
+            title="Long-horizon transfer",
+        )
+
+    if "scale_transfer" in results:
+        orbit_plot.plot_transfer_panel(
             orbit_plot.load_jsonl(merged / "scale_with_astro.jsonl"),
             out,
+            stem="scale_transfer",
+            title="355M transfer",
         )
 
     if "broad_independently_tuned_context" in results:

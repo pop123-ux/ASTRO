@@ -201,7 +201,7 @@ Recipe choice itself has a larger effect than the matched mechanism contrast. Mo
 from its own discovery recipe to the ORBIT-selected recipe changes validation loss by
 \XConfigRecipeMuon{} nats, while the analogous change for ORBIT is
 \XConfigRecipeOrbit{} nats. The cross-over separates update-rule and recipe effects without treating the independently
-tuned gap as a mechanism-only estimate (Figure~\ref{fig:mechanism}a).
+tuned gap as a mechanism-only estimate.
 
 \subsection{Ablations isolate functional Q/K conditioning and RoPE-aware transport}
 The expanded ten-seed ablation tests each component under the same matched recipe and
@@ -220,17 +220,8 @@ Relative to the \textbf{diagonal control}, which removes off-diagonal coupling w
 transported $2\times2$ metric, the difference is \AblDiagDelta{} nats, with 95\% CI
 [\AblDiagCILow{}, \AblDiagCIHigh{}], and full ORBIT is lower on
 \AblDiagWins{} paired seeds. Together these contrasts measure the incremental contribution
-of the three design choices without assuming their direction in advance.
-
-\IfFileExists{figures/mechanism_summary.pdf}{%
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.98\linewidth]{mechanism_summary.pdf}
-\caption{Mechanism isolation. \textbf{(a)} Crossed optimizer--recipe experiment: ORBIT
-retains lower loss under both frozen recipes. \textbf{(b)} Paired mechanism ablations with
-95\% confidence intervals; negative values favor full ORBIT.}
-\label{fig:mechanism}
-\end{figure}}{}
+of the three design choices without assuming their direction in advance
+(Figure~\ref{fig:mechanism-attribution}).
 
 \subsection{Transfer checks across training horizon and model size}
 The transfer experiments preserve each optimizer's independently frozen recipe and probe
@@ -241,23 +232,48 @@ primary 900-step regime. The mean paired differences are \HorizonVsMuon{} nats v
 Muon, \HorizonVsNorMuon{} versus NorMuon, and \HorizonVsAstro{} versus ASTRO.
 Because these cells use independently frozen recipes and only two seeds, their effect sizes
 are not directly comparable with the matched 900-step mechanism estimate and are treated as
-transfer checks rather than confirmatory evidence.
+transfer checks rather than confirmatory evidence (Figure~\ref{fig:long-horizon}).
 
 At 355M and 900 steps, the corresponding mean paired differences are \ScaleVsMuon{} nats
 versus Muon and \ScaleVsNorMuon{} versus NorMuon. The ASTRO comparison has mean
 ORBIT-minus-ASTRO difference \ScaleVsAstro{} nats. This cell uses only two seeds, a
 smaller batch size, a different sampled-token budget per optimizer step, and gradient
-checkpointing; it is therefore a transfer check rather than a controlled scaling result.
+checkpointing; it is therefore a transfer check rather than a controlled scaling result
+(Figure~\ref{fig:scale-transfer}).
 
-\IfFileExists{figures/transfer_summary.pdf}{%
+\IfFileExists{figures/mechanism_attribution.pdf}{%
+\IfFileExists{figures/long_horizon_transfer.pdf}{%
+\IfFileExists{figures/scale_transfer.pdf}{%
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.96\linewidth]{transfer_summary.pdf}
-\caption{Transfer beyond the primary setting. \textbf{(a)} 124M model at 2700 steps.
-\textbf{(b)} 355M model at 900 steps. Points show individual runs; horizontal segments show
-the method mean.}
-\label{fig:transfer}
-\end{figure}}{}
+\begin{minipage}[t]{0.32\textwidth}
+  \centering
+  \vspace{0pt}
+  \includegraphics[width=\linewidth]{mechanism_attribution.pdf}
+  \caption{Mechanism attribution. Paired ablation effects under the Muon-selected matched
+  recipe; negative values favor full ORBIT.}
+  \label{fig:mechanism-attribution}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.32\textwidth}
+  \centering
+  \vspace{0pt}
+  \includegraphics[width=\linewidth]{long_horizon_transfer.pdf}
+  \caption{Long-horizon transfer. 124M model at 2700 steps; points denote individual runs
+  and horizontal segments denote means.}
+  \label{fig:long-horizon}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.32\textwidth}
+  \centering
+  \vspace{0pt}
+  \includegraphics[width=\linewidth]{scale_transfer.pdf}
+  \caption{355M transfer. 355M model at 900 steps, using the same run/mean convention as
+  Figure~\ref{fig:long-horizon}.}
+  \label{fig:scale-transfer}
+\end{minipage}
+\end{figure}
+}{}%
+}{}%
+}{}
 
 \subsection{Broader optimizer context}
 The independently tuned 124M benchmark provides secondary context across the wider

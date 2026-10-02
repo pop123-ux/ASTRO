@@ -347,8 +347,11 @@ def test_paper_presentation_contract():
     assert "post-polar direction" in main
     normalized_main = " ".join(main.split())
     assert "not as a separate research contribution" in normalized_main
-    assert "mechanism_summary.pdf" in main
-    assert "transfer_summary.pdf" in main
+    assert "mechanism_attribution.pdf" in main
+    assert "long_horizon_transfer.pdf" in main
+    assert "scale_transfer.pdf" in main
+    assert "mechanism_summary.pdf" not in main
+    assert "transfer_summary.pdf" not in main
     assert "orbit_overview.pdf" in methods
 
     paper_text = main + "\n" + methods
