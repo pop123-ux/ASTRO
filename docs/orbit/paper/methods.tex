@@ -18,25 +18,34 @@ normalization vectors use the auxiliary AdamW path described in
 Section~\ref{sec:training-setup}.
 
 \subsection{RoPE-conditioned query--key geometry}
-For a single attention head and RoPE frequency pair $f$, the pre-softmax score contribution
-between positions $i$ and $j$ is
+For a query at position $i$ attending to a causal key at position $j\le i$, define the
+non-negative displacement $\Delta=i-j$. The implementation applies $R_f(i)$ to the query
+and $R_f(j)$ to the key, so orthogonality of the RoPE rotations gives
 \begin{equation}
-  s_{ij,f}=q_{i,f}^{\top}R_f(\Delta)k_{j,f},\qquad \Delta=i-j.
+  s_{ij,f}
+  =(R_f(i)q_{i,f})^\top(R_f(j)k_{j,f})
+  =q_{i,f}^{\top}R_f(j-i)k_{j,f}
+  =q_{i,f}^{\top}R_f(-\Delta)k_{j,f}.
   \label{eq:rope-score}
 \end{equation}
-A perturbation of the query therefore interacts with the rotated key statistics, while a
-key perturbation interacts with the corresponding rotated query statistics. Let
+For an unrotated query perturbation $\delta q_f$,
+$\delta s_f=\delta q_f^\top R_f(-\Delta)k_f$. Therefore the expected squared score
+movement is a quadratic form whose metric depends on the opposite-side covariance. Let
 $C_{Q,f}$ and $C_{K,f}$ denote exponential-moving-average $2\times2$ covariances of the
 unrotated query and key coordinates. ORBIT defines
 \begin{align}
-M_{Q,f} &= \mathbb{E}_{\Delta}\!\left[R_f(\Delta)C_{K,f}R_f(\Delta)^\top\right],\\
-M_{K,f} &= \mathbb{E}_{\Delta}\!\left[R_f(\Delta)^\top C_{Q,f}R_f(\Delta)\right].
+M_{Q,f} &= \mathbb{E}_{\Delta}\!\left[
+R_f(-\Delta)C_{K,f}R_f(-\Delta)^\top\right],\\
+M_{K,f} &= \mathbb{E}_{\Delta}\!\left[
+R_f(-\Delta)^\top C_{Q,f}R_f(-\Delta)\right].
 \label{eq:orbit-metrics}
 \end{align}
-The expectation is evaluated on the displacement grid
-$\mathcal{D}=\{1,2,4,8,16,32,64,128\}$. Covariances are updated during training with EMA
-coefficient $\beta=0.95$ after the first observation. These statistics are optimizer-only
-buffers and are absent from the inference graph.
+The expectation is evaluated on the causal-distance grid
+$\mathcal{D}=\{1,2,4,8,16,32,64,128\}$. Covariances are updated once per logical
+forward/backward step with EMA coefficient $\beta=0.95$ after the first observation.
+With distributed data parallelism, unnormalized second moments and sample counts are
+reduced across ranks before the EMA. The covariance buffers and observation counter are
+included in the model checkpoint state.
 
 \subsection{ORBIT preconditioning}
 Let $U_Q$ and $U_K$ be the Muon candidates from Equation~\ref{eq:muon-candidate}. For each
@@ -96,9 +105,9 @@ $U_Q \leftarrow \operatorname{MuonCandidate}(G_Q+\mu m_Q)$;\quad
 $U_K \leftarrow \operatorname{MuonCandidate}(G_K+\mu m_K)$\;
 \ForEach{attention head $h$ and RoPE frequency pair $f$}{
   $M_{Q,f}\leftarrow |\mathcal{D}|^{-1}\sum_{\Delta\in\mathcal{D}}
-  R_f(\Delta)C_{K,f}R_f(\Delta)^\top + 10^{-5}I$\;
+  R_f(-\Delta)C_{K,f}R_f(-\Delta)^\top + 10^{-5}I$\;
   $M_{K,f}\leftarrow |\mathcal{D}|^{-1}\sum_{\Delta\in\mathcal{D}}
-  R_f(\Delta)^\top C_{Q,f}R_f(\Delta) + 10^{-5}I$\;
+  R_f(-\Delta)^\top C_{Q,f}R_f(-\Delta) + 10^{-5}I$\;
   $T_{Q,f}\leftarrow \operatorname{InvSqrt}_{2\times2}(M_{Q,f})$;\quad
   $T_{K,f}\leftarrow \operatorname{InvSqrt}_{2\times2}(M_{K,f})$\;
   $\widehat U_{Q,f}\leftarrow T_{Q,f}U_{Q,f}$;\quad
@@ -114,9 +123,9 @@ $W_K\leftarrow(1-\eta\lambda)W_K-\eta\widetilde U_K$\;
 \end{algorithm}
 
 \subsection{Cost and ablation variants}
-The additional state consists of two $2\times2$ covariance matrices for every attention
-head and RoPE frequency pair. The unique per-step matrix operations are local $2\times2$
-transforms rather than dense model-width preconditioners, leaving inference unchanged.
+The additional ORBIT state consists of two $2\times2$ covariance matrices for every
+attention head and RoPE frequency pair. Its distinctive per-step matrix operations are
+therefore local $2\times2$ transforms rather than dense model-width preconditioners.
 
 Three controls isolate the update components. \textbf{Identity} keeps the ORBIT training
 path and statistics collection but disables functional preconditioning. \textbf{No-RoPE}
