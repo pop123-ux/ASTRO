@@ -233,10 +233,16 @@ def validate_phase(name: str, rows: list[dict]) -> list[str]:
     for row in rows:
         if row.get("status") != "ok":
             raise ValueError(f"{name}: non-success row {row.get('task_id')}")
-        if row.get("code_digest") != CORE_DIGEST:
+        row_digest = row.get("code_digest")
+        if row_digest == LEGACY_PREAUDIT_CORE_DIGEST:
             raise ValueError(
-                f"{name}: core digest changed for {row.get('task_id')}: "
-                f"{row.get('code_digest')}"
+                f"{name}: pre-audit ORBIT evidence detected for {row.get('task_id')}; "
+                "the causal-RoPE/checkpointing audit changed the implementation, so this "
+                "phase must be rerun before it can support the manuscript"
+            )
+        if row_digest != CORE_DIGEST:
+            raise ValueError(
+                f"{name}: core digest changed for {row.get('task_id')}: {row_digest}"
             )
         if not finite_positive(row.get("val_loss")):
             raise ValueError(f"{name}: invalid val_loss in {row.get('task_id')}")
