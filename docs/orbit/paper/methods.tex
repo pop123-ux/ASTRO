@@ -251,8 +251,8 @@ Muon, NorMuon, ASTRO, ORBIT \\
 \vspace{0.35em}
 \footnotesize
 Broad hyperparameter selection used five discovery candidates per optimizer. The matched
-comparison used ten shared candidate configurations; the primary recipe was selected by
-Muon tuning loss only and frozen before the held-out runs. The final ablation followed a
+comparison tuned Muon over ten deterministic candidate configurations; the lowest-loss
+Muon recipe was frozen before the held-out runs and then applied unchanged to both methods. The final ablation followed a
 three-run pilot and used ten paired runs per control.
 \end{table}
 
