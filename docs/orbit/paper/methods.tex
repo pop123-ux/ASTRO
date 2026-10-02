@@ -18,25 +18,36 @@ normalization vectors use the auxiliary AdamW path described in
 Section~\ref{sec:training-setup}.
 
 \subsection{RoPE-conditioned query--key geometry}
-For a single attention head and RoPE frequency pair $f$, the pre-softmax score contribution
-between positions $i$ and $j$ is
+For a query at position $i$ attending to a causal key at position $j\le i$, define the
+non-negative displacement $\Delta=i-j$. The implementation applies $R_f(i)$ to the query
+and $R_f(j)$ to the key, so orthogonality of the RoPE rotations gives
 \begin{equation}
-  s_{ij,f}=q_{i,f}^{\top}R_f(\Delta)k_{j,f},\qquad \Delta=i-j.
+  s_{ij,f}
+  =(R_f(i)q_{i,f})^\top(R_f(j)k_{j,f})
+  =q_{i,f}^{\top}R_f(j-i)k_{j,f}
+  =q_{i,f}^{\top}R_f(-\Delta)k_{j,f}.
   \label{eq:rope-score}
 \end{equation}
-A perturbation of the query therefore interacts with the rotated key statistics, while a
-key perturbation interacts with the corresponding rotated query statistics. Let
-$C_{Q,f}$ and $C_{K,f}$ denote exponential-moving-average $2\times2$ covariances of the
+For an unrotated query perturbation $\delta q_f$,
+$\delta s_f=\delta q_f^\top R_f(-\Delta)k_f$. Therefore the expected squared score
+movement is a quadratic form whose metric depends on the opposite-side second moment. Let
+$S_{Q,f}$ and $S_{K,f}$ denote exponential-moving-average $2\times2$ uncentered second-moment matrices of the
 unrotated query and key coordinates. ORBIT defines
 \begin{align}
-M_{Q,f} &= \mathbb{E}_{\Delta}\!\left[R_f(\Delta)C_{K,f}R_f(\Delta)^\top\right],\\
-M_{K,f} &= \mathbb{E}_{\Delta}\!\left[R_f(\Delta)^\top C_{Q,f}R_f(\Delta)\right].
+M_{Q,f} &= \mathbb{E}_{\Delta}\!\left[
+R_f(-\Delta)S_{K,f}R_f(-\Delta)^\top\right],\\
+M_{K,f} &= \mathbb{E}_{\Delta}\!\left[
+R_f(-\Delta)^\top S_{Q,f}R_f(-\Delta)\right].
 \label{eq:orbit-metrics}
 \end{align}
-The expectation is evaluated on the displacement grid
-$\mathcal{D}=\{1,2,4,8,16,32,64,128\}$. Covariances are updated during training with EMA
-coefficient $\beta=0.95$ after the first observation. These statistics are optimizer-only
-buffers and are absent from the inference graph.
+The expectation is approximated by a uniform average over the fixed log-spaced
+causal-distance grid
+$\mathcal{D}=\{1,2,4,8,16,32,64,128\}$. This is a design approximation rather than an
+empirical estimate of the token-pair distance distribution: activation second moments are
+estimated over tokens, then transported across the chosen distance grid. Second moments are
+updated once per logical training step with EMA coefficient $\beta=0.95$ after the first
+observation. In the 355M runs, gradient-checkpoint recomputation is excluded from statistics
+collection so that checkpointing does not change the EMA cadence.
 
 \subsection{ORBIT preconditioning}
 Let $U_Q$ and $U_K$ be the Muon candidates from Equation~\ref{eq:muon-candidate}. For each
@@ -45,9 +56,13 @@ head and RoPE frequency pair,
 \widehat U_{Q,f} &= M_{Q,f}^{-1/2}U_{Q,f},\\
 \widehat U_{K,f} &= M_{K,f}^{-1/2}U_{K,f}.
 \end{align}
-The metrics are regularized by $10^{-5}I$, their effective condition number is capped at
-100, and the inverse square root is evaluated analytically for each symmetric positive
-$2\times2$ matrix.
+The metric is local to the pre-softmax rotary Q/K score; it is not a full-model Fisher
+matrix, Hessian, or exact natural-gradient metric. The matrices are regularized by
+$10^{-5}I$, their effective condition number is capped at 100, and the inverse square root
+is evaluated analytically for each symmetric positive $2\times2$ matrix. For the
+regularized effective metric $M$, the choice
+$T=M^{-1/2}$ satisfies $T^\top M T=I$, so the local quadratic form is whitened rather
+than inverted as aggressively as an $M^{-1}$ step.
 
 A single joint restoration factor then preserves the total Q/K update budget:
 \begin{equation}
@@ -61,8 +76,10 @@ A single joint restoration factor then preserves the total Q/K update budget:
 \widetilde U_K=\rho\widehat U_K.
 \label{eq:joint-restore}
 \end{equation}
-The functional metric therefore changes the direction of the joint Q/K update without
-increasing its aggregate Frobenius norm.
+Because $\|U\|_F=\|\operatorname{vec}(U)\|_2$, the Frobenius norm is the Euclidean
+magnitude of the matrix update when viewed as a parameter vector. The functional metric
+therefore changes the geometry of the joint Q/K update while the restoration fixes its
+aggregate parameter-space step magnitude.
 
 Figure~\ref{fig:orbit-overview} summarizes the data flow of the optimizer before the
 step-by-step specification in Algorithm~\ref{alg:orbit}.
@@ -71,7 +88,7 @@ step-by-step specification in Algorithm~\ref{alg:orbit}.
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.98\linewidth]{orbit_overview.pdf}
-\caption{ORBIT update pathway. Muon candidate directions are reshaped using Q/K covariance
+\caption{ORBIT update pathway. Muon candidate directions are reshaped using Q/K second-moment
 statistics transported through RoPE relative-position rotations, producing frequency-local
 $2\times2$ metrics. Analytic inverse-square-root preconditioning is followed by joint
 Frobenius-norm restoration before the parameter update. Other parameter classes retain
@@ -86,19 +103,19 @@ Muon and auxiliary AdamW updates proceed unchanged for the remaining parameter c
 \caption{ORBIT update for a RoPE query--key projection pair}
 \label{alg:orbit}
 \DontPrintSemicolon
-\KwIn{$W_Q,W_K$; gradients $G_Q,G_K$; momentum $m_Q,m_K$; covariances $C_Q,C_K$;
+\KwIn{$W_Q,W_K$; gradients $G_Q,G_K$; momentum $m_Q,m_K$; second moments $S_Q,S_K$;
 learning rate $\eta$; weight decay $\lambda$; momentum $\mu$; EMA $\beta$;
 displacements $\mathcal{D}$}
-\textbf{Forward statistics:} update $C_Q,C_K$ from current unrotated Q/K activations
+\textbf{Forward statistics:} update $S_Q,S_K$ from current unrotated Q/K activations
 with EMA coefficient $\beta$\;
 $m_Q \leftarrow \mu m_Q+G_Q$;\quad $m_K \leftarrow \mu m_K+G_K$\;
 $U_Q \leftarrow \operatorname{MuonCandidate}(G_Q+\mu m_Q)$;\quad
 $U_K \leftarrow \operatorname{MuonCandidate}(G_K+\mu m_K)$\;
 \ForEach{attention head $h$ and RoPE frequency pair $f$}{
   $M_{Q,f}\leftarrow |\mathcal{D}|^{-1}\sum_{\Delta\in\mathcal{D}}
-  R_f(\Delta)C_{K,f}R_f(\Delta)^\top + 10^{-5}I$\;
+  R_f(-\Delta)S_{K,f}R_f(-\Delta)^\top + 10^{-5}I$\;
   $M_{K,f}\leftarrow |\mathcal{D}|^{-1}\sum_{\Delta\in\mathcal{D}}
-  R_f(\Delta)^\top C_{Q,f}R_f(\Delta) + 10^{-5}I$\;
+  R_f(-\Delta)^\top S_{Q,f}R_f(-\Delta) + 10^{-5}I$\;
   $T_{Q,f}\leftarrow \operatorname{InvSqrt}_{2\times2}(M_{Q,f})$;\quad
   $T_{K,f}\leftarrow \operatorname{InvSqrt}_{2\times2}(M_{K,f})$\;
   $\widehat U_{Q,f}\leftarrow T_{Q,f}U_{Q,f}$;\quad
@@ -114,13 +131,13 @@ $W_K\leftarrow(1-\eta\lambda)W_K-\eta\widetilde U_K$\;
 \end{algorithm}
 
 \subsection{Cost and ablation variants}
-The additional state consists of two $2\times2$ covariance matrices for every attention
-head and RoPE frequency pair. The unique per-step matrix operations are local $2\times2$
-transforms rather than dense model-width preconditioners, leaving inference unchanged.
+The additional ORBIT state consists of two $2\times2$ second-moment matrices for every
+attention head and RoPE frequency pair. Its distinctive per-step matrix operations are
+therefore local $2\times2$ transforms rather than dense model-width preconditioners.
 
 Three controls isolate the update components. \textbf{Identity} keeps the ORBIT training
 path and statistics collection but disables functional preconditioning. \textbf{No-RoPE}
-uses Q/K covariance metrics without relative-position rotation. \textbf{Diagonal} retains
+uses Q/K second-moment metrics without relative-position rotation. \textbf{Diagonal} retains
 RoPE-aware per-frequency scaling while removing off-diagonal coupling within each
 $2\times2$ pair.
 
@@ -145,8 +162,9 @@ optimizer in a paired setting sees the same validation windows.
 \label{sec:training-setup}
 All optimizers use the same warmup--cosine multiplier. The first 10\% of steps are warmup;
 the remaining schedule follows a cosine decay ending at $0.1$ times the peak learning rate.
-The same multiplier is applied to every learning-rate field, including the auxiliary AdamW
-path. Global gradient norm is clipped at 1.0. Training uses CUDA autocast in float16 with
+For ORBIT, the auxiliary AdamW rate is stored as a fixed ratio to the matrix learning rate,
+so scheduling the matrix rate applies the identical multiplier to both paths. Global gradient
+norm is clipped at 1.0. Training uses CUDA autocast in float16 with
 gradient scaling. The 124M model uses batch size 8 (4,096 sampled tokens per optimizer
 step); the 355M model uses batch size 4 (2,048 sampled tokens per step). The latter
 difference is disclosed because it prevents interpreting the 355M result as a pure
