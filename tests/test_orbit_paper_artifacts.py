@@ -134,7 +134,7 @@ def test_strict_freeze_accepts_complete_exact_fixture(tmp_path):
 
 
 def test_strict_freeze_rejects_pre_audit_core_digest(tmp_path):
-    make_complete_work_dir(tmp_path)
+    build_fixture(tmp_path)
     path = tmp_path / "merged" / "matched_confirm.jsonl"
     rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
     rows[0]["code_digest"] = paper.LEGACY_PREAUDIT_CORE_DIGEST
