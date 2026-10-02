@@ -41,7 +41,8 @@ POST_PHASES = {
     "astro_scale": dict(size="355M", steps=900, seeds=(300, 301)),
 }
 POST_PHASE_ORDER = tuple(POST_PHASES)
-MATCHED_OPTIMIZERS = ("muon", "orbit")
+MATCHED_CONFIRM_OPTIMIZERS = ("muon", "orbit")
+MATCHED_TUNE_OPTIMIZERS = ("muon",)
 EXTENDED_ABLATIONS = ("orbit", "orbit_norope", "orbit_diag", "orbit_identity")
 
 
@@ -70,7 +71,7 @@ def matched_candidate(trial: int) -> dict[str, float]:
     return config
 
 
-def load_matched_best(work_dir: Path) -> dict[str, dict]:
+def load_matched_best(work_dir: Path) -> dict:
     path = work_dir / "merged" / "matched_best_configs.json"
     if not path.exists():
         raise SystemExit(
@@ -153,7 +154,7 @@ def make_tasks(
         for trial in range(POST_TUNE_TRIALS):
             config = matched_candidate(trial)
             config_id = f"shared-{trial:02d}"
-            for optimizer in MATCHED_OPTIMIZERS:
+            for optimizer in MATCHED_TUNE_OPTIMIZERS:
                 tasks.append(
                     _task(
                         phase=phase,
@@ -172,8 +173,9 @@ def make_tasks(
 
     if phase == "matched_confirm":
         matched = load_matched_best(work_dir)
-        for optimizer in MATCHED_OPTIMIZERS:
-            config = dict(matched[optimizer]["config"])
+        config = dict(matched["config"])
+        config_id = str(matched["config_id"])
+        for optimizer in MATCHED_CONFIRM_OPTIMIZERS:
             for seed in seeds:
                 tasks.append(
                     _task(
@@ -184,14 +186,16 @@ def make_tasks(
                         seed=seed,
                         size=size,
                         steps=steps,
-                        config_source=f"matched_tune:{optimizer}",
+                        config_source="matched_tune:muon",
+                        config_id=config_id,
                     )
                 )
         return tasks
 
     if phase == "ablation_ext":
         matched = load_matched_best(work_dir)
-        orbit_config = dict(matched["orbit"]["config"])
+        shared_config = dict(matched["config"])
+        config_id = str(matched["config_id"])
         for optimizer in EXTENDED_ABLATIONS:
             for seed in seeds:
                 tasks.append(
@@ -199,11 +203,12 @@ def make_tasks(
                         phase=phase,
                         optimizer=optimizer,
                         analysis_label=optimizer,
-                        config=orbit_config,
+                        config=shared_config,
                         seed=seed,
                         size=size,
                         steps=steps,
-                        config_source="matched_tune:orbit",
+                        config_source="matched_tune:muon",
+                        config_id=config_id,
                     )
                 )
         return tasks
