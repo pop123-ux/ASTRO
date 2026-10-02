@@ -469,12 +469,10 @@ def main() -> None:
     out = args.out_dir or (args.work_dir / "paper_artifacts" / "figures")
     out.mkdir(parents=True, exist_ok=True)
 
-    plot_orbit_overview(out)
-    plot_protocol_design(out)
+    for old in list(out.glob("*.pdf")) + list(out.glob("*.png")):
+        old.unlink()
 
-    if "matched_confirmation" in results:
-        plot_primary_results_panel(results, out)
-        plot_matched_effect(results, out)
+    plot_orbit_overview(out)
 
     if (
         "cross_configuration_isolation" in results
