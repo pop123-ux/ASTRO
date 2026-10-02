@@ -7,9 +7,9 @@ rows remain valid under the original core code digest.
 
 New phases address the four remaining paper-grade questions:
 1. xconfig: 2x2 optimizer/config cross-over to separate mechanism from recipe;
-2. matched_tune + matched_confirm: Muon is tuned over 10 deterministic
-   hyperparameter configurations at the 900-step target; its winner is frozen
-   and applied unchanged to Muon and ORBIT on 10 held-out paired seeds;
+2. matched_tune + matched_confirm: Muon is tuned over 10 deterministic candidate
+   configurations at the 900-step target; its winner is frozen and both Muon and
+   ORBIT are compared under that recipe on 10 held-out seeds;
 3. ablation_ext: 10-seed mechanism ablation using the matched ORBIT config;
 4. astro_horizon + astro_scale: add the strongest ASTRO-v2 baseline to the
    already-completed long-horizon and 355M transfer cells.
@@ -41,8 +41,8 @@ POST_PHASES = {
     "astro_scale": dict(size="355M", steps=900, seeds=(300, 301)),
 }
 POST_PHASE_ORDER = tuple(POST_PHASES)
-MATCHED_CONFIRM_OPTIMIZERS = ("muon", "orbit")
 MATCHED_TUNE_OPTIMIZERS = ("muon",)
+MATCHED_CONFIRM_OPTIMIZERS = ("muon", "orbit")
 EXTENDED_ABLATIONS = ("orbit", "orbit_norope", "orbit_diag", "orbit_identity")
 
 
@@ -71,7 +71,7 @@ def matched_candidate(trial: int) -> dict[str, float]:
     return config
 
 
-def load_matched_best(work_dir: Path) -> dict:
+def load_matched_best(work_dir: Path) -> dict[str, dict]:
     path = work_dir / "merged" / "matched_best_configs.json"
     if not path.exists():
         raise SystemExit(
@@ -173,9 +173,8 @@ def make_tasks(
 
     if phase == "matched_confirm":
         matched = load_matched_best(work_dir)
-        config = dict(matched["config"])
-        config_id = str(matched["config_id"])
         for optimizer in MATCHED_CONFIRM_OPTIMIZERS:
+            config = dict(matched[optimizer]["config"])
             for seed in seeds:
                 tasks.append(
                     _task(
@@ -186,16 +185,14 @@ def make_tasks(
                         seed=seed,
                         size=size,
                         steps=steps,
-                        config_source="matched_tune:muon",
-                        config_id=config_id,
+                        config_source="matched_tune:muon_primary",
                     )
                 )
         return tasks
 
     if phase == "ablation_ext":
         matched = load_matched_best(work_dir)
-        shared_config = dict(matched["config"])
-        config_id = str(matched["config_id"])
+        orbit_config = dict(matched["muon"]["config"])
         for optimizer in EXTENDED_ABLATIONS:
             for seed in seeds:
                 tasks.append(
@@ -203,12 +200,11 @@ def make_tasks(
                         phase=phase,
                         optimizer=optimizer,
                         analysis_label=optimizer,
-                        config=shared_config,
+                        config=orbit_config,
                         seed=seed,
                         size=size,
                         steps=steps,
-                        config_source="matched_tune:muon",
-                        config_id=config_id,
+                        config_source="matched_tune:muon_primary",
                     )
                 )
         return tasks
