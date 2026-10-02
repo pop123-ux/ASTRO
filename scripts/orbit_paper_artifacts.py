@@ -412,8 +412,10 @@ def build(work_dir: Path, *, allow_incomplete: bool = False) -> tuple[dict, dict
     artifact_dir.mkdir(parents=True, exist_ok=True)
 
     phases: dict[str, list[dict]] = {}
+    raw_phases: dict[str, list[dict]] = {}
     warnings: list[str] = []
     missing: list[str] = []
+    invalid: dict[str, str] = {}
 
     for phase, spec in EXPECTED.items():
         path = merged / spec["path"]
@@ -421,13 +423,16 @@ def build(work_dir: Path, *, allow_incomplete: bool = False) -> tuple[dict, dict
             missing.append(str(path))
             continue
         rows = load_jsonl(path)
+        raw_phases[phase] = rows
         try:
             warnings.extend(validate_phase(phase, rows))
         except Exception as exc:
             if allow_incomplete:
-                warnings.append(f"{phase}: {exc}")
-            else:
-                raise
+                message = str(exc)
+                warnings.append(f"{phase}: {message}")
+                invalid[phase] = message
+                continue
+            raise
         phases[phase] = rows
 
     if missing and not allow_incomplete:
@@ -534,11 +539,14 @@ def build(work_dir: Path, *, allow_incomplete: bool = False) -> tuple[dict, dict
     for phase, spec in EXPECTED.items():
         path = merged / spec["path"]
         if path.exists():
-            rows = phases.get(phase, [])
+            rows = raw_phases.get(phase, [])
+            accepted_rows = phases.get(phase, [])
             sources[phase] = {
                 "path": str(path.relative_to(work_dir)),
                 "sha256": file_sha256(path),
                 "rows": len(rows),
+                "accepted": phase in phases,
+                "accepted_rows": len(accepted_rows),
                 "task_ids": len({x.get("task_id") for x in rows}),
                 "code_digests": sorted({str(x.get("code_digest")) for x in rows}),
                 "orchestration_digests": sorted(
@@ -555,10 +563,11 @@ def build(work_dir: Path, *, allow_incomplete: bool = False) -> tuple[dict, dict
 
     manifest = {
         "schema_version": 2,
-        "status": "paper_ready" if not missing and not warnings else "incomplete_or_warn",
+        "status": "paper_ready" if not missing and not warnings and not invalid else "incomplete_or_warn",
         "core_digest": CORE_DIGEST,
         "sources": sources,
         "missing": missing,
+        "invalid": invalid,
         "warnings": warnings,
         "matched_config_id": best.get("orbit", {}).get("config_id"),
         "matched_config": best.get("orbit", {}).get("config"),
