@@ -162,7 +162,6 @@ def write_matched_table(results: dict, generated: Path) -> None:
         return
     sm = mc["summary"]
     eff = mc["orbit_vs_muon"]
-    cfg = mc["shared_config"]
     lines = [
         "\\begin{table}[H]",
         "\\centering",
@@ -206,14 +205,9 @@ def write_matched_table(results: dict, generated: Path) -> None:
         "",
         "\\begin{minipage}{0.96\\linewidth}",
         "\\footnotesize",
-        f"Both methods selected {tex_escape(mc['shared_config_id'])} from the same 10-candidate tuning grid. "
-        f"The frozen shared recipe uses matrix learning rate "
-        f"{cfg['lr']:.6g}, weight decay {cfg['weight_decay']:.6g}, and auxiliary AdamW "
-        f"multiplier {cfg['scalar_lr_mult']:.6g} (auxiliary learning rate "
-        f"{cfg['lr'] * cfg['scalar_lr_mult']:.6g}). Wall time includes training and the "
-        "fixed 20-batch validation pass. Peak CUDA allocation is reported in GiB. "
-        "The confidence interval is conditional on this frozen shared-grid winner and does "
-        "not include recipe-selection uncertainty.",
+        "Wall time includes training and the fixed 20-batch validation pass. "
+        "Peak CUDA allocation is reported in GiB. The confidence interval is conditional "
+        "on the selected shared recipe and does not include recipe-selection uncertainty.",
         "\\end{minipage}",
         "\\end{table}",
     ]
