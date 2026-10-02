@@ -14,6 +14,7 @@ if str(SCRIPTS) not in sys.path:
 
 import orbit_paper_artifacts as paper  # noqa: E402
 import orbit_build_paper as build_paper  # noqa: E402
+import orbit_postscale_merge as post_merge  # noqa: E402
 
 
 ENV = {
@@ -41,6 +42,8 @@ def row(phase: str, optimizer: str, seed: int, idx: int, *, label=None, trial=No
         "config": dict(CFG),
         "curve": [],
     }
+    if phase in paper.POSTSCALE_PHASES:
+        base["orchestration_digest"] = paper.POSTSCALE_DIGEST
     if label is not None:
         base["analysis_label"] = label
     if trial is not None:
@@ -78,10 +81,7 @@ def build_fixture(tmp_path: Path) -> None:
 
     matched_tune = []
     for trial in range(10):
-        for opt in ("muon", "orbit"):
-            matched_tune.append(
-                row("matched_tune", opt, 0, trial, trial=trial)
-            )
+        matched_tune.append(row("matched_tune", "muon", 0, trial, trial=trial))
     write_jsonl(merged / "matched_tune.jsonl", matched_tune)
 
     matched_confirm = []
@@ -107,18 +107,49 @@ def build_fixture(tmp_path: Path) -> None:
     write_jsonl(merged / "scale_with_astro.jsonl", scale)
 
     best = {
+        "selection_rule": "muon_winner_from_shared_grid",
         "muon": {
             "config": dict(CFG),
             "config_id": "shared-04",
             "code_digest": paper.CORE_DIGEST,
+            "orchestration_digest": paper.POSTSCALE_DIGEST,
+            "selected_by": "muon",
         },
         "orbit": {
             "config": dict(CFG),
             "config_id": "shared-04",
             "code_digest": paper.CORE_DIGEST,
+            "orchestration_digest": paper.POSTSCALE_DIGEST,
+            "selected_by": "muon",
         },
     }
     (merged / "matched_best_configs.json").write_text(json.dumps(best))
+
+
+def test_matched_freeze_uses_lowest_loss_muon_candidate_for_both_methods():
+    rows = []
+    losses = [1.4, 1.1, 1.3, 1.2, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0]
+    for trial, loss in enumerate(losses):
+        rows.append(
+            {
+                "optimizer": "muon",
+                "val_loss": loss,
+                "trial": trial,
+                "config_id": f"shared-{trial:02d}",
+                "config": {"lr": 0.01 + trial * 0.001},
+                "task_id": f"muon-{trial}",
+                "code_digest": paper.CORE_DIGEST,
+                "orchestration_digest": "test",
+                "environment": ENV,
+            }
+        )
+
+    frozen = post_merge.freeze_matched(rows)
+    assert frozen["selection_rule"] == "muon_winner_from_shared_grid"
+    assert frozen["muon"]["config_id"] == "shared-01"
+    assert frozen["orbit"]["config_id"] == "shared-01"
+    assert frozen["muon"]["selected_by"] == "muon"
+    assert frozen["orbit"]["selected_by"] == "muon"
 
 
 def test_strict_freeze_accepts_complete_exact_fixture(tmp_path):
@@ -143,9 +174,28 @@ def test_strict_freeze_rejects_pre_audit_core_digest(tmp_path):
     try:
         paper.build(tmp_path)
     except ValueError as exc:
-        assert "core digest changed" in str(exc)
+        message = str(exc)
+        assert "pre-audit ORBIT evidence detected" in message
+        assert "must be rerun" in message
     else:
         raise AssertionError("strict evidence freeze accepted pre-audit ORBIT evidence")
+
+
+def test_strict_freeze_rejects_stale_postscale_orchestration(tmp_path):
+    build_fixture(tmp_path)
+    path = tmp_path / "merged" / "matched_confirm.jsonl"
+    rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    rows[0]["orchestration_digest"] = "stale-protocol"
+    write_jsonl(path, rows)
+
+    try:
+        paper.build(tmp_path)
+    except ValueError as exc:
+        message = str(exc)
+        assert "orchestration digest changed" in message
+        assert "rerun this phase" in message
+    else:
+        raise AssertionError("strict evidence freeze accepted stale post-scale protocol rows")
 
 
 def test_strict_freeze_refuses_missing_ablation(tmp_path):

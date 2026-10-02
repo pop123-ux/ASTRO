@@ -29,9 +29,19 @@ from pathlib import Path
 from typing import Iterable
 
 import orbit_campaign as campaign
+import orbit_postscale as post
 
 LEGACY_PREAUDIT_CORE_DIGEST = "de8b994a734276871770c6c67648117d3613d0954f3ae90d7e7b69246308c200"
 CORE_DIGEST = campaign.code_digest()
+POSTSCALE_DIGEST = post.postscale_digest()
+POSTSCALE_PHASES = {
+    "xconfig",
+    "matched_tune",
+    "matched_confirm",
+    "ablation_ext",
+    "horizon_with_astro",
+    "scale_with_astro",
+}
 
 EXPECTED = {
     "confirm": {
@@ -59,7 +69,7 @@ EXPECTED = {
     "matched_tune": {
         "path": "matched_tune.jsonl",
         "group_key": "optimizer",
-        "groups": {"muon": (0,) * 10, "orbit": (0,) * 10},
+        "groups": {"muon": (0,) * 10},
         "trials": tuple(range(10)),
     },
     "matched_confirm": {
@@ -233,11 +243,24 @@ def validate_phase(name: str, rows: list[dict]) -> list[str]:
     for row in rows:
         if row.get("status") != "ok":
             raise ValueError(f"{name}: non-success row {row.get('task_id')}")
-        if row.get("code_digest") != CORE_DIGEST:
+        row_digest = row.get("code_digest")
+        if row_digest == LEGACY_PREAUDIT_CORE_DIGEST:
             raise ValueError(
-                f"{name}: core digest changed for {row.get('task_id')}: "
-                f"{row.get('code_digest')}"
+                f"{name}: pre-audit ORBIT evidence detected for {row.get('task_id')}; "
+                "the causal-RoPE/checkpointing audit changed the implementation, so this "
+                "phase must be rerun before it can support the manuscript"
             )
+        if row_digest != CORE_DIGEST:
+            raise ValueError(
+                f"{name}: core digest changed for {row.get('task_id')}: {row_digest}"
+            )
+        if name in POSTSCALE_PHASES:
+            orchestration_digest = row.get("orchestration_digest")
+            if orchestration_digest != POSTSCALE_DIGEST:
+                raise ValueError(
+                    f"{name}: orchestration digest changed for {row.get('task_id')}: "
+                    f"{orchestration_digest}; rerun this phase under the current paper protocol"
+                )
         if not finite_positive(row.get("val_loss")):
             raise ValueError(f"{name}: invalid val_loss in {row.get('task_id')}")
         if not finite_positive(row.get("seconds")):
@@ -257,25 +280,37 @@ def validate_phase(name: str, rows: list[dict]) -> list[str]:
 
 def validate_matched_configs(merged: Path, phases: dict[str, list[dict]]) -> dict:
     best = load_json(merged / "matched_best_configs.json")
+    if best.get("selection_rule") != "muon_winner_from_shared_grid":
+        raise ValueError("matched primary config was not frozen by the Muon-only selection rule")
+
+    for optimizer in ("muon", "orbit"):
+        record = best[optimizer]
+        if record.get("code_digest") != CORE_DIGEST:
+            raise ValueError(f"matched config for {optimizer} was frozen under a stale core digest")
+        if record.get("orchestration_digest") != POSTSCALE_DIGEST:
+            raise ValueError(
+                f"matched config for {optimizer} was frozen under a stale paper protocol"
+            )
+
     muon_cfg = best["muon"]["config"]
     orbit_cfg = best["orbit"]["config"]
     if muon_cfg != orbit_cfg:
-        raise ValueError(
-            "matched_tune winners differ; matched_confirm is not a strict identical-config test"
-        )
+        raise ValueError("matched confirmation does not use one shared frozen config")
     if best["muon"].get("config_id") != best["orbit"].get("config_id"):
-        raise ValueError("matched_tune winners do not share the same config_id")
+        raise ValueError("matched confirmation does not use one shared config_id")
+    if best["muon"].get("selected_by") != "muon" or best["orbit"].get("selected_by") != "muon":
+        raise ValueError("matched config provenance is not Muon-selected")
 
     for row in phases["matched_confirm"]:
         if row["config"] != muon_cfg:
             raise ValueError(
-                f"matched_confirm:{row['task_id']}: config differs from frozen shared winner"
+                f"matched_confirm:{row['task_id']}: config differs from Muon-selected primary"
             )
 
     for row in phases["ablation_ext"]:
-        if row["config"] != orbit_cfg:
+        if row["config"] != muon_cfg:
             raise ValueError(
-                f"ablation_ext:{row['task_id']}: config differs from frozen ORBIT winner"
+                f"ablation_ext:{row['task_id']}: config differs from Muon-selected primary"
             )
     return best
 
@@ -506,6 +541,13 @@ def build(work_dir: Path, *, allow_incomplete: bool = False) -> tuple[dict, dict
                 "rows": len(rows),
                 "task_ids": len({x.get("task_id") for x in rows}),
                 "code_digests": sorted({str(x.get("code_digest")) for x in rows}),
+                "orchestration_digests": sorted(
+                    {
+                        str(x.get("orchestration_digest"))
+                        for x in rows
+                        if x.get("orchestration_digest") is not None
+                    }
+                ),
                 "environments": sorted(
                     {json.dumps(x.get("environment", {}), sort_keys=True) for x in rows}
                 ),
