@@ -44,9 +44,10 @@ function-space extension of Muon for rotary attention: frequency-local $2\times2
 are constructed from query/key second moments transported through RoPE relative-position
 rotations, applied to the candidate Q/K updates, and followed by joint Frobenius-norm
 restoration. On RoPE-modified GPT-2-style decoders trained on FineWeb-Edu, the evaluation
-separates optimizer mechanism from hyperparameter recipe. Muon is first tuned over a
-ten-candidate 900-step grid; its selected configuration is then frozen before held-out
-evaluation of either method. Under that shared recipe, the comparison reports \MatchedWins{}
+separates optimizer mechanism from hyperparameter recipe. Muon and ORBIT are evaluated
+on the same ten-candidate 900-step tuning grid; both independently select the same
+configuration, which is then frozen before held-out paired evaluation. Under that shared
+recipe, the comparison reports \MatchedWins{}
 ORBIT-favoring seeds and a paired ORBIT-minus-Muon mean difference of \MatchedDelta{} nats
 (95\% CI [\MatchedCILow{}, \MatchedCIHigh{}]).
 Mean end-to-end wall-clock difference is \MatchedRuntimeOverhead{}, with peak allocated
@@ -158,7 +159,7 @@ RoPE geometry, or gauge-equivariant conditioning.
 
 \section{Results}
 
-\subsection{Matched shared hyperparameters isolate the update-rule difference}
+\subsection{Shared hyperparameters isolate the update-rule difference}
 The primary comparison controls recipe differences by evaluating Muon and ORBIT on the
 same ten deterministic 900-step candidate configurations on one tuning seed. Both methods
 select the same winner (\MatchedSharedConfigID{}), which is frozen before the held-out
@@ -271,7 +272,7 @@ Muon--ORBIT experiment remains the mechanism-isolated estimate used for the cent
 \IfFileExists{figures/broad_confirmation.pdf}{%
 \begin{figure}[!t]
 \centering
-\includegraphics[width=0.58\linewidth]{broad_confirmation.pdf}
+\includegraphics[width=0.72\linewidth]{broad_confirmation.pdf}
 \caption{Broader 124M optimizer context under independently selected recipes. Points show
 mean validation loss across five seeds; error bars show one standard deviation.}
 \label{fig:broad-context}
