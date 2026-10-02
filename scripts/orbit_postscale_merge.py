@@ -127,11 +127,18 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
 
 
 def freeze_matched(rows: list[dict]) -> dict:
-    best: dict[str, dict] = {}
+    """Freeze one shared primary config using Muon's tuning loss only.
+
+    ORBIT is evaluated under the Muon-selected recipe in the primary held-out
+    comparison. This makes selection independent of ORBIT's tuning outcomes and
+    prevents the primary result from depending on the two optimizers happening
+    to choose the same candidate.
+    """
+    independent: dict[str, dict] = {}
     for row in rows:
         name = row["optimizer"]
-        if name not in best or float(row["val_loss"]) < float(best[name]["val_loss"]):
-            best[name] = {
+        if name not in independent or float(row["val_loss"]) < float(independent[name]["val_loss"]):
+            independent[name] = {
                 "val_loss": row["val_loss"],
                 "trial": row["trial"],
                 "config_id": row.get("config_id"),
@@ -141,12 +148,22 @@ def freeze_matched(rows: list[dict]) -> dict:
                 "orchestration_digest": row["orchestration_digest"],
                 "environment": row["environment"],
             }
-    if set(best) != set(post.MATCHED_OPTIMIZERS):
+    if set(independent) != set(post.MATCHED_OPTIMIZERS):
         raise SystemExit(
             f"matched_tune did not produce winners for {post.MATCHED_OPTIMIZERS}: "
-            f"got {sorted(best)}"
+            f"got {sorted(independent)}"
         )
-    return best
+
+    primary = dict(independent["muon"])
+    primary["selection_rule"] = "muon_winner_from_shared_grid"
+    primary["selected_by"] = "muon"
+
+    return {
+        "selection_rule": "muon_winner_from_shared_grid",
+        "muon": dict(primary),
+        "orbit": dict(primary),
+        "independent_winners": independent,
+    }
 
 
 def load_legacy_rows(work_dir: Path, phase: str) -> list[dict]:
@@ -360,7 +377,7 @@ def main() -> None:
             (merged / "matched_best_configs.json").write_text(
                 json.dumps(best, indent=2, sort_keys=True) + "\n"
             )
-            print("matched_tune winners frozen -> merged/matched_best_configs.json")
+            print("Muon-selected matched config frozen -> merged/matched_best_configs.json")
 
         write_phase_analysis(args.work_dir, phase, rows)
 
