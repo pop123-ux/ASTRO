@@ -244,14 +244,14 @@ $n=5$/method &
 AdamW, AdaMuon, Muon, NorMuon, ASTRO, ORBIT \\
 
 Crossed recipes &
-124M, 900 steps\newline 3.69M tokens &
+124M, 900 steps\newline 3.69M sampled tokens &
 Muon- and ORBIT-selected recipes crossed with both update rules &
 $n=5$/cell &
 Muon, ORBIT \\
 
 \textbf{Matched confirmation} &
 124M, 900 steps\newline 3.69M tokens &
-\textbf{Primary:} same 10 candidates evaluated for both; both select the same winner, then freeze it &
+\textbf{Primary:} same 10 candidates evaluated for both; the same candidate minimizes tuning loss for both and is then frozen &
 $n=10$ paired &
 Muon, ORBIT \\
 
@@ -278,7 +278,7 @@ Muon, NorMuon, ASTRO, ORBIT \\
 \vspace{0.35em}
 \begin{minipage}{0.98\linewidth}
 \footnotesize
-The coincident shared winner (\MatchedSharedConfigID{}) uses matrix learning rate
+The common winning configuration (\MatchedSharedConfigID{}) uses matrix learning rate
 \MatchedSharedLR{}, weight decay \MatchedSharedWeightDecay{}, and auxiliary AdamW
 multiplier \MatchedSharedAuxMult{} (auxiliary learning rate \MatchedSharedAuxLR{}).
 Paired runs use the same run seed and therefore the same sampled training-window sequence;
