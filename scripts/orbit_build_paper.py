@@ -233,7 +233,7 @@ def write_ablation_table(results: dict, generated: Path) -> None:
     lines = [
         "\\begin{table}[t]",
         "\\centering",
-        "\\caption{Expanded 10-seed mechanism ablation under the frozen matched ORBIT "
+        "\\caption{Expanded 10-seed mechanism ablation under the frozen Muon-selected "
         "configuration. $\\Delta$ is full ORBIT minus the control.}",
         "\\label{tab:ablation}",
         "\\begin{tabular}{lrrrr}",
