@@ -80,10 +80,12 @@ the optimizer uses the known computation in which Q/K parameters participate to 
 local update geometry, rather than relying only on generic parameter shape or gradient
 statistics.
 
-Optimizer comparisons are unusually sensitive to tuning policy. The primary comparison
-therefore applies one Muon-selected training recipe unchanged to both Muon and ORBIT, while
-separate crossed-recipe experiments quantify optimizer--recipe interaction. Full selection
-and held-out evaluation details are given in Section~\ref{sec:evaluation-protocol}.
+Optimizer comparisons are unusually sensitive to tuning policy. For the primary comparison,
+Muon and ORBIT are evaluated on the same predeclared ten-candidate grid on one tuning seed;
+their independently selected winners coincide, yielding one shared recipe that is frozen
+before held-out paired evaluation. Separate crossed-recipe experiments quantify
+optimizer--recipe interaction. Full selection and evaluation details are given in
+Section~\ref{sec:evaluation-protocol}.
 
 \Needspace{9\baselineskip}
 \paragraph{Contributions.}
@@ -150,21 +152,21 @@ RoPE geometry, or gauge-equivariant conditioning.
 
 \section{Results}
 
-\subsection{Matched hyperparameters estimate the ORBIT effect}
-The primary comparison removes optimizer-specific recipe selection as a confound. Muon is
-tuned over ten deterministic 900-step candidate configurations generated before the
-held-out comparison. The lowest-loss Muon candidate is frozen and then applied unchanged to
-both Muon and ORBIT on the held-out paired seeds. Under that shared configuration, Muon
-reached mean validation loss
+\subsection{Matched shared hyperparameters isolate the update-rule difference}
+The primary comparison controls recipe differences by evaluating Muon and ORBIT on the
+same ten deterministic 900-step candidate configurations on one tuning seed. Both methods
+select the same winner (\MatchedSharedConfigID{}), which is frozen before the held-out
+paired evaluation. Under that shared configuration, Muon reached mean validation loss
 \MatchedMuonLoss{} and ORBIT reached \MatchedOrbitLoss{} across ten new paired seeds
 (Table~\ref{tab:matched}).
 
 The paired ORBIT-minus-Muon difference was \MatchedDelta{} nats, with a 95\% confidence
 interval of [\MatchedCILow{}, \MatchedCIHigh{}].
 ORBIT has the lower validation loss on \MatchedWins{} of the ten held-out paired runs
-(Table~\ref{tab:matched}). Because the two methods use the same Muon-selected frozen configuration, this contrast
-estimates the update-rule difference without allowing ORBIT's tuning outcomes to influence
-the primary recipe.
+(Table~\ref{tab:matched}). Because the held-out comparison uses an identical frozen
+configuration for both methods, this contrast estimates their update-rule difference at
+that shared recipe; uncertainty from the preceding recipe-selection step is not included
+in the confidence interval.
 
 The mean wall-clock-time difference is \MatchedRuntimeOverhead{} relative to Muon, and
 the recorded peak CUDA-allocation difference is \MatchedMemoryOverhead{}.
@@ -305,7 +307,7 @@ interactions. By constructing frequency-local metrics from Q/K statistics transp
 through causal RoPE relative-position rotations, ORBIT adapts Muon's matrix update to the
 computation performed by attention.
 
-Under the same Muon-selected training recipe, the primary experiment measures the paired
+Under the same frozen shared training recipe, the primary experiment measures the paired
 ORBIT--Muon effect on ten held-out seeds. Crossed-recipe and ablation experiments separate
 recipe sensitivity from the contributions of functional Q/K conditioning, RoPE-aware
 transport, and full frequency-pair coupling; additional experiments probe longer-horizon
