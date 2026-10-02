@@ -44,9 +44,9 @@ function-space extension of Muon for rotary attention: frequency-local $2\times2
 are constructed from query/key second moments transported through RoPE relative-position
 rotations, applied to the candidate Q/K updates, and followed by joint Frobenius-norm
 restoration. On RoPE-modified GPT-2-style decoders trained on FineWeb-Edu, the evaluation
-separates optimizer mechanism from hyperparameter recipe. Muon and ORBIT are evaluated
-on the same ten-candidate 900-step tuning grid; both independently select the same
-configuration, which is then frozen before held-out paired evaluation. Under that shared
+separates optimizer mechanism from hyperparameter recipe. Muon is tuned over a
+predeclared ten-candidate 900-step grid; its lowest-loss configuration is frozen before
+held-out evaluation and then applied unchanged to both Muon and ORBIT. Under that shared
 recipe, the comparison reports \MatchedWins{}
 ORBIT-favoring seeds and a paired ORBIT-minus-Muon mean difference of \MatchedDelta{} nats
 (95\% CI [\MatchedCILow{}, \MatchedCIHigh{}]).
@@ -88,11 +88,10 @@ local update geometry, rather than relying only on generic parameter shape or gr
 statistics.
 
 Optimizer comparisons are unusually sensitive to tuning policy. For the primary comparison,
-Muon and ORBIT are evaluated on the same predeclared ten-candidate grid on one tuning seed;
-their independently selected winners coincide, yielding one shared recipe that is frozen
-before held-out paired evaluation. Separate crossed-recipe experiments quantify
-optimizer--recipe interaction. Full selection and evaluation details are given in
-Section~\ref{sec:evaluation-protocol}.
+Muon alone is tuned on a predeclared ten-candidate grid on one tuning seed; its winner is
+frozen before held-out evaluation and applied unchanged to both Muon and ORBIT. Separate
+crossed-recipe experiments quantify optimizer--recipe interaction. Full selection and
+evaluation details are given in Section~\ref{sec:evaluation-protocol}.
 
 \Needspace{9\baselineskip}
 \paragraph{Contributions.}
@@ -100,11 +99,11 @@ The main contributions are:
 \textbf{(1) RoPE-conditioned Q/K geometry}, a frequency-local functional metric derived
 from the relative-position attention interaction;
 \textbf{(2) matched optimizer evaluation}, separating the ORBIT update from recipe
-selection across unseen seeds;
+selection across unseen seeds while reporting paired effect size, runtime, and memory cost;
 \textbf{(3) mechanism ablations}, isolating functional conditioning, RoPE-aware rotation,
 and full frequency-pair coupling; and
 \textbf{(4) transfer evaluation}, extending the protocol to a longer training horizon and
-a 355M model with measured runtime and memory cost.
+a 355M model as secondary checks outside the primary setting.
 
 \section{Related Work}
 \paragraph{Matrix and spectral optimization.}
@@ -159,22 +158,21 @@ RoPE geometry, or gauge-equivariant conditioning.
 
 \section{Results}
 
-\subsection{Shared hyperparameters isolate the update-rule difference}
-The primary comparison controls recipe differences by evaluating Muon and ORBIT on the
-same ten deterministic 900-step candidate configurations on one tuning seed. Both methods
-select the same winner (\MatchedSharedConfigID{}), which is frozen before the held-out
-paired evaluation. Under that shared configuration, Muon reached mean validation loss
-\MatchedMuonLoss{} and ORBIT reached \MatchedOrbitLoss{} across ten new paired seeds
+\subsection{Baseline-selected hyperparameters isolate the update-rule difference}
+The primary comparison controls recipe differences by tuning Muon over ten deterministic
+900-step candidate configurations on one tuning seed. The lowest-loss Muon configuration
+(\MatchedSharedConfigID{}) is frozen before held-out evaluation and then applied unchanged
+to both methods. Under that shared configuration, Muon reached mean validation loss
+\MatchedMuonLoss{} and ORBIT reached \MatchedOrbitLoss{} across ten held-out paired seeds
 (Table~\ref{tab:matched}).
 
 The paired ORBIT-minus-Muon difference was \MatchedDelta{} nats, with a 95\% confidence
 interval of [\MatchedCILow{}, \MatchedCIHigh{}].
 ORBIT has the lower validation loss on \MatchedWins{} of the ten held-out paired runs
-(Table~\ref{tab:matched}). Muon is lower on one paired run, so the result represents a
-consistent average advantage rather than unanimous per-seed dominance. Because the held-out
-comparison uses an identical frozen configuration for both methods, this contrast estimates
-their update-rule difference at that shared recipe; uncertainty from the preceding
-recipe-selection step is not included in the confidence interval.
+(Table~\ref{tab:matched}). Because the held-out comparison uses an identical frozen
+configuration for both methods, this contrast estimates their update-rule difference at
+that Muon-selected recipe; uncertainty from the preceding recipe-selection step is not
+included in the confidence interval.
 
 The mean end-to-end wall-clock difference is \MatchedRuntimeOverhead{} relative to Muon,
 and the recorded peak allocated CUDA-memory difference is \MatchedMemoryOverhead{}.
@@ -187,15 +185,15 @@ and the recorded peak allocated CUDA-memory difference is \MatchedMemoryOverhead
 
 \subsection{Crossed recipes separate update-rule and recipe effects}
 The optimizer-by-configuration cross-over makes the tuning confound explicit. When both
-methods use the Muon-selected recipe, the ORBIT-minus-Muon difference is
+methods use the Muon discovery recipe, the ORBIT-minus-Muon difference is
 \XConfigMechanismMuon{} nats, with ORBIT lower on
-\XConfigMechanismMuonWins{} paired seeds. Under the ORBIT-selected recipe, the corresponding
+\XConfigMechanismMuonWins{} paired seeds. Under the ORBIT discovery recipe, the corresponding
 difference is \XConfigMechanismOrbit{} nats, with ORBIT lower on
 \XConfigMechanismOrbitWins{} paired seeds. These cells quantify how the update-rule
 difference changes with the surrounding hyperparameters.
 
 Recipe choice itself has a larger effect than the matched mechanism contrast. Moving Muon
-from its own discovery recipe to the ORBIT-selected recipe changes validation loss by
+from its own discovery recipe to the ORBIT discovery recipe changes validation loss by
 \XConfigRecipeMuon{} nats, while the analogous change for ORBIT is
 \XConfigRecipeOrbit{} nats. The cross-over separates update-rule and recipe effects without treating the independently
 tuned gap as a mechanism-only estimate.
@@ -318,7 +316,7 @@ interactions. By constructing frequency-local metrics from Q/K statistics transp
 through causal RoPE relative-position rotations, ORBIT adapts Muon's matrix update to the
 computation performed by attention.
 
-Under the same frozen shared training recipe, the primary experiment measures the paired
+Under the same frozen Muon-selected training recipe, the primary experiment measures the paired
 ORBIT--Muon effect on ten held-out seeds. Crossed-recipe and ablation experiments separate
 recipe sensitivity from the contributions of functional Q/K conditioning, RoPE-aware
 transport, and full frequency-pair coupling; additional experiments probe longer-horizon
