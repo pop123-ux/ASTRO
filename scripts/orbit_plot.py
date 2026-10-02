@@ -57,18 +57,21 @@ def mean_sd(values: list[float]) -> tuple[float, float]:
 
 def plot_orbit_overview(out: Path) -> None:
     """Compact vector schematic of the ORBIT update path."""
-    fig, ax = plt.subplots(figsize=(10.8, 3.35))
+    fig, ax = plt.subplots(figsize=(11.2, 3.05))
     ax.set_xlim(0, 12.2)
     ax.set_ylim(0, 4.0)
     ax.axis("off")
 
-    def box(x, y, w, h, title, subtitle=None, *, lw=1.2):
+    def box(
+        x, y, w, h, title, subtitle=None, *,
+        lw=1.2, facecolor="#FFFFFF", edgecolor="0.25"
+    ):
         patch = FancyBboxPatch(
             (x, y), w, h,
             boxstyle="round,pad=0.035,rounding_size=0.08",
             linewidth=lw,
-            facecolor="white",
-            edgecolor="0.25",
+            facecolor=facecolor,
+            edgecolor=edgecolor,
         )
         ax.add_patch(patch)
         ax.text(
@@ -100,17 +103,35 @@ def plot_orbit_overview(out: Path) -> None:
         ax.annotate("", xy=(x2-0.08,y2), xytext=(x1+0.08,y1),
                     arrowprops=dict(arrowstyle="->", lw=1.25, color="0.35"))
 
-    b1 = box(0.20, 1.95, 1.65, 1.25, "Muon candidate", "Q/K gradients\n+ momentum")
-    b2 = box(2.20, 1.95, 1.70, 1.25, "Q/K statistics", "EMA $2\\times2$\ncovariances")
-    b3 = box(4.25, 1.95, 1.80, 1.25, "RoPE transport", "relative offsets\n$\\Delta$")
-    b4 = box(6.40, 1.95, 1.75, 1.25, "Local metric", "per-frequency\n$2\\times2$")
-    b5 = box(8.50, 1.95, 1.75, 1.25, "Precondition", r"analytic $M^{-1/2}$")
-    b6 = box(10.60, 1.95, 1.40, 1.25, "Restore", "joint Q+K\nnorm")
+    b1 = box(
+        0.20, 1.95, 1.65, 1.25, "Muon candidate", "Q/K gradients\n+ momentum",
+        facecolor="#EDF5FA", edgecolor="#4F7C92",
+    )
+    b2 = box(
+        2.20, 1.95, 1.70, 1.25, "Q/K statistics", "EMA $2\\times2$\ncovariances",
+        facecolor="#F6F4F0", edgecolor="#756F68",
+    )
+    b3 = box(
+        4.25, 1.95, 1.80, 1.25, "RoPE transport", "relative offsets\n$\\Delta$",
+        facecolor="#ECF7F5", edgecolor="#4E928E",
+    )
+    b4 = box(
+        6.40, 1.95, 1.75, 1.25, "Local metric", "per-frequency\n$2\\times2$",
+        facecolor="#EDF5FA", edgecolor="#4F7C92",
+    )
+    b5 = box(
+        8.50, 1.95, 1.75, 1.25, "Precondition", r"analytic $M^{-1/2}$",
+        facecolor="#FAF3E8", edgecolor="#8E7B5C",
+    )
+    b6 = box(
+        10.60, 1.95, 1.40, 1.25, "Restore", "joint Q+K\nnorm",
+        facecolor="#ECF7F5", edgecolor="#4E928E",
+    )
     for a,b in zip((b1,b2,b3,b4,b5),(b2,b3,b4,b5,b6)):
         arrow(a,b)
 
     ax.text(6.10,3.62,"ORBIT: RoPE-conditioned function-space update",
-            ha="center",va="center",fontsize=11.1,fontweight="bold")
+            ha="center",va="center",fontsize=11.1,fontweight="regular")
     ax.text(
         6.10,
         0.42,
