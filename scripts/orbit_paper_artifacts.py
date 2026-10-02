@@ -59,7 +59,7 @@ EXPECTED = {
     "matched_tune": {
         "path": "matched_tune.jsonl",
         "group_key": "optimizer",
-        "groups": {"muon": (0,) * 10, "orbit": (0,) * 10},
+        "groups": {"muon": (0,) * 10},
         "trials": tuple(range(10)),
     },
     "matched_confirm": {
