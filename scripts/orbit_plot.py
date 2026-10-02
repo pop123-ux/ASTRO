@@ -11,7 +11,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-from matplotlib.patches import FancyBboxPatch
+from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
 from orbit_paper_artifacts import build as freeze_evidence
 from orbit_paper_artifacts import grouped, load_jsonl
@@ -149,6 +149,312 @@ def plot_orbit_overview(out: Path) -> None:
     ax.text(11.30, 0.90, "parameter update", ha="center", va="center", fontsize=8.4)
     save(fig, out, "orbit_overview")
 
+
+
+PAPER_COLORS = {
+    "gray_fill": "#F4F2EE",
+    "gray_edge": "#7B756D",
+    "blue_fill": "#EDF5FA",
+    "blue_edge": "#4F7C92",
+    "teal_fill": "#ECF7F5",
+    "teal_edge": "#4E928E",
+    "sand_fill": "#FAF3E8",
+    "sand_edge": "#8E7B5C",
+    "green_fill": "#F1F7EC",
+    "green_edge": "#6E8C5B",
+    "violet_fill": "#F3EFFA",
+    "violet_edge": "#7B67A3",
+    "text": "#1E2430",
+    "muted": "#5B6573",
+}
+
+
+def plot_protocol_design(out: Path) -> None:
+    """Compact visual map of the ORBIT evidence hierarchy."""
+    fig, ax = plt.subplots(figsize=(11.6, 5.3))
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+
+    def card(
+        x, y, w, h, title, role, body, footer, *,
+        facecolor, edgecolor, linewidth=1.25
+    ):
+        patch = FancyBboxPatch(
+            (x, y), w, h,
+            boxstyle="round,pad=0.009,rounding_size=0.018",
+            linewidth=linewidth,
+            facecolor=facecolor,
+            edgecolor=edgecolor,
+        )
+        ax.add_patch(patch)
+        ax.text(
+            x + 0.035 * w, y + 0.82 * h, title,
+            ha="left", va="center", fontsize=10.0,
+            fontweight="bold", color=PAPER_COLORS["text"],
+        )
+
+        tag_w = min(0.42 * w, 0.105)
+        tag = FancyBboxPatch(
+            (x + 0.035 * w, y + 0.62 * h),
+            tag_w, 0.13 * h,
+            boxstyle="round,pad=0.006,rounding_size=0.010",
+            linewidth=0,
+            facecolor=edgecolor,
+            alpha=0.14,
+        )
+        ax.add_patch(tag)
+        ax.text(
+            x + 0.035 * w + tag_w / 2, y + 0.685 * h, role,
+            ha="center", va="center", fontsize=7.7,
+            fontweight="bold", color=edgecolor,
+        )
+
+        ax.text(
+            x + 0.04 * w, y + 0.54 * h, body,
+            ha="left", va="top", fontsize=7.8,
+            color=PAPER_COLORS["muted"], linespacing=1.24,
+        )
+        ax.text(
+            x + 0.04 * w, y + 0.07 * h, footer,
+            ha="left", va="bottom", fontsize=7.5,
+            color=PAPER_COLORS["text"], linespacing=1.15,
+        )
+
+    def arrow(x1, y1, x2, y2, *, color="#69717D"):
+        ax.add_patch(
+            FancyArrowPatch(
+                (x1, y1), (x2, y2),
+                arrowstyle="->", mutation_scale=11,
+                linewidth=1.05, color=color,
+            )
+        )
+
+    ax.text(
+        0.5, 0.955, "Experimental design and evidence hierarchy",
+        ha="center", va="center", fontsize=12.2,
+        fontweight="bold", color=PAPER_COLORS["text"],
+    )
+
+    w, h = 0.285, 0.285
+    xs = (0.035, 0.3575, 0.68)
+    y_top, y_bottom = 0.565, 0.185
+
+    card(
+        xs[0], y_top, w, h,
+        "Broad benchmark", "CONTEXT",
+        "124M · 900 steps\n"
+        "5 seeds\n"
+        "AdamW · AdaMuon · Muon\n"
+        "NorMuon · ASTRO · ORBIT",
+        "Optimizer context",
+        facecolor=PAPER_COLORS["gray_fill"],
+        edgecolor=PAPER_COLORS["gray_edge"],
+    )
+    card(
+        xs[1], y_top, w, h,
+        "Crossed recipes", "RECIPE",
+        "124M · 900 steps\n"
+        "5 seeds per cell\n"
+        "Muon · ORBIT",
+        "Separate recipe and update-rule effects",
+        facecolor=PAPER_COLORS["blue_fill"],
+        edgecolor=PAPER_COLORS["blue_edge"],
+    )
+    card(
+        xs[2], y_top, w, h,
+        "Matched confirmation", "PRIMARY",
+        "124M · 900 steps\n"
+        "10 paired held-out runs\n"
+        "Muon · ORBIT",
+        "Primary confirmatory comparison",
+        facecolor=PAPER_COLORS["teal_fill"],
+        edgecolor=PAPER_COLORS["teal_edge"],
+        linewidth=2.0,
+    )
+    card(
+        xs[0], y_bottom, w, h,
+        "Ablation", "MECHANISM",
+        "124M · 900 steps\n"
+        "10 paired runs per control\n"
+        "ORBIT · identity · no-RoPE · diagonal",
+        "Attribute ORBIT's functional components",
+        facecolor=PAPER_COLORS["green_fill"],
+        edgecolor=PAPER_COLORS["green_edge"],
+    )
+    card(
+        xs[1], y_bottom, w, h,
+        "Long-horizon transfer", "TRANSFER",
+        "124M · 2700 steps\n"
+        "2 paired runs\n"
+        "Muon · NorMuon · ASTRO · ORBIT",
+        "Probe longer-horizon behavior",
+        facecolor=PAPER_COLORS["sand_fill"],
+        edgecolor=PAPER_COLORS["sand_edge"],
+    )
+    card(
+        xs[2], y_bottom, w, h,
+        "Scale transfer", "TRANSFER",
+        "355M · 900 steps\n"
+        "2 paired runs\n"
+        "Muon · NorMuon · ASTRO · ORBIT",
+        "Probe transfer to a larger decoder",
+        facecolor=PAPER_COLORS["violet_fill"],
+        edgecolor=PAPER_COLORS["violet_edge"],
+    )
+
+    arrow(xs[0] + w, y_top + h / 2, xs[1] - 0.012, y_top + h / 2)
+    arrow(xs[1] + w, y_top + h / 2, xs[2] - 0.012, y_top + h / 2)
+
+    primary_x = xs[2] + w / 2
+    for target_x in (xs[0] + w / 2, xs[1] + w / 2, xs[2] + w / 2):
+        arrow(primary_x, y_top - 0.005, target_x, y_bottom + h + 0.005)
+
+    ax.text(
+        0.5, 0.075,
+        "Primary evidence is isolated from contextual, mechanistic, and transfer analyses.",
+        ha="center", va="center", fontsize=8.0, color=PAPER_COLORS["muted"],
+    )
+    save(fig, out, "protocol_design")
+
+
+def plot_primary_results_panel(results: dict, out: Path) -> None:
+    """Compact visual summary of the primary matched Muon--ORBIT comparison."""
+    mc = results["matched_confirmation"]
+    summary = mc["summary"]
+    effect = mc["orbit_vs_muon"]
+
+    muon = summary["muon"]
+    orbit = summary["orbit"]
+    mean = float(effect["mean_delta"])
+    lo, hi = (float(x) for x in effect["ci95"])
+    n = int(effect["n"])
+    wins = int(effect["a_wins"])
+
+    fig, ax = plt.subplots(figsize=(10.8, 4.15))
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+
+    ax.text(
+        0.5, 0.94, "Primary matched-hyperparameter confirmation",
+        ha="center", va="center", fontsize=12.4,
+        fontweight="bold", color=PAPER_COLORS["text"],
+    )
+
+    def result_card(x, y, w, h, name, row, *, facecolor, edgecolor):
+        patch = FancyBboxPatch(
+            (x, y), w, h,
+            boxstyle="round,pad=0.012,rounding_size=0.018",
+            linewidth=1.35, facecolor=facecolor, edgecolor=edgecolor,
+        )
+        ax.add_patch(patch)
+        ax.text(
+            x + 0.055 * w, y + 0.79 * h, name,
+            ha="left", va="center", fontsize=10.7,
+            fontweight="bold", color=PAPER_COLORS["text"],
+        )
+        ax.text(
+            x + 0.055 * w, y + 0.62 * h, f"n = {int(row['n'])}",
+            ha="left", va="center", fontsize=8.1,
+            fontweight="bold", color=edgecolor,
+        )
+        ax.text(
+            x + 0.055 * w, y + 0.43 * h,
+            f"Validation loss  {row['mean_val_loss']:.4f} ± {row['sd_val_loss']:.4f}",
+            ha="left", va="center", fontsize=8.3, color=PAPER_COLORS["text"],
+        )
+        ax.text(
+            x + 0.055 * w, y + 0.25 * h,
+            f"Time  {row['mean_seconds']/60:.1f} min",
+            ha="left", va="center", fontsize=8.1, color=PAPER_COLORS["muted"],
+        )
+        ax.text(
+            x + 0.055 * w, y + 0.10 * h,
+            f"Peak memory  {row['mean_peak_cuda_gb']:.3f} GB",
+            ha="left", va="center", fontsize=8.1, color=PAPER_COLORS["muted"],
+        )
+
+    result_card(
+        0.045, 0.54, 0.28, 0.29, "Muon", muon,
+        facecolor=PAPER_COLORS["blue_fill"],
+        edgecolor=PAPER_COLORS["blue_edge"],
+    )
+    result_card(
+        0.045, 0.17, 0.28, 0.29, "ORBIT", orbit,
+        facecolor=PAPER_COLORS["teal_fill"],
+        edgecolor=PAPER_COLORS["teal_edge"],
+    )
+
+    panel = FancyBboxPatch(
+        (0.39, 0.17), 0.565, 0.66,
+        boxstyle="round,pad=0.014,rounding_size=0.018",
+        linewidth=1.2, facecolor="#FFFFFF", edgecolor="#858585",
+    )
+    ax.add_patch(panel)
+
+    ax.text(
+        0.425, 0.74, "Paired effect (ORBIT − Muon)",
+        ha="left", va="center", fontsize=10.6,
+        fontweight="bold", color=PAPER_COLORS["text"],
+    )
+    ax.text(
+        0.425, 0.62, f"Δ loss = {mean:+.4f}",
+        ha="left", va="center", fontsize=15.2,
+        fontweight="bold", color=PAPER_COLORS["teal_edge"],
+    )
+    ax.text(
+        0.425, 0.53, f"95% CI  [{lo:+.4f}, {hi:+.4f}]",
+        ha="left", va="center", fontsize=9.2, color=PAPER_COLORS["text"],
+    )
+    ax.text(
+        0.425, 0.45, f"ORBIT lower in {wins}/{n} paired runs",
+        ha="left", va="center", fontsize=9.2, color=PAPER_COLORS["text"],
+    )
+
+    # CI axis, with a little padding around the observed interval and zero.
+    span_lo = min(lo, mean, 0.0)
+    span_hi = max(hi, mean, 0.0)
+    width = max(span_hi - span_lo, 1e-4)
+    axis_lo = span_lo - 0.18 * width
+    axis_hi = span_hi + 0.18 * width
+
+    x0, x1, y = 0.46, 0.90, 0.295
+
+    def mapx(value: float) -> float:
+        return x0 + (value - axis_lo) / (axis_hi - axis_lo) * (x1 - x0)
+
+    ax.plot([x0, x1], [y, y], color="#858585", linewidth=1.0)
+
+    for value in (axis_lo, mean, 0.0, axis_hi):
+        xx = mapx(value)
+        ax.plot([xx, xx], [y - 0.012, y + 0.012], color="#858585", linewidth=0.8)
+
+    zero_x = mapx(0.0)
+    ax.plot(
+        [zero_x, zero_x], [y - 0.065, y + 0.065],
+        color="#A45454", linewidth=1.0, linestyle="--",
+    )
+
+    ax.plot(
+        [mapx(lo), mapx(hi)], [y, y],
+        color=PAPER_COLORS["teal_edge"], linewidth=4.0,
+        solid_capstyle="round",
+    )
+    ax.scatter(
+        [mapx(mean)], [y], s=48,
+        color=PAPER_COLORS["teal_edge"], zorder=5,
+    )
+
+    ax.text(
+        x0, 0.205, "negative favors ORBIT",
+        ha="left", va="center", fontsize=7.8, color=PAPER_COLORS["muted"],
+    )
+    ax.text(
+        x1, 0.205, "zero",
+        ha="right", va="center", fontsize=7.8, color=PAPER_COLORS["muted"],
+    )
+    save(fig, out, "primary_results_panel")
 
 def plot_matched_effect(results: dict, out: Path) -> None:
     effect = results["matched_confirmation"]["orbit_vs_muon"]
@@ -465,8 +771,10 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
 
     plot_orbit_overview(out)
+    plot_protocol_design(out)
 
     if "matched_confirmation" in results:
+        plot_primary_results_panel(results, out)
         plot_matched_effect(results, out)
 
     if (
