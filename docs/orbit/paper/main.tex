@@ -35,8 +35,9 @@ function-space extension of Muon for rotary attention: frequency-local $2\times2
 are constructed from query/key second moments transported through RoPE relative-position
 rotations, applied to the candidate Q/K updates, and followed by joint Frobenius-norm
 restoration. On RoPE-modified GPT-2-style decoders trained on FineWeb-Edu, the evaluation
-separates optimizer mechanism from hyperparameter recipe. Under one configuration selected from the shared ten-candidate grid using Muon tuning loss
-only and frozen before held-out evaluation, the comparison reports \MatchedWins{}
+separates optimizer mechanism from hyperparameter recipe. Muon is first tuned over a
+ten-candidate 900-step grid; its selected configuration is then frozen before held-out
+evaluation of either method. Under that shared recipe, the comparison reports \MatchedWins{}
 ORBIT-favoring seeds and a paired ORBIT-minus-Muon mean difference of \MatchedDelta{} nats
 (95\% CI [\MatchedCILow{}, \MatchedCIHigh{}]).
 Mean training-time difference is \MatchedRuntimeOverhead{}, with peak allocated-memory
@@ -78,11 +79,10 @@ statistics.
 
 Optimizer comparisons are unusually sensitive to tuning policy, making experimental design
 part of the contribution. The evaluation first crosses the frozen Muon and ORBIT recipes. For the primary matched
-comparison, both methods are evaluated over the same candidate grid, but the shared
-confirmation recipe is selected using Muon tuning loss only and then frozen before any
-held-out ORBIT--Muon comparison. This baseline-selected design prevents ORBIT's tuning
-outcomes from influencing the primary configuration. The same frozen recipe anchors the
-subsequent ablations.
+comparison, Muon alone is tuned over a predeclared ten-candidate grid. Its winner is frozen
+before any held-out ORBIT--Muon comparison and then applied unchanged to both methods.
+This baseline-selected design prevents ORBIT outcomes from influencing the primary
+configuration. The same frozen recipe anchors the subsequent ablations.
 
 \Needspace{9\baselineskip}
 \paragraph{Contributions.}
@@ -156,11 +156,11 @@ or gauge-equivariant conditioning.
 \section{Results}
 
 \subsection{Matched hyperparameters estimate the ORBIT effect}
-The primary comparison removes optimizer-specific recipe selection as a confound. Muon and
-ORBIT are evaluated on the same ten deterministic 900-step candidate configurations, but
-the primary shared recipe is selected using Muon's tuning loss only. That Muon-selected
-candidate is frozen before any held-out confirmation seed is evaluated and is then applied
-unchanged to both methods. Under that shared configuration, Muon reached mean validation loss
+The primary comparison removes optimizer-specific recipe selection as a confound. Muon is
+tuned over ten deterministic 900-step candidate configurations generated before the
+held-out comparison. The lowest-loss Muon candidate is frozen and then applied unchanged to
+both Muon and ORBIT on the held-out paired seeds. Under that shared configuration, Muon
+reached mean validation loss
 \MatchedMuonLoss{} and ORBIT reached \MatchedOrbitLoss{} across ten new paired seeds
 (Table~\ref{tab:matched}).
 
