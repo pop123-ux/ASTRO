@@ -318,7 +318,7 @@ def test_paper_presentation_contract():
     assert "inference-time computation" not in main
     assert "inference graph" not in main
     assert "inference graph" not in methods
-    assert "Additional development baseline" in main
+    assert r"\paragraph{ASTRO development baseline.}" in main
     assert "post-polar direction" in main
     normalized_main = " ".join(main.split())
     assert "not as a separate research contribution" in normalized_main
