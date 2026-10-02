@@ -35,10 +35,10 @@ function-space extension of Muon for rotary attention: frequency-local $2\times2
 are constructed from query/key second moments transported through RoPE relative-position
 rotations, applied to the candidate Q/K updates, and followed by joint Frobenius-norm
 restoration. On RoPE-modified GPT-2-style decoders trained on FineWeb-Edu, the evaluation
-separates optimizer mechanism from hyperparameter recipe. Under an identical configuration
-selected independently by both methods from the same ten-candidate grid, the held-out
-comparison reports \MatchedWins{} ORBIT-favoring seeds and a paired ORBIT-minus-Muon mean
-difference of \MatchedDelta{} nats (95\% CI [\MatchedCILow{}, \MatchedCIHigh{}]).
+separates optimizer mechanism from hyperparameter recipe. Under one configuration selected from the shared ten-candidate grid using Muon tuning loss
+only and frozen before held-out evaluation, the comparison reports \MatchedWins{}
+ORBIT-favoring seeds and a paired ORBIT-minus-Muon mean difference of \MatchedDelta{} nats
+(95\% CI [\MatchedCILow{}, \MatchedCIHigh{}]).
 Mean training-time difference is \MatchedRuntimeOverhead{}, with peak allocated-memory
 difference \MatchedMemoryOverhead{}. Cross-configuration experiments quantify recipe
 sensitivity, while the ablations isolate functional Q/K conditioning, RoPE-aware transport,
@@ -77,10 +77,12 @@ local update geometry, rather than relying only on generic parameter shape or gr
 statistics.
 
 Optimizer comparisons are unusually sensitive to tuning policy, making experimental design
-part of the contribution. The evaluation first crosses the frozen Muon and ORBIT recipes,
-then presents both methods with the same candidate set and evaluates their independently
-selected winner on unseen paired seeds. This mechanism-isolated comparison anchors the
-subsequent ablations and longer-horizon/model-scale transfer experiments.
+part of the contribution. The evaluation first crosses the frozen Muon and ORBIT recipes. For the primary matched
+comparison, both methods are evaluated over the same candidate grid, but the shared
+confirmation recipe is selected using Muon tuning loss only and then frozen before any
+held-out ORBIT--Muon comparison. This baseline-selected design prevents ORBIT's tuning
+outcomes from influencing the primary configuration. The same frozen recipe anchors the
+subsequent ablations.
 
 \Needspace{9\baselineskip}
 \paragraph{Contributions.}
@@ -155,17 +157,19 @@ or gauge-equivariant conditioning.
 
 \subsection{Matched hyperparameters estimate the ORBIT effect}
 The primary comparison removes optimizer-specific recipe selection as a confound. Muon and
-ORBIT were presented with the same ten deterministic 900-step candidate configurations and
-independently selected the same frozen candidate before any held-out confirmation seed was
-evaluated. Under that shared configuration, Muon reached mean validation loss
+ORBIT are evaluated on the same ten deterministic 900-step candidate configurations, but
+the primary shared recipe is selected using Muon's tuning loss only. That Muon-selected
+candidate is frozen before any held-out confirmation seed is evaluated and is then applied
+unchanged to both methods. Under that shared configuration, Muon reached mean validation loss
 \MatchedMuonLoss{} and ORBIT reached \MatchedOrbitLoss{} across ten new paired seeds
 (Table~\ref{tab:matched}).
 
 The paired ORBIT-minus-Muon difference was \MatchedDelta{} nats, with a 95\% confidence
 interval of [\MatchedCILow{}, \MatchedCIHigh{}].
 ORBIT has the lower validation loss on \MatchedWins{} of the ten held-out paired runs
-(Figure~\ref{fig:matched}). Because the two methods use the same frozen configuration,
-this contrast estimates the update-rule difference without independent recipe selection.
+(Figure~\ref{fig:matched}). Because the two methods use the same Muon-selected frozen configuration, this contrast
+estimates the update-rule difference without allowing ORBIT's tuning outcomes to influence
+the primary recipe.
 
 The mean wall-clock-time difference is \MatchedRuntimeOverhead{} relative to Muon, and
 the recorded peak CUDA-allocation difference is \MatchedMemoryOverhead{}.
