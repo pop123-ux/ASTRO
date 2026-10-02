@@ -143,7 +143,9 @@ def test_strict_freeze_rejects_pre_audit_core_digest(tmp_path):
     try:
         paper.build(tmp_path)
     except ValueError as exc:
-        assert "core digest changed" in str(exc)
+        message = str(exc)
+        assert "pre-audit ORBIT evidence detected" in message
+        assert "must be rerun" in message
     else:
         raise AssertionError("strict evidence freeze accepted pre-audit ORBIT evidence")
 
