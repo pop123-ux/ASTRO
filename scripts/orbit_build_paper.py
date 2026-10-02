@@ -167,7 +167,7 @@ def write_matched_table(results: dict, generated: Path) -> None:
         "\\begin{table}[H]",
         "\\centering",
         "\\caption{Primary matched-hyperparameter confirmation on ten held-out paired runs. "
-        "Both optimizers use the same Muon-selected training recipe.}",
+        "Both optimizers use the same frozen shared-grid winner.}",
         "\\label{tab:matched}",
         "\\small",
         "\\setlength{\\tabcolsep}{6pt}",
@@ -212,7 +212,7 @@ def write_matched_table(results: dict, generated: Path) -> None:
         f"{cfg['lr'] * cfg['scalar_lr_mult']:.6g}). Wall time includes training and the "
         "fixed 20-batch validation pass. Peak allocation is "
         "\\texttt{torch.cuda.max\\_memory\\_allocated}, reported in GiB. "
-        "The confidence interval is conditional on this frozen selected recipe and does "
+        "The confidence interval is conditional on this frozen shared-grid winner and does "
         "not include recipe-selection uncertainty.",
         "\\end{minipage}",
         "\\end{table}",
