@@ -29,9 +29,19 @@ from pathlib import Path
 from typing import Iterable
 
 import orbit_campaign as campaign
+import orbit_postscale as post
 
 LEGACY_PREAUDIT_CORE_DIGEST = "de8b994a734276871770c6c67648117d3613d0954f3ae90d7e7b69246308c200"
 CORE_DIGEST = campaign.code_digest()
+POSTSCALE_DIGEST = post.postscale_digest()
+POSTSCALE_PHASES = {
+    "xconfig",
+    "matched_tune",
+    "matched_confirm",
+    "ablation_ext",
+    "horizon_with_astro",
+    "scale_with_astro",
+}
 
 EXPECTED = {
     "confirm": {
@@ -244,6 +254,13 @@ def validate_phase(name: str, rows: list[dict]) -> list[str]:
             raise ValueError(
                 f"{name}: core digest changed for {row.get('task_id')}: {row_digest}"
             )
+        if name in POSTSCALE_PHASES:
+            orchestration_digest = row.get("orchestration_digest")
+            if orchestration_digest != POSTSCALE_DIGEST:
+                raise ValueError(
+                    f"{name}: orchestration digest changed for {row.get('task_id')}: "
+                    f"{orchestration_digest}; rerun this phase under the current paper protocol"
+                )
         if not finite_positive(row.get("val_loss")):
             raise ValueError(f"{name}: invalid val_loss in {row.get('task_id')}")
         if not finite_positive(row.get("seconds")):
@@ -515,6 +532,13 @@ def build(work_dir: Path, *, allow_incomplete: bool = False) -> tuple[dict, dict
                 "rows": len(rows),
                 "task_ids": len({x.get("task_id") for x in rows}),
                 "code_digests": sorted({str(x.get("code_digest")) for x in rows}),
+                "orchestration_digests": sorted(
+                    {
+                        str(x.get("orchestration_digest"))
+                        for x in rows
+                        if x.get("orchestration_digest") is not None
+                    }
+                ),
                 "environments": sorted(
                     {json.dumps(x.get("environment", {}), sort_keys=True) for x in rows}
                 ),
