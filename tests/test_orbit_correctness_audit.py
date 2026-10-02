@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import socket
+import sys
+from pathlib import Path
 
 import pytest
 import torch
@@ -10,6 +12,13 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 from orbit import Orbit, OrbitGPT, OrbitGPTConfig
 from orbit.model import RotaryAttention
+from orbit.optimizer import inverse_metric_power
+
+SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
+
+import paper_campaign as paper_campaign  # noqa: E402
 
 
 def tiny_config(**overrides):
@@ -70,6 +79,88 @@ def test_negative_relative_distance_is_rejected():
     with pytest.raises(ValueError, match="causal distances"):
         attn.orbit_metrics((-1,), rotate=True)
 
+
+
+@pytest.mark.parametrize("power", [0.5, 1.0, 2.0])
+def test_inverse_metric_power_matches_float64_reference_across_scales(power):
+    torch.manual_seed(19)
+    scales = (1e-8, 1e-4, 1.0, 1e4, 1e8)
+    metrics = []
+    for scale in scales:
+        q, _ = torch.linalg.qr(torch.randn(2, 2, dtype=torch.float64))
+        values = torch.tensor([scale, scale * 1e3], dtype=torch.float64)
+        metrics.append((q * values.unsqueeze(0)) @ q.T)
+    metric64 = torch.stack(metrics)
+    got, _ = inverse_metric_power(
+        metric64.float(),
+        power=power,
+        eps=1e-12,
+        condition_cap=1e6,
+    )
+    values, vectors = torch.linalg.eigh(metric64)
+    reference = (
+        vectors
+        * values.pow(-0.5 * power).unsqueeze(-2)
+    ) @ vectors.transpose(-1, -2)
+    assert torch.allclose(got.double(), reference, atol=2e-3, rtol=2e-3)
+
+
+def test_joint_frobenius_restore_preserves_qk_budget():
+    model = OrbitGPT(tiny_config(n_head=1, n_embd=16))
+    optimizer = Orbit(model, lr=0.01, adamw_lr=1e-3)
+    pair = model.orbit_qk_pairs()[0]
+    with torch.no_grad():
+        pair["module"].orbit_q_second_moment.copy_(
+            torch.tensor([[5.0, 1.4], [1.4, 0.8]])
+            .view(1, 1, 2, 2)
+            .repeat(1, pair["module"].n_freq, 1, 1)
+        )
+        pair["module"].orbit_k_second_moment.copy_(
+            torch.tensor([[0.9, -0.3], [-0.3, 3.0]])
+            .view(1, 1, 2, 2)
+            .repeat(1, pair["module"].n_freq, 1, 1)
+        )
+    torch.manual_seed(23)
+    q_update = torch.randn_like(pair["q"])
+    k_update = torch.randn_like(pair["k"])
+    before = q_update.float().square().sum() + k_update.float().square().sum()
+    q_after, k_after = optimizer._precondition_pair(pair, q_update, k_update)
+    after = q_after.float().square().sum() + k_after.float().square().sum()
+    assert torch.allclose(after, before, atol=2e-4, rtol=2e-6)
+
+
+def test_paper_identity_control_matches_paper_muon_update():
+    config = tiny_config(n_head=1, n_embd=16)
+    torch.manual_seed(31)
+    orbit_model = OrbitGPT(config)
+    muon_model = OrbitGPT(config)
+    muon_model.load_state_dict(orbit_model.state_dict())
+
+    recipe = {"lr": 0.01, "scalar_lr_mult": 0.1, "weight_decay": 0.02}
+    orbit_opt = Orbit(
+        orbit_model,
+        variant="orbit_identity",
+        lr=recipe["lr"],
+        adamw_lr=recipe["lr"] * recipe["scalar_lr_mult"],
+        weight_decay=recipe["weight_decay"],
+    )
+    muon_opt = paper_campaign.paper_build_optimizer("muon", muon_model, recipe)
+
+    generator = torch.Generator().manual_seed(37)
+    for _ in range(5):
+        x = torch.randint(0, config.vocab_size, (2, 12), generator=generator)
+        orbit_loss = orbit_model(x, labels=x).loss
+        muon_loss = muon_model(x, labels=x).loss
+        assert torch.equal(orbit_loss, muon_loss)
+        orbit_loss.backward()
+        muon_loss.backward()
+        orbit_opt.step()
+        muon_opt.step()
+        orbit_opt.zero_grad(set_to_none=True)
+        muon_opt.zero_grad(set_to_none=True)
+
+    for orbit_param, muon_param in zip(orbit_model.parameters(), muon_model.parameters()):
+        assert torch.equal(orbit_param, muon_param)
 
 def test_checkpointing_updates_statistics_once_per_step():
     model = OrbitGPT(tiny_config(gradient_checkpointing=True))
