@@ -274,7 +274,7 @@ def plot_mechanism_summary(results: dict, out: Path) -> None:
     ax = axes[0]
     sm = results["cross_configuration_isolation"]["summary"]
     x = [0, 1]
-    labels = ["Muon recipe", "ORBIT recipe"]
+    labels = ["Muon discovery recipe", "ORBIT discovery recipe"]
     series = {
         "Muon": ["muon_at_muon_config", "muon_at_orbit_config"],
         "ORBIT": ["orbit_at_muon_config", "orbit_at_orbit_config"],
