@@ -30,8 +30,8 @@ and $R_f(j)$ to the key, so orthogonality of the RoPE rotations gives
 \end{equation}
 For an unrotated query perturbation $\delta q_f$,
 $\delta s_f=\delta q_f^\top R_f(-\Delta)k_f$. Therefore the expected squared score
-movement is a quadratic form whose metric depends on the opposite-side covariance. Let
-$C_{Q,f}$ and $C_{K,f}$ denote exponential-moving-average $2\times2$ covariances of the
+movement is a quadratic form whose metric depends on the opposite-side second moment. Let
+$C_{Q,f}$ and $C_{K,f}$ denote exponential-moving-average $2\times2$ uncentered second-moment matrices of the
 unrotated query and key coordinates. ORBIT defines
 \begin{align}
 M_{Q,f} &= \mathbb{E}_{\Delta}\!\left[
@@ -41,10 +41,10 @@ R_f(-\Delta)^\top C_{Q,f}R_f(-\Delta)\right].
 \label{eq:orbit-metrics}
 \end{align}
 The expectation is evaluated on the causal-distance grid
-$\mathcal{D}=\{1,2,4,8,16,32,64,128\}$. Covariances are updated once per logical
+$\mathcal{D}=\{1,2,4,8,16,32,64,128\}$. Second moments are updated once per logical
 forward/backward step with EMA coefficient $\beta=0.95$ after the first observation.
 With distributed data parallelism, unnormalized second moments and sample counts are
-reduced across ranks before the EMA. The covariance buffers and observation counter are
+reduced across ranks before the EMA. The second-moment buffers and observation counter are
 included in the model checkpoint state.
 
 \subsection{ORBIT preconditioning}
@@ -80,7 +80,7 @@ step-by-step specification in Algorithm~\ref{alg:orbit}.
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.98\linewidth]{orbit_overview.pdf}
-\caption{ORBIT update pathway. Muon candidate directions are reshaped using Q/K covariance
+\caption{ORBIT update pathway. Muon candidate directions are reshaped using Q/K second-moment
 statistics transported through RoPE relative-position rotations, producing frequency-local
 $2\times2$ metrics. Analytic inverse-square-root preconditioning is followed by joint
 Frobenius-norm restoration before the parameter update. Other parameter classes retain
@@ -95,7 +95,7 @@ Muon and auxiliary AdamW updates proceed unchanged for the remaining parameter c
 \caption{ORBIT update for a RoPE query--key projection pair}
 \label{alg:orbit}
 \DontPrintSemicolon
-\KwIn{$W_Q,W_K$; gradients $G_Q,G_K$; momentum $m_Q,m_K$; covariances $C_Q,C_K$;
+\KwIn{$W_Q,W_K$; gradients $G_Q,G_K$; momentum $m_Q,m_K$; second moments $C_Q,C_K$;
 learning rate $\eta$; weight decay $\lambda$; momentum $\mu$; EMA $\beta$;
 displacements $\mathcal{D}$}
 \textbf{Forward statistics:} update $C_Q,C_K$ from current unrotated Q/K activations
@@ -123,13 +123,13 @@ $W_K\leftarrow(1-\eta\lambda)W_K-\eta\widetilde U_K$\;
 \end{algorithm}
 
 \subsection{Cost and ablation variants}
-The additional ORBIT state consists of two $2\times2$ covariance matrices for every
+The additional ORBIT state consists of two $2\times2$ second-moment matrices for every
 attention head and RoPE frequency pair. Its distinctive per-step matrix operations are
 therefore local $2\times2$ transforms rather than dense model-width preconditioners.
 
 Three controls isolate the update components. \textbf{Identity} keeps the ORBIT training
 path and statistics collection but disables functional preconditioning. \textbf{No-RoPE}
-uses Q/K covariance metrics without relative-position rotation. \textbf{Diagonal} retains
+uses Q/K second-moment metrics without relative-position rotation. \textbf{Diagonal} retains
 RoPE-aware per-frequency scaling while removing off-diagonal coupling within each
 $2\times2$ pair.
 
