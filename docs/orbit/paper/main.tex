@@ -220,6 +220,16 @@ transported $2\times2$ metric, the difference is \AblDiagDelta{} nats, with 95\%
 of the three design choices without assuming their direction in advance
 (Figure~\ref{fig:mechanism}).
 
+\IfFileExists{figures/mechanism_summary.pdf}{%
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.98\linewidth]{mechanism_summary.pdf}
+\caption{Mechanism isolation. \textbf{(a)} Crossed optimizer--recipe experiment.
+\textbf{(b)} Paired mechanism ablations with 95\% confidence intervals; negative values
+favor full ORBIT.}
+\label{fig:mechanism}
+\end{figure}}{}
+
 \subsection{Transfer checks across training horizon and model size}
 The transfer experiments preserve each optimizer's independently frozen recipe and probe
 behavior outside the primary 124M/900-step setting.
@@ -237,16 +247,6 @@ ORBIT-minus-ASTRO difference \ScaleVsAstro{} nats. This cell uses only two seeds
 smaller batch size, a different sampled-token budget per optimizer step, and gradient
 checkpointing; it is therefore a transfer check rather than a controlled scaling result
 (Figure~\ref{fig:transfer}).
-
-\IfFileExists{figures/mechanism_summary.pdf}{%
-\begin{figure}[!t]
-\centering
-\includegraphics[width=0.98\linewidth]{mechanism_summary.pdf}
-\caption{Mechanism isolation. \textbf{(a)} Crossed optimizer--recipe experiment.
-\textbf{(b)} Paired mechanism ablations with 95\% confidence intervals; negative values
-favor full ORBIT.}
-\label{fig:mechanism}
-\end{figure}}{}
 
 \IfFileExists{figures/transfer_summary.pdf}{%
 \begin{figure}[!t]
