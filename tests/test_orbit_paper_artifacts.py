@@ -79,10 +79,7 @@ def build_fixture(tmp_path: Path) -> None:
 
     matched_tune = []
     for trial in range(10):
-        for opt in ("muon", "orbit"):
-            matched_tune.append(
-                row("matched_tune", opt, 0, trial, trial=trial)
-            )
+        matched_tune.append(row("matched_tune", "muon", 0, trial, trial=trial))
     write_jsonl(merged / "matched_tune.jsonl", matched_tune)
 
     matched_confirm = []
@@ -121,39 +118,34 @@ def build_fixture(tmp_path: Path) -> None:
             "code_digest": paper.CORE_DIGEST,
             "selected_by": "muon",
         },
-        "independent_winners": {},
     }
     (merged / "matched_best_configs.json").write_text(json.dumps(best))
 
 
-def test_matched_freeze_uses_muon_winner_even_when_orbit_prefers_another_candidate():
+def test_matched_freeze_uses_lowest_loss_muon_candidate_for_both_methods():
     rows = []
-    for optimizer, losses in (
-        ("muon", [1.0, 2.0]),
-        ("orbit", [2.0, 1.0]),
-    ):
-        for trial, loss in enumerate(losses):
-            rows.append(
-                {
-                    "optimizer": optimizer,
-                    "val_loss": loss,
-                    "trial": trial,
-                    "config_id": f"shared-{trial:02d}",
-                    "config": {"lr": 0.01 + trial * 0.01},
-                    "task_id": f"{optimizer}-{trial}",
-                    "code_digest": paper.CORE_DIGEST,
-                    "orchestration_digest": "test",
-                    "environment": ENV,
-                }
-            )
+    losses = [1.4, 1.1, 1.3, 1.2, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0]
+    for trial, loss in enumerate(losses):
+        rows.append(
+            {
+                "optimizer": "muon",
+                "val_loss": loss,
+                "trial": trial,
+                "config_id": f"shared-{trial:02d}",
+                "config": {"lr": 0.01 + trial * 0.001},
+                "task_id": f"muon-{trial}",
+                "code_digest": paper.CORE_DIGEST,
+                "orchestration_digest": "test",
+                "environment": ENV,
+            }
+        )
 
     frozen = post_merge.freeze_matched(rows)
     assert frozen["selection_rule"] == "muon_winner_from_shared_grid"
-    assert frozen["muon"]["config_id"] == "shared-00"
-    assert frozen["orbit"]["config_id"] == "shared-00"
+    assert frozen["muon"]["config_id"] == "shared-01"
+    assert frozen["orbit"]["config_id"] == "shared-01"
     assert frozen["muon"]["selected_by"] == "muon"
     assert frozen["orbit"]["selected_by"] == "muon"
-    assert frozen["independent_winners"]["orbit"]["config_id"] == "shared-01"
 
 
 def test_strict_freeze_accepts_complete_exact_fixture(tmp_path):
