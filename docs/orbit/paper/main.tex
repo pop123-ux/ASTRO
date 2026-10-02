@@ -170,15 +170,17 @@ paired evaluation. Under that shared configuration, Muon reached mean validation
 The paired ORBIT-minus-Muon difference was \MatchedDelta{} nats, with a 95\% confidence
 interval of [\MatchedCILow{}, \MatchedCIHigh{}].
 ORBIT has the lower validation loss on \MatchedWins{} of the ten held-out paired runs
-(Table~\ref{tab:matched}). Because the held-out comparison uses an identical frozen
-configuration for both methods, this contrast estimates their update-rule difference at
-that shared recipe; uncertainty from the preceding recipe-selection step is not included
-in the confidence interval.
+(Table~\ref{tab:matched}). Muon is lower on one paired run, so the result represents a
+consistent average advantage rather than unanimous per-seed dominance. Because the held-out
+comparison uses an identical frozen configuration for both methods, this contrast estimates
+their update-rule difference at that shared recipe; uncertainty from the preceding
+recipe-selection step is not included in the confidence interval.
 
 The mean end-to-end wall-clock difference is \MatchedRuntimeOverhead{} relative to Muon,
 and the recorded peak allocated CUDA-memory difference is \MatchedMemoryOverhead{}.
 
 \IfFileExists{generated/table_matched.tex}{\input{generated/table_matched.tex}}{}
+\medskip
 
 
 
@@ -252,10 +254,11 @@ checkpointing; it is therefore a transfer check rather than a controlled scaling
 \centering
 \includegraphics[width=0.96\linewidth]{transfer_summary.pdf}
 \caption{Transfer beyond the primary setting. \textbf{(a)} 124M model at 2700 steps.
-\textbf{(b)} 355M model at 900 steps. Points show individual runs; horizontal segments
-show the method mean.}
+\textbf{(b)} 355M model at 900 steps. Colors identify the optimizer; each colored point is
+one run, and the matching horizontal segment is that optimizer's mean across the two runs.}
 \label{fig:transfer}
 \end{figure}}{}
+\medskip
 \FloatBarrier
 
 \subsection{Broader optimizer context}
@@ -266,8 +269,9 @@ Each method was selected from a shallow optimizer-specific discovery budget, so 
 numbers combine optimizer behavior with recipe selection and should not be interpreted as
 a ranking of isolated update rules.
 
-Figure~\ref{fig:broad-context} summarizes this exploratory comparison. The matched
-Muon--ORBIT experiment remains the mechanism-isolated estimate used for the central claim.
+Figure~\ref{fig:broad-context} provides broader exploratory context under
+optimizer-specific recipes. The matched Muon--ORBIT comparison remains the primary
+mechanism-isolated estimate of the update-rule effect.
 
 \IfFileExists{figures/broad_confirmation.pdf}{%
 \begin{figure}[!t]
@@ -325,6 +329,16 @@ optimizer geometry may be derived from the computation performed by a parameter 
 only from tensor shape or generic gradient statistics. ORBIT provides one concrete
 instantiation of this principle for rotary Q/K interactions, with the matched comparison
 and mechanism ablations providing the primary empirical support.
+
+More broadly, function-aware optimization suggests moving beyond a single update geometry
+applied uniformly across an entire network. Different parameter groups implement different
+computations---rotary query--key projections, normalization, embeddings, routing, and other
+specialized mechanisms---and can therefore warrant different training geometries. ORBIT
+explores one such specialization for RoPE. A longer-term direction is to compose multiple
+function-specific update rules within the same model, so that each parameter block is
+optimized according to the computation it performs, with the aim of reducing loss and
+improving training efficiency. Instead of one optimizer geometry for an entire model,
+future training may use the right geometry for each computation.
 
 \FloatBarrier
 \bibliographystyle{plain}
