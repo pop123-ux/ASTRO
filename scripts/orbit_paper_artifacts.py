@@ -263,25 +263,28 @@ def validate_phase(name: str, rows: list[dict]) -> list[str]:
 
 def validate_matched_configs(merged: Path, phases: dict[str, list[dict]]) -> dict:
     best = load_json(merged / "matched_best_configs.json")
+    if best.get("selection_rule") != "muon_winner_from_shared_grid":
+        raise ValueError("matched primary config was not frozen by the Muon-only selection rule")
+
     muon_cfg = best["muon"]["config"]
     orbit_cfg = best["orbit"]["config"]
     if muon_cfg != orbit_cfg:
-        raise ValueError(
-            "matched_tune winners differ; matched_confirm is not a strict identical-config test"
-        )
+        raise ValueError("matched confirmation does not use one shared frozen config")
     if best["muon"].get("config_id") != best["orbit"].get("config_id"):
-        raise ValueError("matched_tune winners do not share the same config_id")
+        raise ValueError("matched confirmation does not use one shared config_id")
+    if best["muon"].get("selected_by") != "muon" or best["orbit"].get("selected_by") != "muon":
+        raise ValueError("matched config provenance is not Muon-selected")
 
     for row in phases["matched_confirm"]:
         if row["config"] != muon_cfg:
             raise ValueError(
-                f"matched_confirm:{row['task_id']}: config differs from frozen shared winner"
+                f"matched_confirm:{row['task_id']}: config differs from Muon-selected primary"
             )
 
     for row in phases["ablation_ext"]:
-        if row["config"] != orbit_cfg:
+        if row["config"] != muon_cfg:
             raise ValueError(
-                f"ablation_ext:{row['task_id']}: config differs from frozen ORBIT winner"
+                f"ablation_ext:{row['task_id']}: config differs from Muon-selected primary"
             )
     return best
 
