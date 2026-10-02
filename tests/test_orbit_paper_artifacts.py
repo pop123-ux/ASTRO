@@ -133,6 +133,21 @@ def test_strict_freeze_accepts_complete_exact_fixture(tmp_path):
     assert (tmp_path / "paper_artifacts" / "paper_results.json").is_file()
 
 
+def test_strict_freeze_rejects_pre_audit_core_digest(tmp_path):
+    make_complete_work_dir(tmp_path)
+    path = tmp_path / "merged" / "matched_confirm.jsonl"
+    rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    rows[0]["code_digest"] = paper.LEGACY_PREAUDIT_CORE_DIGEST
+    write_jsonl(path, rows)
+
+    try:
+        paper.build(tmp_path)
+    except ValueError as exc:
+        assert "core digest changed" in str(exc)
+    else:
+        raise AssertionError("strict evidence freeze accepted pre-audit ORBIT evidence")
+
+
 def test_strict_freeze_refuses_missing_ablation(tmp_path):
     build_fixture(tmp_path)
     (tmp_path / "merged" / "ablation_ext.jsonl").unlink()
