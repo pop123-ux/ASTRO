@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+import socket
 
 import pytest
 import torch
@@ -95,10 +95,10 @@ def test_standard_scheduler_scales_auxiliary_path():
     assert optimizer.auxiliary_lr() == pytest.approx(before * 0.1)
 
 
-def _ddp_worker(rank: int, world_size: int, init_file: str) -> None:
+def _ddp_worker(rank: int, world_size: int, port: int) -> None:
     dist.init_process_group(
         "gloo",
-        init_method=f"file://{init_file}",
+        init_method=f"tcp://127.0.0.1:{port}",
         rank=rank,
         world_size=world_size,
     )
@@ -133,6 +133,8 @@ def _ddp_worker(rank: int, world_size: int, init_file: str) -> None:
 
 
 @pytest.mark.skipif(not dist.is_available(), reason="torch.distributed unavailable")
-def test_ddp_keeps_orbit_statistics_and_weights_synchronized(tmp_path):
-    init_file = os.fspath(tmp_path / "ddp_init")
-    mp.spawn(_ddp_worker, args=(2, init_file), nprocs=2, join=True)
+def test_ddp_keeps_orbit_statistics_and_weights_synchronized():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    mp.spawn(_ddp_worker, args=(2, port), nprocs=2, join=True)
