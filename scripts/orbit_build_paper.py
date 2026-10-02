@@ -237,7 +237,7 @@ def write_xconfig_table(results: dict, generated: Path) -> None:
         "\\toprule",
         " & \\multicolumn{2}{c}{Frozen training recipe}" + ROW_END,
         "\\cmidrule(lr){2-3}",
-        "Update rule & Muon-selected & ORBIT-selected" + ROW_END,
+        "Update rule & Muon discovery & ORBIT discovery" + ROW_END,
         "\\midrule",
         f"Muon & {sm['muon_at_muon_config']['mean_val_loss']:.4f} $\\pm$ "
         f"{sm['muon_at_muon_config']['sd_val_loss']:.4f} & "
