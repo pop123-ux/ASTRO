@@ -186,9 +186,9 @@ step); the 355M model uses batch size 4 (2,048 sampled tokens per step). The lat
 difference is disclosed because it prevents interpreting the 355M result as a pure
 model-size scaling experiment. Reported wall-clock time starts immediately before the
 training loop and ends after the fixed 20-batch validation pass, so it is an end-to-end
-per-run measure rather than optimizer-step time alone. Peak CUDA allocation is recorded
-with \texttt{torch.cuda.max\_memory\_allocated} and reported in GiB. All twenty runs in
-the primary matched-confirmation comparison were executed on NVIDIA Tesla T4 GPUs.
+per-run measure rather than optimizer-step time alone. Peak allocated CUDA memory is
+reported in GiB. All twenty runs in the primary matched-confirmation comparison were
+executed on NVIDIA Tesla T4 GPUs.
 
 \subsection{Baselines and hyperparameter selection}
 The broad campaign includes AdamW, Muon, NorMuon, AdaMuon, ASTRO, and ORBIT. ASTRO is a
