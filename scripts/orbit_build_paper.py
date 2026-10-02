@@ -189,7 +189,7 @@ def write_matched_table(results: dict, generated: Path) -> None:
     lines += [
         "\\bottomrule",
         "\\end{tabular}",
-        "\\vspace{0.55em}",
+        "\\vspace{0.75em}",
         "",
         "\\begin{tabular}{l c S[table-format=+1.4] S[table-format=1.4] c c}",
         "\\toprule",
@@ -201,7 +201,7 @@ def write_matched_table(results: dict, generated: Path) -> None:
         f"{eff['sd_delta']:.4f} & {{{ci(eff)}}} & {{{eff['a_wins']}/{eff['n']}}} \\\\",
         "\\bottomrule",
         "\\end{tabular}",
-        "\\vspace{0.35em}",
+        "\\vspace{0.55em}",
         "",
         "\\begin{minipage}{0.96\\linewidth}",
         "\\footnotesize",
