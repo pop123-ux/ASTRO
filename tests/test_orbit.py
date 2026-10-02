@@ -35,8 +35,8 @@ def test_orbit_optimizer_enables_functional_statistics():
     out.loss.backward()
     for block in model.blocks:
         assert int(block.attn.orbit_stats_seen) > 0
-        assert torch.isfinite(block.attn.orbit_q_cov).all()
-        assert torch.isfinite(block.attn.orbit_k_cov).all()
+        assert torch.isfinite(block.attn.orbit_q_second_moment).all()
+        assert torch.isfinite(block.attn.orbit_k_second_moment).all()
 
 
 def test_rope_metric_is_spd_and_position_sensitive():
@@ -44,8 +44,8 @@ def test_rope_metric_is_spd_and_position_sensitive():
     attn = model.blocks[0].attn
     with torch.no_grad():
         base = torch.tensor([[5.0, 1.2], [1.2, 0.8]])
-        attn.orbit_k_cov.copy_(base.view(1, 1, 2, 2).repeat(attn.n_head, attn.n_freq, 1, 1))
-        attn.orbit_q_cov.copy_(base.flip(0).flip(1).view(1, 1, 2, 2).repeat(attn.n_head, attn.n_freq, 1, 1))
+        attn.orbit_k_second_moment.copy_(base.view(1, 1, 2, 2).repeat(attn.n_head, attn.n_freq, 1, 1))
+        attn.orbit_q_second_moment.copy_(base.flip(0).flip(1).view(1, 1, 2, 2).repeat(attn.n_head, attn.n_freq, 1, 1))
     mq0, _ = attn.orbit_metrics((0,), rotate=True)
     mq8, _ = attn.orbit_metrics((8,), rotate=True)
     assert torch.linalg.eigvalsh(mq0).min() > 0
@@ -156,7 +156,7 @@ def test_rope_transport_matches_causal_score_sign():
 
     with torch.no_grad():
         cov = torch.tensor([[4.0, 1.3], [1.3, 0.7]])
-        attn.orbit_k_cov.copy_(cov.view(1, 1, 2, 2))
+        attn.orbit_k_second_moment.copy_(cov.view(1, 1, 2, 2))
     mq, _ = attn.orbit_metrics((8,), rotate=True, eps=0.0)
     assert torch.allclose(mq[0, 0], r @ cov @ r.T, atol=1e-6, rtol=1e-6)
 
@@ -186,12 +186,12 @@ def test_orbit_statistics_are_checkpointed():
     x = torch.randint(0, 127, (2, 16))
     model(x, labels=x)
     state = model.state_dict()
-    assert "blocks.0.attn.orbit_q_cov" in state
-    assert "blocks.0.attn.orbit_k_cov" in state
+    assert "blocks.0.attn.orbit_q_second_moment" in state
+    assert "blocks.0.attn.orbit_k_second_moment" in state
     assert "blocks.0.attn.orbit_stats_seen" in state
 
     restored = tiny_model()
     restored.load_state_dict(state)
-    assert torch.equal(restored.blocks[0].attn.orbit_q_cov, model.blocks[0].attn.orbit_q_cov)
-    assert torch.equal(restored.blocks[0].attn.orbit_k_cov, model.blocks[0].attn.orbit_k_cov)
+    assert torch.equal(restored.blocks[0].attn.orbit_q_second_moment, model.blocks[0].attn.orbit_q_second_moment)
+    assert torch.equal(restored.blocks[0].attn.orbit_k_second_moment, model.blocks[0].attn.orbit_k_second_moment)
     assert torch.equal(restored.blocks[0].attn.orbit_stats_seen, model.blocks[0].attn.orbit_stats_seen)
