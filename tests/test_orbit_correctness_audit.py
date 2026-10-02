@@ -284,6 +284,11 @@ def _ddp_worker(rank: int, world_size: int, port: int) -> None:
             assert torch.allclose(weights[0], other, atol=1e-7, rtol=1e-7)
         for other in covs[1:]:
             assert torch.allclose(covs[0], other, atol=1e-7, rtol=1e-7)
+
+        # Let all ranks finish collective work before DDP/process-group teardown.
+        # This avoids intermittent Gloo worker aborts on newer PyTorch runners.
+        dist.barrier()
+        del ddp
     finally:
         dist.destroy_process_group()
 
