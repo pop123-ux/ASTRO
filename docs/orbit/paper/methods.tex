@@ -98,9 +98,9 @@ Figure~\ref{fig:orbit-overview} summarizes the data flow of the optimizer before
 step-by-step specification in Algorithm~\ref{alg:orbit}.
 
 \IfFileExists{figures/orbit_overview.pdf}{%
-\begin{figure}[H]
+\begin{figure}[!t]
 \centering
-\includegraphics[width=\linewidth]{orbit_overview.pdf}
+\includegraphics[width=0.97\linewidth]{orbit_overview.pdf}
 \caption{ORBIT update pathway. Muon candidate directions are reshaped using Q/K second-moment
 statistics transported through RoPE relative-position rotations, producing frequency-local
 $2\times2$ metrics. Analytic inverse-square-root preconditioning is followed by joint
@@ -112,7 +112,7 @@ their standard Muon or auxiliary AdamW path.}
 Algorithm~\ref{alg:orbit} gives the corresponding Q/K-pair update. Here
 $\epsilon=10^{-5}$ and $\mathcal D=\{1,2,4,8,16,32,64,128\}$ in the reported experiments.
 
-\begin{algorithm}[H]
+\begin{algorithm}[!t]
 \caption{ORBIT update for a RoPE query--key projection pair}
 \label{alg:orbit}
 \begin{algorithmic}[1]
@@ -142,7 +142,6 @@ $\widetilde U_K \gets \rho\widehat U_K$
 \State $W_K \gets (1-\eta\lambda)W_K-\eta\widetilde U_K$
 \end{algorithmic}
 \end{algorithm}
-\FloatBarrier
 
 \subsection{Cost and ablation variants}
 The additional ORBIT state consists of two $2\times2$ second-moment matrices for every
