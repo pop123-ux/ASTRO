@@ -160,9 +160,8 @@ RoPE geometry, or gauge-equivariant conditioning.
 
 \subsection{Baseline-selected hyperparameters isolate the update-rule difference}
 The primary comparison controls recipe differences by tuning Muon over ten deterministic
-900-step candidate configurations on one tuning seed. The lowest-loss Muon configuration
-(\MatchedSharedConfigID{}) is frozen before held-out evaluation and then applied unchanged
-to both methods. Under that shared configuration, Muon reached mean validation loss
+900-step candidate configurations on one tuning seed. The lowest-loss Muon configuration is frozen before held-out evaluation and then applied
+unchanged to both methods. Under that shared configuration, Muon reached mean validation loss
 \MatchedMuonLoss{} and ORBIT reached \MatchedOrbitLoss{} across ten held-out paired seeds
 (Table~\ref{tab:matched}).
 
