@@ -101,7 +101,7 @@ def plot_orbit_overview(out: Path) -> None:
                     arrowprops=dict(arrowstyle="->", lw=1.25, color="0.35"))
 
     b1 = box(0.20, 1.95, 1.65, 1.25, "Muon candidate", "Q/K gradients\n+ momentum")
-    b2 = box(2.20, 1.95, 1.70, 1.25, "Q/K statistics", "EMA $2\\times2$\nsecond moments")
+    b2 = box(2.20, 1.95, 1.70, 1.25, "Q/K statistics", "EMA $2\\times2$\ncovariances")
     b3 = box(4.25, 1.95, 1.80, 1.25, "RoPE transport", "relative offsets\n$\\Delta$")
     b4 = box(6.40, 1.95, 1.75, 1.25, "Local metric", "per-frequency\n$2\\times2$")
     b5 = box(8.50, 1.95, 1.75, 1.25, "Precondition", r"analytic $M^{-1/2}$")
@@ -241,61 +241,6 @@ def plot_ablation_effects(results: dict, out: Path) -> None:
     ax.set_xlabel(r"Validation-loss difference (full ORBIT $-$ control)")
     ax.set_title("Mechanism ablation: paired effects with 95% CIs")
     save(fig, out, "ablation_effects")
-
-
-def plot_mechanism_attribution(results: dict, out: Path) -> None:
-    """Compact standalone ablation panel for the horizontal results row."""
-    ab = results["mechanism_ablation"]
-    comparisons = [
-        ("Identity", ab["orbit_vs_identity"]),
-        ("No-RoPE", ab["orbit_vs_norope"]),
-        ("Diagonal", ab["orbit_vs_diag"]),
-    ]
-
-    fig, ax = plt.subplots(figsize=(4.15, 3.55))
-    ax.axvline(0.0, linewidth=0.9, linestyle="--", color="0.45")
-    for yi, (label, effect) in enumerate(comparisons):
-        mean = float(effect["mean_delta"])
-        lo, hi = effect["ci95"]
-        ax.errorbar(
-            mean,
-            yi,
-            xerr=[[mean - lo], [hi - mean]],
-            fmt="o",
-            markersize=4.8,
-            capsize=3,
-            linewidth=1.2,
-        )
-    ax.set_yticks(range(len(comparisons)), [x[0] for x in comparisons])
-    ax.invert_yaxis()
-    ax.set_xlabel(r"$\Delta$ validation loss (ORBIT $-$ control)", fontsize=9)
-    ax.set_title("Mechanism attribution", fontsize=11)
-    ax.tick_params(axis="both", labelsize=8)
-    save(fig, out, "mechanism_attribution")
-
-
-def plot_transfer_panel(rows: list[dict], out: Path, *, stem: str, title: str) -> None:
-    """Compact standalone transfer panel for the horizontal results row."""
-    by = grouped(rows, "optimizer")
-    order = ["muon", "normuon", "astro_v2", "orbit"]
-    display = {
-        "muon": "Muon",
-        "normuon": "NorMuon",
-        "astro_v2": "ASTRO",
-        "orbit": "ORBIT",
-    }
-
-    fig, ax = plt.subplots(figsize=(4.15, 3.55))
-    for xi, name in enumerate(order):
-        vals = [float(x["val_loss"]) for x in sorted(by[name], key=lambda r: r["seed"])]
-        offsets = [-0.055, 0.055] if len(vals) == 2 else [0.0] * len(vals)
-        ax.scatter([xi + o for o in offsets], vals, s=27, zorder=3)
-        mean = statistics.fmean(vals)
-        ax.plot([xi - 0.14, xi + 0.14], [mean, mean], linewidth=1.9)
-    ax.set_xticks(range(len(order)), [display[x] for x in order])
-    ax.set_title(title, fontsize=11)
-    ax.tick_params(axis="both", labelsize=8)
-    save(fig, out, stem)
 
 
 
@@ -503,23 +448,20 @@ def main() -> None:
     if "matched_confirmation" in results:
         plot_matched_effect(results, out)
 
-    if "mechanism_ablation" in results:
-        plot_mechanism_attribution(results, out)
+    if (
+        "cross_configuration_isolation" in results
+        and "mechanism_ablation" in results
+    ):
+        plot_mechanism_summary(results, out)
 
-    if "long_horizon_transfer" in results:
-        plot_transfer_panel(
+    if (
+        "long_horizon_transfer" in results
+        and "scale_transfer" in results
+    ):
+        plot_transfer_summary(
             load_jsonl(merged / "horizon_with_astro.jsonl"),
-            out,
-            stem="long_horizon_transfer",
-            title="Long-horizon transfer",
-        )
-
-    if "scale_transfer" in results:
-        plot_transfer_panel(
             load_jsonl(merged / "scale_with_astro.jsonl"),
             out,
-            stem="scale_transfer",
-            title="355M transfer",
         )
 
     if "broad_independently_tuned_context" in results:
