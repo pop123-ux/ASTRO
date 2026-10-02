@@ -98,7 +98,10 @@ aggregate parameter-space step magnitude.
 \noindent\fbox{%
 \begin{minipage}{0.965\linewidth}
 \small
-\textbf{ORBIT update rule.}
+\textbf{ORBIT update rule}
+\par\vspace{0.18em}
+\hrule height 0.8pt
+\vspace{0.55em}
 For a RoPE query--key projection pair, define the frequency-wise preconditioners
 $\mathcal T_Q=\operatorname{blkdiag}_f(M_{Q,f}^{-1/2})$ and
 $\mathcal T_K=\operatorname{blkdiag}_f(M_{K,f}^{-1/2})$. Then
@@ -132,6 +135,7 @@ biases, normalization parameters, and the tied output head use the auxiliary Ada
 Figure~\ref{fig:orbit-overview} summarizes the data flow of the optimizer before the
 step-by-step specification in Algorithm~\ref{alg:orbit}.
 
+\medskip
 \IfFileExists{figures/orbit_overview.pdf}{%
 \begin{figure}[!htbp]
 \centering
@@ -144,6 +148,7 @@ their standard Muon or auxiliary AdamW path.}
 \label{fig:orbit-overview}
 \end{figure}}{}
 
+\medskip
 Algorithm~\ref{alg:orbit} gives the corresponding Q/K-pair update. Here
 $\epsilon=10^{-5}$ and $\mathcal D=\{1,2,4,8,16,32,64,128\}$ in the reported experiments.
 
@@ -337,10 +342,6 @@ are reported without multiplicity adjustment; the long-horizon and 355M cells ar
 descriptive transfer checks rather than high-powered inferential tests. End-to-end
 wall-clock time and peak allocated CUDA memory are reported alongside loss.
 
-All final comparisons use the same frozen implementation and a consistent run-record format.
-Optimizer settings, random seeds, environment metadata, validation metrics, runtime,
-memory use, and training trajectories are retained with each run. Results are merged only
-after automated consistency checks verify the expected experiment structure, matched
-configuration, finite metrics, and a common implementation/software state.
+
 
 
