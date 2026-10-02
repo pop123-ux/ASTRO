@@ -405,12 +405,11 @@ def test_paper_method_and_protocol_contract_are_explicit():
     assert "lowest-loss Muon candidate is frozen" in normalized
     assert "ORBIT outcomes therefore do not influence the primary recipe" in normalized
 
-    # ASTRO must be defined before a reader encounters it in the experimental table.
-    astro_definition = main.index(r"\paragraph{ASTRO development baseline.}")
-    protocol_table = methods.index(r"\label{tab:protocol}")
-    assert astro_definition >= 0
-    assert protocol_table >= 0
+    # main.tex is typeset before methods.tex, where Table 1 lives. Keeping the
+    # ASTRO definition in main.tex guarantees it is introduced before that table.
+    assert r"\paragraph{ASTRO development baseline.}" in main
     assert "ASTRO is a frozen Muon-family development baseline" in main
+    assert r"\label{tab:protocol}" in methods
 
     # Transfer cells stay secondary; the paper must not hard-code success language.
     assert "transfer evaluation" in main
