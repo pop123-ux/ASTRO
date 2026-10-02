@@ -380,6 +380,42 @@ def test_generated_claim_ledger_is_outcome_neutral(tmp_path):
     assert "descriptive transfer checks" in ledger
 
 
+def test_paper_method_and_protocol_contract_are_explicit():
+    main = (ROOT / "docs" / "orbit" / "paper" / "main.tex").read_text()
+    methods = (ROOT / "docs" / "orbit" / "paper" / "methods.tex").read_text()
+    paper_text = main + "\n" + methods
+
+    # Mathematical convention: causal distance Delta=i-j>=0 implies R(-Delta).
+    assert r"R_f(-\Delta)" in methods
+    assert r"R_f(\Delta)C_{K,f}" not in methods
+    assert "uncentered second-moment" in methods
+
+    # Scope of the approximation: the 2x2 factor is not presented as a complete
+    # parameter-space pullback or exact second-order metric.
+    assert "output-coordinate factors" in methods
+    assert "not complete" in methods
+    assert "parameter-space pullbacks" in methods
+    assert "input activation" in methods
+    assert "not a full-model Fisher" in methods
+
+    # Primary confirmatory recipe selection is baseline-only and frozen before
+    # any held-out ORBIT comparison.
+    normalized = " ".join(paper_text.split())
+    assert "Muon alone is tuned over a predeclared ten-candidate grid" in normalized
+    assert "lowest-loss Muon candidate is frozen" in normalized
+    assert "ORBIT outcomes therefore do not influence the primary recipe" in normalized
+
+    # Transfer cells stay secondary; the paper must not hard-code success language.
+    assert "transfer evaluation" in main
+    for phrase in (
+        "transfer evidence",
+        "observed advantage",
+        "ORBIT improves on Muon",
+        "ORBIT remains lower-loss",
+    ):
+        assert phrase not in main
+
+
 def test_generated_macros_define_then_override(tmp_path):
     build_fixture(tmp_path)
     results, _ = paper.build(tmp_path)
