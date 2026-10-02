@@ -30,7 +30,7 @@
 Matrix optimizers such as Muon exploit the spectral structure of parameter matrices while
 treating query and key projections as ordinary matrix parameters. ORBIT\,\href{https://github.com/pop123-ux/ORBIT}{\faGithub}\ introduces a
 function-space extension of Muon for rotary attention: frequency-local $2\times2$ metrics
-are constructed from query/key covariances transported through RoPE relative-position
+are constructed from query/key second moments transported through RoPE relative-position
 rotations, applied to the candidate Q/K updates, and followed by joint Frobenius-norm
 restoration. On RoPE-modified GPT-2-style decoders trained on FineWeb-Edu, the evaluation
 separates optimizer mechanism from hyperparameter recipe. Under an identical configuration
@@ -68,7 +68,7 @@ not model this interaction.
 ORBIT incorporates that functional geometry on top of Muon's spectral update. It first
 forms the ordinary Muon-style candidate Q/K directions, then preconditions each RoPE
 frequency pair with a
-compact metric derived from the covariance of the opposite circuit after transport through a
+compact metric derived from the uncentered second moment of the opposite circuit after transport through a
 fixed distribution of relative-position rotations. A single joint Frobenius restoration
 prevents this conditioning from winning merely by increasing the total Q/K step norm. The distinctive ORBIT operations are local $2\times2$ matrix functions. This provides a concrete instance of \emph{function-aware optimization}:
 the optimizer uses the known computation in which Q/K parameters participate to define a
@@ -214,7 +214,7 @@ removing the relative-position rotations, weakens the optimizer further: full OR
 \AblNoRoPEDelta{} nats, with 95\% CI
 [\AblNoRoPECILow{}, \AblNoRoPECIHigh{}], and wins \AblNoRoPEWins{} seeds. This comparison
 supports the claim that relative-position-aware conditioning contributes beyond generic
-Q/K covariance adaptation in the tested architecture.
+Q/K second-moment adaptation in the tested architecture.
 
 Full ORBIT also improves on the \textbf{diagonal control} by \AblDiagDelta{} nats, with 95\% CI
 [\AblDiagCILow{}, \AblDiagCIHigh{}], and wins \AblDiagWins{} seeds. This smaller contrast
