@@ -35,8 +35,8 @@ def run_gate() -> dict:
 
     eye = torch.eye(2).view(1, 1, 2, 2).repeat(attn.n_head, attn.n_freq, 1, 1)
     with torch.no_grad():
-        attn.orbit_q_second_moment.copy_(eye * 2.0)
-        attn.orbit_k_second_moment.copy_(eye * 3.0)
+        attn.orbit_q_cov.copy_(eye * 2.0)
+        attn.orbit_k_cov.copy_(eye * 3.0)
     iso_rope_q, iso_rope_k = attn.orbit_metrics((1, 7, 31), rotate=True)
     iso_plain_q, iso_plain_k = attn.orbit_metrics((1,), rotate=False)
     isotropic_error = max(
@@ -46,10 +46,10 @@ def run_gate() -> dict:
     anis_q = torch.tensor([[4.0, 1.1], [1.1, 0.7]])
     anis_k = torch.tensor([[0.9, -0.6], [-0.6, 3.2]])
     with torch.no_grad():
-        attn.orbit_q_second_moment.copy_(
+        attn.orbit_q_cov.copy_(
             anis_q.view(1, 1, 2, 2).repeat(attn.n_head, attn.n_freq, 1, 1)
         )
-        attn.orbit_k_second_moment.copy_(
+        attn.orbit_k_cov.copy_(
             anis_k.view(1, 1, 2, 2).repeat(attn.n_head, attn.n_freq, 1, 1)
         )
     rope_q, rope_k = attn.orbit_metrics((1, 2, 4, 8, 16, 32), rotate=True)

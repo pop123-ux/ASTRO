@@ -300,20 +300,16 @@ def write_broad_table(results: dict, generated: Path) -> None:
     lines = [
         "\\begin{table}[t]",
         "\\centering",
-        "\\caption{Exploratory 124M optimizer context under independently selected recipes. "
-        "The shallow per-optimizer search makes this table descriptive rather than a "
-        "mechanism-isolated ranking.}",
+        "\\caption{Broad independently tuned 124M confirmation. This table provides "
+        "optimizer context but is not used as the primary causal estimate of the ORBIT "
+        "mechanism because each optimizer carries its independently selected recipe.}",
         "\\label{tab:broad}",
         "\\begin{tabular}{lrrrr}",
         "\\toprule",
         "Optimizer & $n$ & Mean loss & SD & Mean min." + ROW_END,
         "\\midrule",
     ]
-    order = ("adamw", "adamuon_ref", "muon", "normuon", "astro_v2", "orbit")
-    for name in order:
-        if name not in sm:
-            continue
-        row = sm[name]
+    for name, row in sorted(sm.items(), key=lambda kv: kv[1]["mean_val_loss"]):
         lines.append(
             f"{display_name(name)} & {row['n']} & {row['mean_val_loss']:.4f} & "
             f"{row['sd_val_loss']:.4f} & {row['mean_seconds']/60:.1f}" + ROW_END

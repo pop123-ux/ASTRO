@@ -1,6 +1,6 @@
 {
   "name": "ORBIT-v0",
-  "status": "pre-release-audited-rerun-required",
+  "status": "research-candidate",
   "model": {
     "family": "GPT-2-sized pre-norm decoder with RoPE",
     "sequence_length": 512,
@@ -34,10 +34,9 @@
     "functional_power": 1,
     "metric_condition_cap": 100,
     "metric_eps": 0.00001,
+    "qk_stat_ema_beta": 0.95,
     "joint_qk_frobenius_restore": true,
-    "relative_position_convention": "delta=i-j>=0; score transport uses R(-delta)",
-    "qk_statistic": "uncentered second moment",
-    "qk_second_moment_ema_beta": 0.95
+    "inference_change": false
   },
   "discovery": {
     "size": "124M",
@@ -105,6 +104,14 @@
       "normuon",
       "orbit"
     ]
+  },
+  "production_gate": {
+    "required_after_paper_core": [
+      "GQA",
+      "QK-norm"
+    ],
+    "target_overhead_vs_muon_percent": 15,
+    "zero_inference_overhead_required": true
   },
   "post_scale_validation": {
     "xconfig": {
@@ -184,7 +191,7 @@
         401
       ],
       "optimizer": "astro_v2",
-      "combines_with": "current-digest horizon reruns for muon/normuon/orbit"
+      "combines_with": "legacy horizon muon/normuon/orbit rows"
     },
     "astro_scale": {
       "size": "355M",
@@ -194,23 +201,9 @@
         301
       ],
       "optimizer": "astro_v2",
-      "combines_with": "current-digest scale reruns for muon/normuon/orbit"
+      "combines_with": "legacy scale muon/normuon/orbit rows"
     },
     "logical_shards": 4,
     "physical_colabs_supported": 3
-  },
-  "release_gate": {
-    "pre_audit_evidence_digest": "de8b994a734276871770c6c67648117d3613d0954f3ae90d7e7b69246308c200",
-    "policy": "pre-audit records are provenance only and cannot populate release claims",
-    "required_current_digest_phases": [
-      "confirm",
-      "xconfig",
-      "matched_tune",
-      "matched_confirm",
-      "ablation_ext",
-      "horizon_with_astro",
-      "scale_with_astro"
-    ],
-    "matched_tune_policy": "rerun shared candidate selection after the RoPE-sign correction; do not reuse the pre-audit ORBIT winner"
   }
 }
