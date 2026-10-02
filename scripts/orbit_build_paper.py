@@ -167,7 +167,7 @@ def write_matched_table(results: dict, generated: Path) -> None:
         "\\begin{table}[H]",
         "\\centering",
         "\\caption{Primary matched-hyperparameter confirmation on ten held-out paired runs. "
-        "Both optimizers use the same configuration selected from the shared tuning grid.}",
+        "The same configuration was the lowest-loss shared-grid candidate for both optimizers.}",
         "\\label{tab:matched}",
         "\\small",
         "\\setlength{\\tabcolsep}{6pt}",
@@ -211,14 +211,14 @@ def write_matched_table(results: dict, generated: Path) -> None:
         f"{cfg['lr']:.6g}, weight decay {cfg['weight_decay']:.6g}, and auxiliary AdamW "
         f"multiplier {cfg['scalar_lr_mult']:.6g} (auxiliary learning rate "
         f"{cfg['lr'] * cfg['scalar_lr_mult']:.6g}). Wall time includes training and the "
-        "fixed 20-batch validation pass. Peak allocation is "
-        "\\texttt{torch.cuda.max\\_memory\\_allocated}, reported in GiB. "
+        "fixed 20-batch validation pass. Peak CUDA allocation is reported in GiB. "
         "The confidence interval is conditional on this frozen shared-grid winner and does "
         "not include recipe-selection uncertainty.",
         "\\end{minipage}",
         "\\end{table}",
     ]
     generated.joinpath("table_matched.tex").write_text("\n".join(lines) + "\n")
+
 
 def write_xconfig_table(results: dict, generated: Path) -> None:
     x = results.get("cross_configuration_isolation")
