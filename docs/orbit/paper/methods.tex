@@ -291,19 +291,25 @@ The 355M transfer uses 1.84M sampled training tokens at 900 steps because of its
 batch size.
 
 \paragraph{Statistical analysis.}
-The primary estimand is the paired per-run validation-loss difference, ORBIT minus the
-comparison method. Reported statistics include the paired mean, sample standard deviation,
-paired-run win count, and a two-sided 95\% Student-$t$ confidence interval for the mean
-paired difference. The matched Muon--ORBIT comparison is the sole primary confirmatory contrast.
-Ablation intervals are secondary mechanism analyses and are reported without multiplicity
-adjustment; the long-horizon and 355M cells are descriptive transfer checks rather than
-high-powered inferential tests. Wall-clock time and peak GPU-memory allocation are reported
-alongside loss.
+The primary estimand is the paired per-run validation-loss difference, ORBIT minus Muon.
+Reported statistics include the paired mean, sample standard deviation, paired-run win
+count, and a two-sided 95\% Student-$t$ confidence interval for the mean paired difference.
+The matched Muon--ORBIT comparison is the sole primary confirmatory contrast. Its confidence
+interval is conditional on the frozen Muon-selected recipe and does not incorporate
+uncertainty from recipe selection. Ablation intervals are secondary mechanism analyses and
+are reported without multiplicity adjustment; the long-horizon and 355M cells are
+descriptive transfer checks rather than high-powered inferential tests. End-to-end
+wall-clock time and peak allocated CUDA memory are reported alongside loss.
 
 All final comparisons use the same frozen implementation and a consistent run-record format.
 Optimizer settings, random seeds, environment metadata, validation metrics, runtime,
 memory use, and training trajectories are retained with each run. Results are merged only
 after automated consistency checks verify the expected experiment structure, matched
-configuration, finite metrics, and a common implementation/software state. Exact
-environment details and run metadata were retained in the experiment records used for this
-study.
+configuration, finite metrics, and a common implementation/software state.
+
+\paragraph{Code and reproducibility.}
+The exact implementation state associated with the frozen experimental evidence is archived
+at ASTRO commit \texttt{0cb446923ab7bf2650de68fe73b5a3a3fe5b5238}; the frozen
+evidence digest begins \texttt{\EvidenceCoreDigestShort{}}. The standalone ORBIT
+repository is linked from the project materials, but later repository revisions should not
+be treated as the implementation that generated the numerical results reported here.
