@@ -165,10 +165,10 @@ Transformer blocks, GELU MLPs with $4d$ hidden width, and zero dropout. Learned 
 position embeddings are replaced by RoPE with base 10,000. Attention uses separate
 $q_{\mathrm{proj}}$, $k_{\mathrm{proj}}$, and $v_{\mathrm{proj}}$ matrices.
 
-The corpus is \texttt{HuggingFaceFW/fineweb-edu}, configuration
-\texttt{sample-10BT}, pinned to revision \texttt{v1.0.0}. Text is tokenized with the
-GPT-2 tokenizer. A fixed stream of 12.4M tokens is shared across runs: the first 400,000
-tokens form the validation pool and the next 12,000,000 tokens form the training pool.
+The corpus is FineWeb-Edu, using the \emph{sample-10BT} configuration from Hugging Face.
+Text is tokenized with the GPT-2 tokenizer. A fixed stream of 12.4M tokens is shared across
+runs: the first 400,000 tokens form the validation pool and the next 12,000,000 tokens form
+the training pool.
 Every training step samples random contiguous 512-token windows from that pool with a
 seeded generator. In paired cells, methods with the same run seed therefore receive the
 same sequence of sampled training windows. Evaluation uses a fixed, separate generator and
@@ -308,10 +308,4 @@ memory use, and training trajectories are retained with each run. Results are me
 after automated consistency checks verify the expected experiment structure, matched
 configuration, finite metrics, and a common implementation/software state.
 
-\paragraph{Code and reproducibility.}
-The exact implementation state associated with the frozen experimental evidence is archived
-at \href{https://github.com/pop123-ux/ASTRO/tree/0cb446923ab7bf2650de68fe73b5a3a3fe5b5238}
-{ASTRO commit \texttt{0cb446923ab7}}; the frozen evidence digest begins
-\texttt{\EvidenceCoreDigestShort{}}. A standalone maintained implementation is available
-at \href{https://github.com/pop123-ux/ORBIT}{github.com/pop123-ux/ORBIT}. Numerical
-results in this paper refer to the archived experiment snapshot above.
+
