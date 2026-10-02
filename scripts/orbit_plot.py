@@ -214,7 +214,7 @@ def plot_matched_pairs(rows: list[dict], out: Path) -> None:
 def plot_xconfig(results: dict, out: Path) -> None:
     sm = results["cross_configuration_isolation"]["summary"]
     x = [0, 1]
-    labels = ["Muon-selected config", "ORBIT-selected config"]
+    labels = ["Muon discovery recipe", "ORBIT discovery recipe"]
     series = {
         "Muon": ["muon_at_muon_config", "muon_at_orbit_config"],
         "ORBIT": ["orbit_at_muon_config", "orbit_at_orbit_config"],
