@@ -413,6 +413,7 @@ def build(work_dir: Path, *, allow_incomplete: bool = False) -> tuple[dict, dict
 
     phases: dict[str, list[dict]] = {}
     warnings: list[str] = []
+    invalid: dict[str, str] = {}
     missing: list[str] = []
 
     for phase, spec in EXPECTED.items():
@@ -425,9 +426,14 @@ def build(work_dir: Path, *, allow_incomplete: bool = False) -> tuple[dict, dict
             warnings.extend(validate_phase(phase, rows))
         except Exception as exc:
             if allow_incomplete:
-                warnings.append(f"{phase}: {exc}")
-            else:
-                raise
+                message = f"{phase}: {exc}"
+                warnings.append(message)
+                invalid[phase] = message
+                # Invalid evidence must never flow into generated statistics or
+                # manuscript macros. In incomplete mode the phase is omitted,
+                # so the paper renders placeholders instead of stale numbers.
+                continue
+            raise
         phases[phase] = rows
 
     if missing and not allow_incomplete:
@@ -534,22 +540,25 @@ def build(work_dir: Path, *, allow_incomplete: bool = False) -> tuple[dict, dict
     for phase, spec in EXPECTED.items():
         path = merged / spec["path"]
         if path.exists():
-            rows = phases.get(phase, [])
+            raw_rows = load_jsonl(path)
+            accepted_rows = phases.get(phase, [])
             sources[phase] = {
                 "path": str(path.relative_to(work_dir)),
                 "sha256": file_sha256(path),
-                "rows": len(rows),
-                "task_ids": len({x.get("task_id") for x in rows}),
-                "code_digests": sorted({str(x.get("code_digest")) for x in rows}),
+                "rows": len(raw_rows),
+                "accepted_rows": len(accepted_rows),
+                "accepted": phase in phases,
+                "task_ids": len({x.get("task_id") for x in raw_rows}),
+                "code_digests": sorted({str(x.get("code_digest")) for x in raw_rows}),
                 "orchestration_digests": sorted(
                     {
                         str(x.get("orchestration_digest"))
-                        for x in rows
+                        for x in raw_rows
                         if x.get("orchestration_digest") is not None
                     }
                 ),
                 "environments": sorted(
-                    {json.dumps(x.get("environment", {}), sort_keys=True) for x in rows}
+                    {json.dumps(x.get("environment", {}), sort_keys=True) for x in raw_rows}
                 ),
             }
 
@@ -559,6 +568,7 @@ def build(work_dir: Path, *, allow_incomplete: bool = False) -> tuple[dict, dict
         "core_digest": CORE_DIGEST,
         "sources": sources,
         "missing": missing,
+        "invalid": invalid,
         "warnings": warnings,
         "matched_config_id": best.get("orbit", {}).get("config_id"),
         "matched_config": best.get("orbit", {}).get("config"),

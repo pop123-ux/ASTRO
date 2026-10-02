@@ -181,6 +181,23 @@ def test_strict_freeze_rejects_pre_audit_core_digest(tmp_path):
         raise AssertionError("strict evidence freeze accepted pre-audit ORBIT evidence")
 
 
+def test_incomplete_freeze_excludes_stale_phase_from_generated_results(tmp_path):
+    build_fixture(tmp_path)
+    path = tmp_path / "merged" / "matched_confirm.jsonl"
+    rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    rows[0]["code_digest"] = paper.LEGACY_PREAUDIT_CORE_DIGEST
+    write_jsonl(path, rows)
+
+    results, manifest = paper.build(tmp_path, allow_incomplete=True)
+
+    assert manifest["status"] == "incomplete_or_warn"
+    assert "matched_confirm" in manifest["invalid"]
+    assert "matched_confirmation" not in results
+    assert manifest["sources"]["matched_confirm"]["accepted"] is False
+    assert manifest["sources"]["matched_confirm"]["accepted_rows"] == 0
+    assert manifest["sources"]["matched_confirm"]["rows"] == 20
+
+
 def test_strict_freeze_rejects_stale_postscale_orchestration(tmp_path):
     build_fixture(tmp_path)
     path = tmp_path / "merged" / "matched_confirm.jsonl"
@@ -299,6 +316,14 @@ def test_manuscript_uses_publication_facing_names_only():
     for token in forbidden:
         assert token not in paper_text, f"implementation-facing token leaked into paper: {token}"
 
+
+
+def test_incomplete_build_status_is_visible_in_manuscript():
+    main = (ROOT / "docs" / "orbit" / "paper" / "main.tex").read_text()
+    build_script = (ROOT / "scripts" / "orbit_build_paper.py").read_text()
+    assert r"\IfFileExists{generated/status.tex}" in main
+    assert "DRAFT --- corrected evidence incomplete." in build_script
+    assert "Invalid or stale experiment phases were excluded" in build_script
 
 
 def test_paper_presentation_contract():

@@ -423,6 +423,21 @@ def write_generated(results: dict, paper_dir: Path, artifact_dir: Path, manifest
     write_broad_table(results, generated)
     write_claim_ledger(results, manifest, artifact_dir)
 
+    status_lines = ["% AUTO-GENERATED evidence status."]
+    if manifest.get("status") != "paper_ready":
+        status_lines.extend(
+            [
+                r"\begin{center}",
+                r"\fcolorbox{red!70!black}{red!4}{%",
+                r"\parbox{0.92\linewidth}{\centering\small\textbf{DRAFT --- corrected evidence incomplete.} "
+                r"Invalid or stale experiment phases were excluded from all generated statistics; "
+                r"placeholder dashes remain until the audited campaign is rerun.}}",
+                r"\end{center}",
+                r"\vspace{0.5em}",
+            ]
+        )
+    (generated / "status.tex").write_text("\n".join(status_lines) + "\n")
+
     compatibility = [
         "% AUTO-GENERATED compatibility shim.",
         "\\input{generated/macros.tex}",
