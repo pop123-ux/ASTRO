@@ -133,16 +133,17 @@ def plot_orbit_overview(out: Path) -> None:
     ax.text(6.10,3.62,"ORBIT: RoPE-conditioned function-space update",
             ha="center",va="center",fontsize=12.0,fontweight="regular")
     ax.text(
-        6.10,
-        0.42,
-        r"Other hidden matrices $\rightarrow$ standard Muon   $\bullet$   "
-        r"embeddings / biases / norms $\rightarrow$ auxiliary AdamW"
+        2.25,
+        0.72,
+        r"Other hidden matrices $\rightarrow$ standard Muon"
+        "\n"
+        r"Embeddings / biases / norms $\rightarrow$ auxiliary AdamW"
         "\nInference graph unchanged",
-        ha="center",
+        ha="left",
         va="center",
-        fontsize=8.8,
-        color="0.28",
-        linespacing=1.2,
+        fontsize=8.5,
+        color="black",
+        linespacing=1.25,
     )
     ax.annotate("", xy=(11.30, 1.68), xytext=(11.30, 1.14),
                 arrowprops=dict(arrowstyle="->", lw=1.15, color="0.35"))
