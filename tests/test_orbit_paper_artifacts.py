@@ -321,7 +321,7 @@ def test_paper_presentation_contract():
     assert r"\paragraph{ASTRO development baseline.}" in main
     assert "post-polar direction" in main
     normalized_main = " ".join(main.split())
-    assert "not as a separate research contribution" in normalized_main
+    assert "is not presented as a separate research contribution" in normalized_main
     assert "mechanism_summary.pdf" in main
     assert "transfer_summary.pdf" in main
     assert "orbit_overview.pdf" in methods
