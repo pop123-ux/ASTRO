@@ -203,13 +203,13 @@ log-uniform deterministic sampling. AdamW tunes learning rate, weight decay, and
 AdaMuon uses its published natural learning-rate range but the same weight-decay and
 auxiliary-rate policy. Five discovery trials are used per optimizer in the broad campaign.
 
-The primary Muon--ORBIT comparison uses a stricter baseline-selected policy: ten
-deterministic 900-step candidate configurations are generated once from the Muon search
-space and evaluated for Muon on one fixed tuning seed. The lowest-loss Muon candidate is
-frozen before any
-held-out matched-confirmation seed is evaluated, then applied unchanged to both Muon and
-ORBIT. ORBIT outcomes therefore do not influence the primary recipe. The same
-Muon-selected setting is reused in the expanded ORBIT ablation.
+The primary Muon--ORBIT comparison uses ten deterministic 900-step candidate
+configurations drawn once from the Muon search space and applied identically to both update
+rules on one fixed tuning seed. Muon and ORBIT independently attain their lowest tuning loss
+at the same candidate, \MatchedSharedConfigID{}. That coincident winner is frozen before
+the ten held-out matched-confirmation seeds are evaluated, and the same shared setting is
+reused in the expanded ORBIT ablation. Thus the held-out comparison is an identical-recipe
+test, while its uncertainty remains conditional on the preceding shared-grid selection.
 
 \subsection{Evaluation protocol}
 \label{sec:evaluation-protocol}
@@ -250,7 +250,7 @@ Muon, ORBIT \\
 
 \textbf{Matched confirmation} &
 124M, 900 steps\newline 3.69M tokens &
-\textbf{Primary:} Muon selected from 10 deterministic candidates; one shared recipe applied to both methods &
+\textbf{Primary:} same 10 candidates evaluated for both; both select the same winner, then freeze it &
 $n=10$ paired &
 Muon, ORBIT \\
 
@@ -277,7 +277,7 @@ Muon, NorMuon, ASTRO, ORBIT \\
 \vspace{0.35em}
 \begin{minipage}{0.98\linewidth}
 \footnotesize
-The primary shared recipe (\MatchedSharedConfigID{}) uses matrix learning rate
+The coincident shared winner (\MatchedSharedConfigID{}) uses matrix learning rate
 \MatchedSharedLR{}, weight decay \MatchedSharedWeightDecay{}, and auxiliary AdamW
 multiplier \MatchedSharedAuxMult{} (auxiliary learning rate \MatchedSharedAuxLR{}).
 Paired runs use the same run seed and therefore the same sampled training-window sequence;
@@ -295,7 +295,7 @@ The primary estimand is the paired per-run validation-loss difference, ORBIT min
 Reported statistics include the paired mean, sample standard deviation, paired-run win
 count, and a two-sided 95\% Student-$t$ confidence interval for the mean paired difference.
 The matched Muon--ORBIT comparison is the sole primary confirmatory contrast. Its confidence
-interval is conditional on the frozen Muon-selected recipe and does not incorporate
+interval is conditional on the frozen shared selected recipe and does not incorporate
 uncertainty from recipe selection. Ablation intervals are secondary mechanism analyses and
 are reported without multiplicity adjustment; the long-horizon and 355M cells are
 descriptive transfer checks rather than high-powered inferential tests. End-to-end
