@@ -185,12 +185,12 @@ log-uniform deterministic sampling. AdamW tunes learning rate, weight decay, and
 AdaMuon uses its published natural learning-rate range but the same weight-decay and
 auxiliary-rate policy. Five discovery trials are used per optimizer in the broad campaign.
 
-The primary Muon--ORBIT comparison uses a stricter matched policy: ten deterministic
-900-step candidate configurations are generated once from the Muon search space and
-presented identically to both methods. The primary shared configuration is selected using
-Muon tuning loss only, then frozen before any held-out matched-confirmation seed is
-evaluated. ORBIT tuning outcomes therefore do not influence the primary recipe. The same
-Muon-selected setting is reused in the matched confirmation and expanded ORBIT ablation.
+The primary Muon--ORBIT comparison uses a stricter baseline-selected policy: ten
+deterministic 900-step candidate configurations are generated once from the Muon search
+space and evaluated for Muon only. The lowest-loss Muon candidate is frozen before any
+held-out matched-confirmation seed is evaluated, then applied unchanged to both Muon and
+ORBIT. ORBIT outcomes therefore do not influence the primary recipe. The same
+Muon-selected setting is reused in the expanded ORBIT ablation.
 
 \subsection{Evaluation protocol}
 The evaluation is organized into complementary study blocks rather than a single benchmark:
