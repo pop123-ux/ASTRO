@@ -14,6 +14,7 @@ if str(SCRIPTS) not in sys.path:
 
 import orbit_paper_artifacts as paper  # noqa: E402
 import orbit_build_paper as build_paper  # noqa: E402
+import orbit_postscale_merge as post_merge  # noqa: E402
 
 
 ENV = {
@@ -107,18 +108,52 @@ def build_fixture(tmp_path: Path) -> None:
     write_jsonl(merged / "scale_with_astro.jsonl", scale)
 
     best = {
+        "selection_rule": "muon_winner_from_shared_grid",
         "muon": {
             "config": dict(CFG),
             "config_id": "shared-04",
             "code_digest": paper.CORE_DIGEST,
+            "selected_by": "muon",
         },
         "orbit": {
             "config": dict(CFG),
             "config_id": "shared-04",
             "code_digest": paper.CORE_DIGEST,
+            "selected_by": "muon",
         },
+        "independent_winners": {},
     }
     (merged / "matched_best_configs.json").write_text(json.dumps(best))
+
+
+def test_matched_freeze_uses_muon_winner_even_when_orbit_prefers_another_candidate():
+    rows = []
+    for optimizer, losses in (
+        ("muon", [1.0, 2.0]),
+        ("orbit", [2.0, 1.0]),
+    ):
+        for trial, loss in enumerate(losses):
+            rows.append(
+                {
+                    "optimizer": optimizer,
+                    "val_loss": loss,
+                    "trial": trial,
+                    "config_id": f"shared-{trial:02d}",
+                    "config": {"lr": 0.01 + trial * 0.01},
+                    "task_id": f"{optimizer}-{trial}",
+                    "code_digest": paper.CORE_DIGEST,
+                    "orchestration_digest": "test",
+                    "environment": ENV,
+                }
+            )
+
+    frozen = post_merge.freeze_matched(rows)
+    assert frozen["selection_rule"] == "muon_winner_from_shared_grid"
+    assert frozen["muon"]["config_id"] == "shared-00"
+    assert frozen["orbit"]["config_id"] == "shared-00"
+    assert frozen["muon"]["selected_by"] == "muon"
+    assert frozen["orbit"]["selected_by"] == "muon"
+    assert frozen["independent_winners"]["orbit"]["config_id"] == "shared-01"
 
 
 def test_strict_freeze_accepts_complete_exact_fixture(tmp_path):
