@@ -65,8 +65,16 @@ def main() -> None:
 
     if best.get("selection_rule") != "muon_winner_from_shared_grid":
         fail("primary recipe was not selected by the Muon-only rule")
-    if best.get("selected_by") != "muon":
-        fail("primary recipe was not selected by Muon")
+    for optimizer in ("muon", "orbit"):
+        record = best.get(optimizer, {})
+        if record.get("selected_by") != "muon":
+            fail(f"{optimizer} primary recipe provenance is not Muon-selected")
+        if record.get("code_digest") != digest:
+            fail(f"{optimizer} primary recipe was frozen under another implementation")
+    if best["muon"].get("config") != best["orbit"].get("config"):
+        fail("Muon and ORBIT do not share one frozen primary configuration")
+    if best["muon"].get("config_id") != best["orbit"].get("config_id"):
+        fail("Muon and ORBIT do not share one primary config ID")
 
     sources = manifest.get("sources", {})
     for phase, expected_rows in EXPECTED_SOURCE_ROWS.items():
@@ -95,7 +103,7 @@ def main() -> None:
 
     print("ORBIT RELEASE CHECK: PASS")
     print(f"implementation digest: {digest}")
-    print(f"primary config: {best.get('config_id')}")
+    print(f"primary config: {best['muon'].get('config_id')}")
     print(f"paper: {pdf}")
 
 
