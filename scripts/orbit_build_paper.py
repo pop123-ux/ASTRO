@@ -56,6 +56,8 @@ def write_macros(results: dict, generated: Path) -> None:
         "AblDiagCIHigh", "AblDiagWins", "HorizonVsAstro", "HorizonVsMuon",
         "HorizonVsNorMuon", "ScaleVsAstro", "ScaleVsMuon", "ScaleVsNorMuon",
         "BroadAstroLoss", "BroadOrbitLoss", "BroadMuonLoss", "BroadNorMuonLoss",
+        "MatchedSharedLR", "MatchedSharedWeightDecay", "MatchedSharedAuxMult",
+        "MatchedSharedAuxLR", "MatchedSharedConfigID", "EvidenceCoreDigestShort",
     ]
     lines = ["% AUTO-GENERATED. Do not edit."]
     lines.extend(f"\\newcommand{{\\{name}}}{{--}}" for name in macro_names)
@@ -74,7 +76,16 @@ def write_macros(results: dict, generated: Path) -> None:
             f"\\renewcommand{{\\MatchedWins}}{{{eff['a_wins']}/{eff['n']}}}",
             f"\\renewcommand{{\\MatchedRuntimeOverhead}}{{{100*mc['runtime_overhead_fraction']:.1f}\\%}}",
             f"\\renewcommand{{\\MatchedMemoryOverhead}}{{{100*mc['memory_overhead_fraction']:.1f}\\%}}",
+            f"\\renewcommand{{\\MatchedSharedLR}}{{{mc['shared_config']['lr']:.6g}}}",
+            f"\\renewcommand{{\\MatchedSharedWeightDecay}}{{{mc['shared_config']['weight_decay']:.6g}}}",
+            f"\\renewcommand{{\\MatchedSharedAuxMult}}{{{mc['shared_config']['scalar_lr_mult']:.6g}}}",
+            f"\\renewcommand{{\\MatchedSharedAuxLR}}{{{mc['shared_config']['lr'] * mc['shared_config']['scalar_lr_mult']:.6g}}}",
+            f"\\renewcommand{{\\MatchedSharedConfigID}}{{{tex_escape(mc['shared_config_id'])}}}",
         ]
+        if results.get("core_digest"):
+            lines.append(
+                f"\\renewcommand{{\\EvidenceCoreDigestShort}}{{{str(results['core_digest'])[:12]}}}"
+            )
 
     xc = results.get("cross_configuration_isolation")
     if xc:
@@ -151,35 +162,62 @@ def write_matched_table(results: dict, generated: Path) -> None:
         return
     sm = mc["summary"]
     eff = mc["orbit_vs_muon"]
+    cfg = mc["shared_config"]
     lines = [
-        "\\begin{table}[t]",
+        "\\begin{table}[H]",
         "\\centering",
-        "\\caption{Primary matched-hyperparameter confirmation across 10 held-out paired runs. "
-        "Both optimizers use the same selected configuration. Lower validation loss is better.}",
+        "\\caption{Primary matched-hyperparameter confirmation on ten held-out paired runs. "
+        "Both optimizers use the same Muon-selected training recipe.}",
         "\\label{tab:matched}",
-        "\\begin{tabular}{lrrrrr}",
+        "\\small",
+        "\\setlength{\\tabcolsep}{6pt}",
+        "\\renewcommand{\\arraystretch}{1.12}",
+        "\\begin{tabular}{l c S[table-format=1.4] S[table-format=1.4] "
+        "S[table-format=2.2] S[table-format=1.3]}",
         "\\toprule",
-        "Optimizer & $n$ & Mean loss & SD & Mean min. & Peak GB" + ROW_END,
+        "\\multicolumn{6}{l}{\\textit{Descriptive statistics}} \\\\",
+        "\\addlinespace[0.2em]",
+        "Method & {$n$} & {Validation loss} & {SD} & {Wall time (min)} & {Peak alloc. (GiB)} \\\\",
         "\\midrule",
     ]
     for name in ("muon", "orbit"):
         row = sm[name]
         lines.append(
             f"{display_name(name)} & {row['n']} & {row['mean_val_loss']:.4f} & "
-            f"{row['sd_val_loss']:.4f} & {row['mean_seconds']/60:.1f} & "
-            f"{row['mean_peak_cuda_gb']:.3f}" + ROW_END
+            f"{row['sd_val_loss']:.4f} & {row['mean_seconds']/60:.2f} & "
+            f"{row['mean_peak_cuda_gb']:.3f} \\\\"
         )
     lines += [
-        "\\midrule",
-        f"ORBIT $-$ Muon & {eff['n']} & {eff['mean_delta']:.4f} & "
-        f"{eff['sd_delta']:.4f} & \\multicolumn{{2}}{{c}}{{95\\% CI {ci(eff)}, "
-        f"wins {eff['a_wins']}/{eff['n']}}}" + ROW_END,
         "\\bottomrule",
         "\\end{tabular}",
+        "\\vspace{0.55em}",
+        "",
+        "\\begin{tabular}{l c S[table-format=-1.4] S[table-format=1.4] c c}",
+        "\\toprule",
+        "\\multicolumn{6}{l}{\\textit{Paired contrast}} \\\\",
+        "\\addlinespace[0.2em]",
+        "Contrast & {$n$} & {$\\Delta$ loss} & {SD($\\Delta$)} & {95\\% CI} & {ORBIT lower} \\\\",
+        "\\midrule",
+        f"ORBIT $-$ Muon & {eff['n']} & {eff['mean_delta']:.4f} & "
+        f"{eff['sd_delta']:.4f} & {{{ci(eff)}}} & {{{eff['a_wins']}/{eff['n']}}} \\\\",
+        "\\bottomrule",
+        "\\end{tabular}",
+        "\\vspace{0.35em}",
+        "",
+        "\\begin{minipage}{0.96\\linewidth}",
+        "\\footnotesize",
+        f"Shared recipe ({tex_escape(mc['shared_config_id'])}): matrix learning rate "
+        f"{cfg['lr']:.6g}, weight decay {cfg['weight_decay']:.6g}, and auxiliary AdamW "
+        f"multiplier {cfg['scalar_lr_mult']:.6g} (auxiliary learning rate "
+        f"{cfg['lr'] * cfg['scalar_lr_mult']:.6g}). Wall time includes training and the "
+        "fixed 20-batch validation pass. Peak allocation is "
+        "\\texttt{torch.cuda.max\\_memory\\_allocated}, reported in GiB. "
+        "The confidence interval is conditional on this frozen selected recipe and does "
+        "not include recipe-selection uncertainty.",
+        "\\end{minipage}",
         "\\end{table}",
     ]
     generated.joinpath("table_matched.tex").write_text("\n".join(lines) + "\n")
-
 
 def write_xconfig_table(results: dict, generated: Path) -> None:
     x = results.get("cross_configuration_isolation")
@@ -472,12 +510,11 @@ def generate_plots(work_dir: Path, allow_incomplete: bool) -> None:
     out = work_dir / "paper_artifacts" / "figures"
     out.mkdir(parents=True, exist_ok=True)
 
-    # Data-independent visual summaries generated with every paper build.
-    orbit_plot.plot_orbit_overview(out)
-    orbit_plot.plot_protocol_design(out)
+    # Clear stale paper-figure outputs so removed figures cannot leak into a rebuild.
+    for old in list(out.glob("*.pdf")) + list(out.glob("*.png")):
+        old.unlink()
 
-    if "matched_confirmation" in results:
-        orbit_plot.plot_primary_results_panel(results, out)
+    orbit_plot.plot_orbit_overview(out)
 
     if (
         "cross_configuration_isolation" in results
