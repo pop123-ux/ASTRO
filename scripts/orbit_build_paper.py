@@ -478,7 +478,6 @@ def generate_plots(work_dir: Path, allow_incomplete: bool) -> None:
 
     if "matched_confirmation" in results:
         orbit_plot.plot_primary_results_panel(results, out)
-        orbit_plot.plot_matched_effect(results, out)
 
     if (
         "cross_configuration_isolation" in results
