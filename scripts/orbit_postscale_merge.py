@@ -127,42 +127,30 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
 
 
 def freeze_matched(rows: list[dict]) -> dict:
-    """Freeze one shared primary config using Muon's tuning loss only.
-
-    ORBIT is evaluated under the Muon-selected recipe in the primary held-out
-    comparison. This makes selection independent of ORBIT's tuning outcomes and
-    prevents the primary result from depending on the two optimizers happening
-    to choose the same candidate.
-    """
-    independent: dict[str, dict] = {}
-    for row in rows:
-        name = row["optimizer"]
-        if name not in independent or float(row["val_loss"]) < float(independent[name]["val_loss"]):
-            independent[name] = {
-                "val_loss": row["val_loss"],
-                "trial": row["trial"],
-                "config_id": row.get("config_id"),
-                "config": row["config"],
-                "task_id": row["task_id"],
-                "code_digest": row["code_digest"],
-                "orchestration_digest": row["orchestration_digest"],
-                "environment": row["environment"],
-            }
-    if set(independent) != set(post.MATCHED_OPTIMIZERS):
+    """Freeze one shared primary config using Muon tuning only."""
+    muon_rows = [row for row in rows if row["optimizer"] == "muon"]
+    if len(muon_rows) != post.POST_TUNE_TRIALS:
         raise SystemExit(
-            f"matched_tune did not produce winners for {post.MATCHED_OPTIMIZERS}: "
-            f"got {sorted(independent)}"
+            f"matched_tune expected {post.POST_TUNE_TRIALS} Muon rows, got {len(muon_rows)}"
         )
 
-    primary = dict(independent["muon"])
-    primary["selection_rule"] = "muon_winner_from_shared_grid"
-    primary["selected_by"] = "muon"
-
+    winner = min(muon_rows, key=lambda row: float(row["val_loss"]))
+    primary = {
+        "val_loss": winner["val_loss"],
+        "trial": winner["trial"],
+        "config_id": winner.get("config_id"),
+        "config": winner["config"],
+        "task_id": winner["task_id"],
+        "code_digest": winner["code_digest"],
+        "orchestration_digest": winner["orchestration_digest"],
+        "environment": winner["environment"],
+        "selection_rule": "muon_winner_from_shared_grid",
+        "selected_by": "muon",
+    }
     return {
         "selection_rule": "muon_winner_from_shared_grid",
         "muon": dict(primary),
         "orbit": dict(primary),
-        "independent_winners": independent,
     }
 
 
