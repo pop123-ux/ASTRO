@@ -182,6 +182,7 @@ $\widetilde U_K \gets \rho\widehat U_K$
 \State $W_K \gets (1-\eta\lambda)W_K-\eta\widetilde U_K$
 \end{algorithmic}
 \end{algorithm}
+\FloatBarrier
 
 \subsection{Cost and ablation variants}
 The additional ORBIT state consists of two $2\times2$ second-moment matrices for every
@@ -225,9 +226,7 @@ step); the 355M model uses batch size 4 (2,048 sampled tokens per step). The lat
 difference is disclosed because it prevents interpreting the 355M result as a pure
 model-size scaling experiment. Reported wall-clock time starts immediately before the
 training loop and ends after the fixed 20-batch validation pass, so it is an end-to-end
-per-run measure rather than optimizer-step time alone. Peak allocated CUDA memory is
-reported in GiB. All twenty runs in the primary matched-confirmation comparison were
-executed on NVIDIA Tesla T4 GPUs.
+per-run measure rather than optimizer-step time alone. Peak allocated CUDA memory is reported in GiB.
 
 \subsection{Baselines and hyperparameter selection}
 The broad campaign includes AdamW, Muon, NorMuon, AdaMuon, ASTRO, and ORBIT. ASTRO is a
@@ -244,12 +243,13 @@ AdaMuon uses its published natural learning-rate range but the same weight-decay
 auxiliary-rate policy. Five discovery trials are used per optimizer in the broad campaign.
 
 The primary Muon--ORBIT comparison uses ten deterministic 900-step candidate
-configurations drawn once from the Muon search space and applied identically to both update
-rules on one fixed tuning seed. Muon and ORBIT independently attain their lowest tuning loss
-at the same candidate, \MatchedSharedConfigID{}. That coincident winner is frozen before
-the ten held-out matched-confirmation seeds are evaluated, and the same shared setting is
-reused in the expanded ORBIT ablation. Thus the held-out comparison is an identical-recipe
-test, while its uncertainty remains conditional on the preceding shared-grid selection.
+configurations drawn once from the Muon search space and evaluated for Muon on one fixed
+tuning seed. The lowest-loss Muon candidate, \MatchedSharedConfigID{}, is frozen before
+the ten held-out matched-confirmation seeds are evaluated and is then applied unchanged to
+both Muon and ORBIT. The same setting is reused in the expanded ORBIT ablation. Thus the
+held-out comparison is an identical-recipe test in which ORBIT outcomes do not influence
+the primary recipe; its confidence interval remains conditional on the preceding Muon
+selection step.
 
 \subsection{Evaluation protocol}
 \label{sec:evaluation-protocol}
@@ -270,8 +270,9 @@ is the sole primary confirmatory analysis.}
 >{\raggedright\arraybackslash}p{1.65cm}
 >{\raggedright\arraybackslash}p{1.65cm}
 >{\raggedright\arraybackslash}X
->{\centering\arraybackslash}p{1.35cm}
->{\raggedright\arraybackslash}p{2.55cm}
+>{\centering\arraybackslash}p{1.30cm}
+@{\hspace{0.55em}}
+>{\raggedright\arraybackslash}p{2.45cm}
 @{}}
 \toprule
 Study & Setting & Selection / control policy & Replication & Methods \\
@@ -288,9 +289,9 @@ Muon- and ORBIT-selected recipes crossed with both update rules &
 $n=5$/cell &
 Muon, ORBIT \\
 
-\textbf{Matched confirmation} &
+\textbf{Matched}\\[-0.15em]\textbf{confirmation} &
 124M, 900 steps &
-\textbf{Primary:} same 10 candidates for both; common winner frozen before held-out evaluation &
+\textbf{Primary:} Muon tuned over 10 candidates; its winner is frozen and shared &
 $n=10$ paired &
 Muon, ORBIT \\
 
@@ -317,7 +318,7 @@ Muon, NorMuon, ASTRO, ORBIT \\
 \vspace{0.35em}
 \begin{minipage}{0.98\linewidth}
 \small
-The common winning configuration (\MatchedSharedConfigID{}) uses matrix learning rate
+The Muon-selected configuration (\MatchedSharedConfigID{}) uses matrix learning rate
 \MatchedSharedLR{}, weight decay \MatchedSharedWeightDecay{}, and auxiliary AdamW
 multiplier \MatchedSharedAuxMult{} (auxiliary learning rate \MatchedSharedAuxLR{}).
 Paired runs use the same run seed and therefore the same sampled training-window sequence;
@@ -336,7 +337,7 @@ The primary estimand is the paired per-run validation-loss difference, ORBIT min
 Reported statistics include the paired mean, sample standard deviation, paired-run win
 count, and a two-sided 95\% Student-$t$ confidence interval for the mean paired difference.
 The matched Muon--ORBIT comparison is the sole primary confirmatory contrast. Its confidence
-interval is conditional on the selected shared recipe and does not incorporate
+interval is conditional on the selected Muon recipe and does not incorporate
 uncertainty from recipe selection. Ablation intervals are secondary mechanism analyses and
 are reported without multiplicity adjustment; the long-horizon and 355M cells are
 descriptive transfer checks rather than high-powered inferential tests. End-to-end
