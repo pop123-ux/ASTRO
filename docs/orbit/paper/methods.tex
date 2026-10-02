@@ -98,9 +98,9 @@ Figure~\ref{fig:orbit-overview} summarizes the data flow of the optimizer before
 step-by-step specification in Algorithm~\ref{alg:orbit}.
 
 \IfFileExists{figures/orbit_overview.pdf}{%
-\begin{figure}[t]
+\begin{figure}[H]
 \centering
-\includegraphics[width=0.98\linewidth]{orbit_overview.pdf}
+\includegraphics[width=\linewidth]{orbit_overview.pdf}
 \caption{ORBIT update pathway. Muon candidate directions are reshaped using Q/K second-moment
 statistics transported through RoPE relative-position rotations, producing frequency-local
 $2\times2$ metrics. Analytic inverse-square-root preconditioning is followed by joint
@@ -112,7 +112,7 @@ their standard Muon or auxiliary AdamW path.}
 Algorithm~\ref{alg:orbit} gives the corresponding Q/K-pair update. Here
 $\epsilon=10^{-5}$ and $\mathcal D=\{1,2,4,8,16,32,64,128\}$ in the reported experiments.
 
-\begin{algorithm}[t]
+\begin{algorithm}[H]
 \caption{ORBIT update for a RoPE query--key projection pair}
 \label{alg:orbit}
 \begin{algorithmic}[1]
@@ -238,8 +238,8 @@ is the sole primary confirmatory analysis.}
 Study & Setting & Selection / control policy & Replication & Methods \\
 \midrule
 Broad benchmark &
-124M, 900 steps\newline 3.69M tokens &
-Five discovery candidates per optimizer; selected method-specific recipes fixed for evaluation &
+124M, 900 steps\newline 3.69M sampled tokens &
+Five 300-step discovery candidates per optimizer; selected recipes fixed for 900-step evaluation &
 $n=5$/method &
 AdamW, AdaMuon, Muon, NorMuon, ASTRO, ORBIT \\
 
@@ -258,17 +258,17 @@ Muon, ORBIT \\
 Ablation &
 124M, 900 steps\newline 3.69M tokens &
 Same matched recipe and statistics path; only the mechanism variant changes &
-$n=10$/control &
+$n=10$/variant &
 ORBIT, identity, no-RoPE, diagonal \\
 
 Long-horizon transfer &
-124M, 2700 steps\newline 11.06M tokens &
+124M, 2700 steps\newline 11.06M sampled tokens &
 Independently fixed method recipes &
 $n=2$/method &
 Muon, NorMuon, ASTRO, ORBIT \\
 
 Scale transfer &
-355M, 900 steps\newline 1.84M tokens &
+355M, 900 steps\newline 1.84M sampled tokens &
 Independently fixed method recipes; batch size 4 with checkpointing &
 $n=2$/method &
 Muon, NorMuon, ASTRO, ORBIT \\
