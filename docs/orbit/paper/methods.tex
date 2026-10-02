@@ -245,7 +245,7 @@ $n=5$/method &
 AdamW, AdaMuon, Muon, NorMuon, ASTRO, ORBIT \\
 
 Crossed recipes &
-124M, 900 steps\newline 3.69M sampled tokens &
+124M, 900 steps &
 Muon- and ORBIT-selected recipes crossed with both update rules &
 $n=5$/cell &
 Muon, ORBIT \\
@@ -257,7 +257,7 @@ $n=10$ paired &
 Muon, ORBIT \\
 
 Ablation &
-124M, 900 steps\newline 3.69M tokens &
+124M, 900 steps &
 Shared matched recipe; only the mechanism variant changes &
 $n=10$/variant &
 ORBIT, identity, no-RoPE, diagonal \\
@@ -287,8 +287,9 @@ all runs use the same fixed validation-window generator.
 \end{minipage}
 \end{table}
 
-At 124M, 300, 900, and 2700 optimizer steps correspond to approximately 1.23M, 3.69M,
-and 11.06M sampled training tokens for the discovery, primary, and long-horizon regimes.
+At 124M, 300, 900, and 2700 optimizer steps correspond respectively to approximately
+1.23M, 3.69M, and 11.06M sampled training tokens for the discovery, primary, and
+long-horizon regimes.
 The 355M transfer uses 1.84M sampled training tokens at 900 steps because of its smaller
 batch size.
 
