@@ -7,9 +7,9 @@ rows remain valid under the original core code digest.
 
 New phases address the four remaining paper-grade questions:
 1. xconfig: 2x2 optimizer/config cross-over to separate mechanism from recipe;
-2. matched_tune + matched_confirm: Muon and ORBIT receive the same 10 candidate
-   hyperparameter configurations at the 900-step target, then are compared on
-   10 held-out seeds;
+2. matched_tune + matched_confirm: Muon is tuned over 10 deterministic
+   hyperparameter configurations at the 900-step target; its winner is frozen
+   and applied unchanged to Muon and ORBIT on 10 held-out paired seeds;
 3. ablation_ext: 10-seed mechanism ablation using the matched ORBIT config;
 4. astro_horizon + astro_scale: add the strongest ASTRO-v2 baseline to the
    already-completed long-horizon and 355M transfer cells.
