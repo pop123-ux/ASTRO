@@ -94,6 +94,39 @@ magnitude of the matrix update when viewed as a parameter vector. The functional
 therefore changes the geometry of the joint Q/K update while the restoration fixes its
 aggregate parameter-space step magnitude.
 
+\medskip
+\noindent\fbox{%
+\begin{minipage}{0.965\linewidth}
+\small
+\textbf{ORBIT update rule.}
+For a RoPE query--key projection pair, define the frequency-wise preconditioners
+$\mathcal T_Q=\operatorname{blkdiag}_f(M_{Q,f}^{-1/2})$ and
+$\mathcal T_K=\operatorname{blkdiag}_f(M_{K,f}^{-1/2})$. Then
+\[
+\bigl(\widetilde U_Q,\widetilde U_K\bigr)
+=
+\mathcal P_{\mathrm{ORBIT}}(U_Q,U_K)
+=
+\rho\bigl(\mathcal T_Q U_Q,\mathcal T_K U_K\bigr),
+\qquad
+\rho=
+\sqrt{
+\frac{\|U_Q\|_F^2+\|U_K\|_F^2}
+     {\|\mathcal T_Q U_Q\|_F^2+\|\mathcal T_K U_K\|_F^2}
+}.
+\]
+The paired parameter update is therefore
+\[
+W_{Q,t+1}=(1-\eta_t\lambda)W_{Q,t}-\eta_t\widetilde U_Q,
+\qquad
+W_{K,t+1}=(1-\eta_t\lambda)W_{K,t}-\eta_t\widetilde U_K.
+\]
+Other hidden matrix parameters retain the standard Muon update, while embeddings,
+biases, normalization parameters, and the tied output head use the auxiliary AdamW path.
+\end{minipage}%
+}
+\medskip
+
 \FloatBarrier
 
 Figure~\ref{fig:orbit-overview} summarizes the data flow of the optimizer before the
