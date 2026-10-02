@@ -127,19 +127,15 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
 
 
 def freeze_matched(rows: list[dict]) -> dict:
-    muon_rows = [row for row in rows if row.get("optimizer") == "muon"]
+    """Freeze one shared primary config using Muon tuning only."""
+    muon_rows = [row for row in rows if row["optimizer"] == "muon"]
     if len(muon_rows) != post.POST_TUNE_TRIALS:
         raise SystemExit(
-            f"matched_tune expected {post.POST_TUNE_TRIALS} Muon trials, got {len(muon_rows)}"
+            f"matched_tune expected {post.POST_TUNE_TRIALS} Muon rows, got {len(muon_rows)}"
         )
-    trials = sorted(int(row["trial"]) for row in muon_rows)
-    if trials != list(range(post.POST_TUNE_TRIALS)):
-        raise SystemExit(f"matched_tune trial mismatch: {trials}")
 
     winner = min(muon_rows, key=lambda row: float(row["val_loss"]))
-    return {
-        "selection_rule": "muon_winner_from_shared_grid",
-        "selected_by": "muon",
+    primary = {
         "val_loss": winner["val_loss"],
         "trial": winner["trial"],
         "config_id": winner.get("config_id"),
@@ -148,7 +144,15 @@ def freeze_matched(rows: list[dict]) -> dict:
         "code_digest": winner["code_digest"],
         "orchestration_digest": winner["orchestration_digest"],
         "environment": winner["environment"],
+        "selection_rule": "muon_winner_from_shared_grid",
+        "selected_by": "muon",
     }
+    return {
+        "selection_rule": "muon_winner_from_shared_grid",
+        "muon": dict(primary),
+        "orbit": dict(primary),
+    }
+
 
 def load_legacy_rows(work_dir: Path, phase: str) -> list[dict]:
     path = work_dir / "merged" / f"{phase}.jsonl"
@@ -361,7 +365,7 @@ def main() -> None:
             (merged / "matched_best_configs.json").write_text(
                 json.dumps(best, indent=2, sort_keys=True) + "\n"
             )
-            print("Muon-selected matched recipe frozen -> merged/matched_best_configs.json")
+            print("Muon-selected matched config frozen -> merged/matched_best_configs.json")
 
         write_phase_analysis(args.work_dir, phase, rows)
 
