@@ -318,6 +318,14 @@ def test_manuscript_uses_publication_facing_names_only():
 
 
 
+def test_incomplete_build_status_is_visible_in_manuscript():
+    main = (ROOT / "docs" / "orbit" / "paper" / "main.tex").read_text()
+    build_script = (ROOT / "scripts" / "orbit_build_paper.py").read_text()
+    assert r"\IfFileExists{generated/status.tex}" in main
+    assert "DRAFT --- corrected evidence incomplete." in build_script
+    assert "Invalid or stale experiment phases were excluded" in build_script
+
+
 def test_paper_presentation_contract():
     main = (ROOT / "docs" / "orbit" / "paper" / "main.tex").read_text()
     methods = (ROOT / "docs" / "orbit" / "paper" / "methods.tex").read_text()
