@@ -56,7 +56,9 @@ head and RoPE frequency pair,
 \end{align}
 The metrics are regularized by $10^{-5}I$, their effective condition number is capped at
 100, and the inverse square root is evaluated analytically for each symmetric positive
-$2\times2$ matrix.
+$2\times2$ matrix. For the regularized effective metric $M$, the choice
+$T=M^{-1/2}$ satisfies $T^\top M T=I$, so the local quadratic form is whitened rather
+than inverted as aggressively as an $M^{-1}$ step.
 
 A single joint restoration factor then preserves the total Q/K update budget:
 \begin{equation}
@@ -70,8 +72,10 @@ A single joint restoration factor then preserves the total Q/K update budget:
 \widetilde U_K=\rho\widehat U_K.
 \label{eq:joint-restore}
 \end{equation}
-The functional metric therefore changes the direction of the joint Q/K update without
-increasing its aggregate Frobenius norm.
+Because $\|U\|_F=\|\operatorname{vec}(U)\|_2$, the Frobenius norm is the Euclidean
+magnitude of the matrix update when viewed as a parameter vector. The functional metric
+therefore changes the geometry of the joint Q/K update while the restoration fixes its
+aggregate parameter-space step magnitude.
 
 Figure~\ref{fig:orbit-overview} summarizes the data flow of the optimizer before the
 step-by-step specification in Algorithm~\ref{alg:orbit}.
