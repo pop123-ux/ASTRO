@@ -96,14 +96,14 @@ and full frequency-pair coupling; and
 \textbf{(4) transfer evaluation}, extending the protocol to a longer training horizon and
 a 355M model with measured runtime and memory cost.
 
-\paragraph{Additional development baseline.}
-ASTRO is included only as a frozen reference optimizer from a preceding development study, not as a
-separate research contribution of this paper. In the configuration used here, its matrix
-path combines Nesterov-style momentum and a Newton--Schulz/polar transform with a row-wise
-second moment measured on the post-polar direction, followed by norm-preserving adaptive
-redistribution and Muon-style aspect-ratio scaling. Non-matrix parameters use a separate
-Adam-like auxiliary path. The ASTRO recipe was fixed before the ORBIT campaign and is not
-retuned in response to any ORBIT result.
+\paragraph{ASTRO development baseline.}
+ASTRO is a frozen Muon-family development baseline from a preceding side study and is not
+presented as a separate research contribution of this paper. Its matrix path combines
+Nesterov-style momentum and a Newton--Schulz/polar transform with a row-wise second moment
+measured on the post-polar direction, followed by norm-preserving adaptive redistribution
+and Muon-style aspect-ratio scaling; non-matrix parameters use an Adam-like auxiliary path.
+Its recipe was fixed before the ORBIT campaign and is not retuned in response to ORBIT
+results.
 
 \section{Related Work}
 \paragraph{Matrix and spectral optimization.}
