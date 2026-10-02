@@ -94,11 +94,13 @@ magnitude of the matrix update when viewed as a parameter vector. The functional
 therefore changes the geometry of the joint Q/K update while the restoration fixes its
 aggregate parameter-space step magnitude.
 
+\FloatBarrier
+
 Figure~\ref{fig:orbit-overview} summarizes the data flow of the optimizer before the
 step-by-step specification in Algorithm~\ref{alg:orbit}.
 
 \IfFileExists{figures/orbit_overview.pdf}{%
-\begin{figure}[!t]
+\begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.97\linewidth]{orbit_overview.pdf}
 \caption{ORBIT update pathway. Muon candidate directions are reshaped using Q/K second-moment
@@ -112,7 +114,7 @@ their standard Muon or auxiliary AdamW path.}
 Algorithm~\ref{alg:orbit} gives the corresponding Q/K-pair update. Here
 $\epsilon=10^{-5}$ and $\mathcal D=\{1,2,4,8,16,32,64,128\}$ in the reported experiments.
 
-\begin{algorithm}[!t]
+\begin{algorithm}[!htbp]
 \caption{ORBIT update for a RoPE query--key projection pair}
 \label{alg:orbit}
 \begin{algorithmic}[1]
@@ -223,22 +225,22 @@ hierarchy and the selection policy used in each block.
 \caption{Experimental protocol and evidence hierarchy. The matched Muon--ORBIT comparison
 is the sole primary confirmatory analysis.}
 \label{tab:protocol}
-\footnotesize
-\setlength{\tabcolsep}{3.5pt}
+\small
+\setlength{\tabcolsep}{3.8pt}
 \renewcommand{\arraystretch}{1.12}
 \begin{tabularx}{\textwidth}{@{}
->{\raggedright\arraybackslash}p{1.75cm}
->{\raggedright\arraybackslash}p{2.05cm}
+>{\raggedright\arraybackslash}p{1.65cm}
+>{\raggedright\arraybackslash}p{1.65cm}
 >{\raggedright\arraybackslash}X
->{\centering\arraybackslash}p{1.45cm}
->{\raggedright\arraybackslash}p{2.75cm}
+>{\centering\arraybackslash}p{1.35cm}
+>{\raggedright\arraybackslash}p{2.55cm}
 @{}}
 \toprule
 Study & Setting & Selection / control policy & Replication & Methods \\
 \midrule
 Broad benchmark &
-124M, 900 steps\newline 3.69M sampled tokens &
-Five 300-step discovery candidates per optimizer; selected recipes fixed for 900-step evaluation &
+124M, 900 steps &
+Five discovery candidates per optimizer; selected recipe fixed for evaluation &
 $n=5$/method &
 AdamW, AdaMuon, Muon, NorMuon, ASTRO, ORBIT \\
 
@@ -249,26 +251,26 @@ $n=5$/cell &
 Muon, ORBIT \\
 
 \textbf{Matched confirmation} &
-124M, 900 steps\newline 3.69M tokens &
-\textbf{Primary:} same 10 candidates evaluated for both; the same candidate minimizes tuning loss for both and is then frozen &
+124M, 900 steps &
+\textbf{Primary:} same 10 candidates for both; common winner frozen before held-out evaluation &
 $n=10$ paired &
 Muon, ORBIT \\
 
 Ablation &
 124M, 900 steps\newline 3.69M tokens &
-Same matched recipe and statistics path; only the mechanism variant changes &
+Shared matched recipe; only the mechanism variant changes &
 $n=10$/variant &
 ORBIT, identity, no-RoPE, diagonal \\
 
 Long-horizon transfer &
-124M, 2700 steps\newline 11.06M sampled tokens &
-Independently fixed method recipes &
+124M, 2700 steps &
+Fixed method-specific recipes &
 $n=2$/method &
 Muon, NorMuon, ASTRO, ORBIT \\
 
 Scale transfer &
-355M, 900 steps\newline 1.84M sampled tokens &
-Independently fixed method recipes; batch size 4 with checkpointing &
+355M, 900 steps &
+Fixed method-specific recipes; batch size 4 with checkpointing &
 $n=2$/method &
 Muon, NorMuon, ASTRO, ORBIT \\
 \bottomrule
@@ -276,7 +278,7 @@ Muon, NorMuon, ASTRO, ORBIT \\
 
 \vspace{0.35em}
 \begin{minipage}{0.98\linewidth}
-\footnotesize
+\small
 The common winning configuration (\MatchedSharedConfigID{}) uses matrix learning rate
 \MatchedSharedLR{}, weight decay \MatchedSharedWeightDecay{}, and auxiliary AdamW
 multiplier \MatchedSharedAuxMult{} (auxiliary learning rate \MatchedSharedAuxLR{}).
@@ -295,7 +297,7 @@ The primary estimand is the paired per-run validation-loss difference, ORBIT min
 Reported statistics include the paired mean, sample standard deviation, paired-run win
 count, and a two-sided 95\% Student-$t$ confidence interval for the mean paired difference.
 The matched Muon--ORBIT comparison is the sole primary confirmatory contrast. Its confidence
-interval is conditional on the frozen shared selected recipe and does not incorporate
+interval is conditional on the selected shared recipe and does not incorporate
 uncertainty from recipe selection. Ablation intervals are secondary mechanism analyses and
 are reported without multiplicity adjustment; the long-horizon and 355M cells are
 descriptive transfer checks rather than high-powered inferential tests. End-to-end
