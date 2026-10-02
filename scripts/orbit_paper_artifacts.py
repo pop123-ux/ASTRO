@@ -28,7 +28,10 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Iterable
 
-CORE_DIGEST = "de8b994a734276871770c6c67648117d3613d0954f3ae90d7e7b69246308c200"
+import orbit_campaign as campaign
+
+LEGACY_PREAUDIT_CORE_DIGEST = "de8b994a734276871770c6c67648117d3613d0954f3ae90d7e7b69246308c200"
+CORE_DIGEST = campaign.code_digest()
 
 EXPECTED = {
     "confirm": {
