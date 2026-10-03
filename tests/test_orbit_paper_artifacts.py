@@ -140,7 +140,7 @@ def test_manuscript_states_forward_and_optimizer_rotations_separately():
     assert r"R_f(-\Delta)" in text
     assert r"R_f(+\Delta)" in text
     assert "optimizer design choice" in normalized_main
-    assert "not an exact score-side pullback" in normalized_main
+    assert "rather than an exact score-side pullback" in normalized_main
     assert r"R_f(+\Delta)S_{K,f}R_f(+\Delta)^\top" in methods
     assert r"R_f(+\Delta)^\top S_{Q,f}R_f(+\Delta)" in methods
     assert "exact causal-score pullback" in normalized_methods
