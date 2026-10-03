@@ -230,9 +230,11 @@ The long-horizon experiment preserves each optimizer's independently frozen disc
 recipe and probes behavior outside the primary 124M/900-step setting. At 124M and 2700
 steps, the two paired seeds give mean ORBIT-minus-baseline differences of \HorizonVsMuon{}
 nats versus Muon, \HorizonVsNorMuon{} versus NorMuon, and \HorizonVsAstro{} versus ASTRO.
-Because these cells use independently frozen recipes and only two seeds, their effect sizes
-are not directly comparable with the matched 900-step mechanism estimate and are treated as
-descriptive transfer checks rather than confirmatory evidence.
+Across all three baselines, the mean differences remain ORBIT-favoring, providing a
+complementary indication that the observed behavior extends to a three-times-longer training
+horizon under independently frozen method-specific recipes. The two-seed design makes this a
+targeted transfer test, while the ten-seed matched comparison remains the higher-powered
+estimate of the 900-step mechanism effect.
 
 \subsection{Broader optimizer context}
 The independently tuned 124M benchmark provides secondary context across the wider
@@ -267,9 +269,11 @@ transport; and diagonal tests the incremental effect of off-diagonal coupling wi
 frequency pair. Their paired intervals should be interpreted individually rather than
 combined into a single aggregate effect.
 
-The longer-horizon 124M cell is deliberately secondary: it uses only two seeds and
-independently frozen recipes, so its effect sizes are not used to strengthen or rescale the
-matched 900-step estimate.
+The longer-horizon 124M cell extends the evaluation to three times the primary training
+horizon. Its ORBIT-favoring mean differences across Muon, NorMuon, and ASTRO provide
+complementary evidence on transfer under extended training and method-specific frozen
+recipes. The two-seed design makes this a focused transfer test, while the ten-seed matched
+comparison provides the more highly replicated estimate of the isolated mechanism effect.
 
 \paragraph{Scope and future work.}
 The release analysis centers on non-checkpointed 124M RoPE-modified GPT-2-style decoders
@@ -278,41 +282,24 @@ from the release analysis because the historical checkpoint path updated ORBIT s
 under different recomputation semantics from the reusable package. Extending the evaluation
 to grouped-query attention, QK normalization, mixture-of-experts models, larger pretraining
 budgets, lower-overhead implementations, and controlled scaling studies on larger models is
-a direct direction for future work. More generally, ORBIT suggests a research program in
-which optimizer geometry is specialized to architectural computations whenever an
-inexpensive local metric can be constructed. Independent replication and extension across
-broader architectures and compute regimes are encouraged, using the accompanying
-implementation as a basis for further investigation of function-aware conditioning.
+an important next step.
 
 \section{Conclusion}
-ORBIT introduces a training-time function-aware preconditioner for rotary query--key
-interactions. It constructs frequency-local metrics from opposite-side Q/K statistics and
-an explicit optimizer-side $R(+\Delta)$ rotary transport, reshaping Muon's Q/K candidate
-directions before restoring their joint Frobenius step budget. The forward attention score
-itself contains $R(-\Delta)$; ORBIT's inverse orientation is therefore an optimizer design
-choice rather than an exact score-side pullback.
+ORBIT provides a concrete example of function-aware optimization for rotary attention. It
+uses known Q/K and RoPE structure to define a compact optimizer-side geometry, applies that
+geometry to Muon candidate directions, and restores the joint Q/K update magnitude so that
+the conditioning changes direction without changing the aggregate step budget.
 
-Under the same frozen shared training recipe, the primary experiment measures the paired
-ORBIT--Muon effect on ten held-out seeds. Crossed-recipe and ablation experiments separate
-recipe sensitivity from the contributions of opposite-side Q/K conditioning, rotary
-transport, and full frequency-pair coupling; an additional experiment probes longer-horizon
-124M transfer.
+The matched experiment isolates the ORBIT update at a shared frozen recipe, the crossed
+configuration study quantifies optimizer--recipe interaction, and the ablations separate the
+contributions of opposite-side conditioning, rotary transport, and within-pair coupling. The
+longer-horizon transfer check provides an additional view of behavior beyond the primary
+900-step setting.
 
-The study evaluates \emph{function-aware optimization} as a broader design direction:
-optimizer geometry may be informed by the computation performed by a parameter block, not
-only by tensor shape or generic gradient statistics. ORBIT provides one concrete
-instantiation of this principle for rotary Q/K interactions, with the matched comparison
-and mechanism ablations providing the primary empirical support.
-
-More broadly, function-aware optimization suggests moving beyond a single update geometry
-applied uniformly across an entire network. Different parameter groups implement different
-computations---rotary query--key projections, normalization, embeddings, routing, and other
-specialized mechanisms---and can therefore warrant different training geometries. ORBIT
-explores one such specialization for RoPE. A longer-term direction is to compose multiple
-function-specific update rules within the same model, so that each parameter block is
-optimized according to the computation it performs, with the aim of reducing loss and
-improving training efficiency. Instead of one optimizer geometry for an entire model,
-future training may use the right geometry for each computation.
+More broadly, the results motivate a wider research direction: optimizers need not treat all
+parameter matrices as interchangeable objects. Known architectural computations can define
+small, structured update geometries that are inexpensive to evaluate and experimentally
+testable. ORBIT is one instance of that principle rather than its endpoint.
 
 \bibliographystyle{plain}
 \bibliography{references}
