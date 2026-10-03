@@ -154,26 +154,23 @@ def plot_mechanism_summary(results: dict, out: Path) -> None:
     save(fig, out, "mechanism_summary")
 
 
-def plot_transfer_summary(horizon_rows: list[dict], scale_rows: list[dict], out: Path) -> None:
-    """Compatibility plot for archived transfer evidence; not used in release manuscript."""
-    fig, axes = plt.subplots(1, 2, figsize=(10.2, 3.45), gridspec_kw={"wspace": 0.30})
+def plot_transfer_summary(horizon_rows: list[dict], _scale_rows: list[dict], out: Path) -> None:
+    """Release long-horizon plot; the historical 355M development panel is omitted."""
     order = ["muon", "normuon", "astro_v2", "orbit"]
     names = {"muon": "Muon", "normuon": "NorMuon", "astro_v2": "ASTRO", "orbit": "ORBIT"}
-    for ax, rows, title in (
-        (axes[0], horizon_rows, "124M / 2700 steps"),
-        (axes[1], scale_rows, "355M / 900 steps (development)"),
-    ):
-        by = grouped(rows, "optimizer")
-        for xi, method in enumerate(order):
-            vals = [float(x["val_loss"]) for x in sorted(by[method], key=lambda r: r["seed"])]
-            offsets = [-0.055, 0.055] if len(vals) == 2 else [0.0] * len(vals)
-            ax.scatter([xi + o for o in offsets], vals, s=32, zorder=3)
-            mean = statistics.fmean(vals)
-            ax.plot([xi - 0.14, xi + 0.14], [mean, mean], linewidth=2.0)
-        ax.set_xticks(range(len(order)), [names[m] for m in order])
-        ax.set_ylabel("Validation loss")
-        ax.set_title(title)
-    save(fig, out, "transfer_summary")
+    by = grouped(horizon_rows, "optimizer")
+
+    fig, ax = plt.subplots(figsize=(6.2, 3.55))
+    for xi, method in enumerate(order):
+        vals = [float(x["val_loss"]) for x in sorted(by[method], key=lambda r: r["seed"])]
+        offsets = [-0.055, 0.055] if len(vals) == 2 else [0.0] * len(vals)
+        ax.scatter([xi + o for o in offsets], vals, s=32, zorder=3)
+        mean = statistics.fmean(vals)
+        ax.plot([xi - 0.14, xi + 0.14], [mean, mean], linewidth=2.0)
+    ax.set_xticks(range(len(order)), [names[m] for m in order])
+    ax.set_ylabel("Validation loss")
+    ax.set_title("124M / 2700 steps")
+    save(fig, out, "horizon_transfer")
 
 
 def plot_broad_confirmation(rows: list[dict], out: Path) -> None:
@@ -192,7 +189,7 @@ def plot_broad_confirmation(rows: list[dict], out: Path) -> None:
     xs = list(range(len(order)))
     ax.errorbar(xs, means, yerr=sds, fmt="o", capsize=4, linewidth=1.5)
     ax.set_xticks(xs, [names[m] for m in order], rotation=20, ha="right")
-    ax.set_ylabel("Validation loss")
+    ax.set_ylabel(r"Validation loss (mean $\pm$ SD)")
     ax.set_title("Broader 124M optimizer context")
     save(fig, out, "broad_confirmation")
 
