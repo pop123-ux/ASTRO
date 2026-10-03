@@ -151,8 +151,9 @@ def test_manuscript_presentation_and_github_links():
     methods = (ROOT / "docs" / "orbit" / "paper" / "methods.tex").read_text()
 
     assert r"\usepackage{fontawesome5}" in main
-    assert r"\href{https://github.com/pop123-ux/ORBIT}{\faGithub}" in main
+    assert r"\href{https://github.com/pop123-ux/ORBIT}{\texttt{github.com/pop123-ux/ORBIT}}" in main
     assert r"\href{https://github.com/pop123-ux}{\faGithub\;pop123-ux}" in main
+    assert r"\href{https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu}{\raisebox{-0.08ex}{\faSmileBeam}}" in methods
     assert "Independent Researcher" in main
     assert "alexandrupp55@gmail.com" in main
     assert "Toward Function-Aware Optimization" in main
