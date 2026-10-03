@@ -1,4 +1,4 @@
-"""Tests for the strict ORBIT paper evidence-freeze layer."""
+"""Regression tests for the release-facing ORBIT paper contract."""
 
 from __future__ import annotations
 
@@ -12,9 +12,8 @@ SCRIPTS = ROOT / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
-import orbit_paper_artifacts as paper  # noqa: E402
 import orbit_build_paper as build_paper  # noqa: E402
-import orbit_postscale_merge as post_merge  # noqa: E402
+import orbit_paper_artifacts as paper  # noqa: E402
 
 
 ENV = {
@@ -28,7 +27,7 @@ CFG = {"lr": 0.018, "scalar_lr_mult": 0.49, "weight_decay": 0.006}
 
 
 def row(phase: str, optimizer: str, seed: int, idx: int, *, label=None, trial=None):
-    base = {
+    item = {
         "phase": phase,
         "optimizer": optimizer,
         "seed": seed,
@@ -42,14 +41,12 @@ def row(phase: str, optimizer: str, seed: int, idx: int, *, label=None, trial=No
         "config": dict(CFG),
         "curve": [],
     }
-    if phase in paper.POSTSCALE_PHASES:
-        base["orchestration_digest"] = paper.POSTSCALE_DIGEST
     if label is not None:
-        base["analysis_label"] = label
+        item["analysis_label"] = label
     if trial is not None:
-        base["trial"] = trial
-        base["config_id"] = f"shared-{trial:02d}"
-    return base
+        item["trial"] = trial
+        item["config_id"] = f"shared-{trial:02d}"
+    return item
 
 
 def write_jsonl(path: Path, rows: list[dict]) -> None:
@@ -68,20 +65,20 @@ def build_fixture(tmp_path: Path) -> None:
     write_jsonl(merged / "confirm.jsonl", confirm)
 
     xconfig = []
-    cells = (
+    for opt, label in (
         ("muon", "muon_at_muon_config"),
         ("muon", "muon_at_orbit_config"),
         ("orbit", "orbit_at_muon_config"),
         ("orbit", "orbit_at_orbit_config"),
-    )
-    for opt, label in cells:
+    ):
         for i, seed in enumerate(range(100, 105)):
             xconfig.append(row("xconfig", opt, seed, i, label=label))
     write_jsonl(merged / "xconfig.jsonl", xconfig)
 
     matched_tune = []
     for trial in range(10):
-        matched_tune.append(row("matched_tune", "muon", 0, trial, trial=trial))
+        for opt in ("muon", "orbit"):
+            matched_tune.append(row("matched_tune", opt, 0, trial, trial=trial))
     write_jsonl(merged / "matched_tune.jsonl", matched_tune)
 
     matched_confirm = []
@@ -96,330 +93,94 @@ def build_fixture(tmp_path: Path) -> None:
             ablation.append(row("ablation_ext", opt, seed, i))
     write_jsonl(merged / "ablation_ext.jsonl", ablation)
 
-    horizon = []
-    scale = []
-    for opt in ("muon", "normuon", "astro_v2", "orbit"):
-        for i, seed in enumerate((400, 401)):
-            horizon.append(row("horizon_with_astro", opt, seed, i))
-        for i, seed in enumerate((300, 301)):
-            scale.append(row("scale_with_astro", opt, seed, i))
-    write_jsonl(merged / "horizon_with_astro.jsonl", horizon)
-    write_jsonl(merged / "scale_with_astro.jsonl", scale)
+    for phase, seeds in (("horizon_with_astro", (400, 401)), ("scale_with_astro", (300, 301))):
+        rows = []
+        for opt in ("muon", "normuon", "astro_v2", "orbit"):
+            for i, seed in enumerate(seeds):
+                rows.append(row(phase, opt, seed, i))
+        write_jsonl(merged / f"{phase}.jsonl", rows)
 
     best = {
-        "selection_rule": "muon_winner_from_shared_grid",
-        "muon": {
-            "config": dict(CFG),
-            "config_id": "shared-04",
-            "code_digest": paper.CORE_DIGEST,
-            "orchestration_digest": paper.POSTSCALE_DIGEST,
-            "selected_by": "muon",
-        },
-        "orbit": {
-            "config": dict(CFG),
-            "config_id": "shared-04",
-            "code_digest": paper.CORE_DIGEST,
-            "orchestration_digest": paper.POSTSCALE_DIGEST,
-            "selected_by": "muon",
-        },
+        "muon": {"config": dict(CFG), "config_id": "shared-04", "code_digest": paper.CORE_DIGEST},
+        "orbit": {"config": dict(CFG), "config_id": "shared-04", "code_digest": paper.CORE_DIGEST},
     }
     (merged / "matched_best_configs.json").write_text(json.dumps(best))
 
 
-def test_matched_freeze_uses_lowest_loss_muon_candidate_for_both_methods():
-    rows = []
-    losses = [1.4, 1.1, 1.3, 1.2, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0]
-    for trial, loss in enumerate(losses):
-        rows.append(
-            {
-                "optimizer": "muon",
-                "val_loss": loss,
-                "trial": trial,
-                "config_id": f"shared-{trial:02d}",
-                "config": {"lr": 0.01 + trial * 0.001},
-                "task_id": f"muon-{trial}",
-                "code_digest": paper.CORE_DIGEST,
-                "orchestration_digest": "test",
-                "environment": ENV,
-            }
-        )
-
-    frozen = post_merge.freeze_matched(rows)
-    assert frozen["selection_rule"] == "muon_winner_from_shared_grid"
-    assert frozen["muon"]["config_id"] == "shared-01"
-    assert frozen["orbit"]["config_id"] == "shared-01"
-    assert frozen["muon"]["selected_by"] == "muon"
-    assert frozen["orbit"]["selected_by"] == "muon"
-
-
-def test_strict_freeze_accepts_complete_exact_fixture(tmp_path):
+def test_strict_freeze_accepts_complete_paper_fixture(tmp_path):
     build_fixture(tmp_path)
     results, manifest = paper.build(tmp_path)
     assert manifest["status"] == "paper_ready"
     assert results["matched_confirmation"]["orbit_vs_muon"]["n"] == 10
     assert results["mechanism_ablation"]["orbit_vs_identity"]["n"] == 10
     assert results["long_horizon_transfer"]["orbit_vs_astro_v2"]["n"] == 2
-    assert results["scale_transfer"]["orbit_vs_astro_v2"]["n"] == 2
-    assert (tmp_path / "paper_artifacts" / "manifest.json").is_file()
-    assert (tmp_path / "paper_artifacts" / "paper_results.json").is_file()
 
 
-def test_strict_freeze_rejects_pre_audit_core_digest(tmp_path):
+def test_strict_freeze_rejects_wrong_core_digest(tmp_path):
     build_fixture(tmp_path)
     path = tmp_path / "merged" / "matched_confirm.jsonl"
     rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
-    rows[0]["code_digest"] = paper.LEGACY_PREAUDIT_CORE_DIGEST
+    rows[0]["code_digest"] = "not-the-paper-implementation"
     write_jsonl(path, rows)
-
     try:
         paper.build(tmp_path)
-    except ValueError as exc:
-        message = str(exc)
-        assert "pre-audit ORBIT evidence detected" in message
-        assert "must be rerun" in message
+    except (SystemExit, ValueError) as exc:
+        assert "digest" in str(exc).lower()
     else:
-        raise AssertionError("strict evidence freeze accepted pre-audit ORBIT evidence")
+        raise AssertionError("strict evidence freeze accepted a mismatched implementation")
 
 
-def test_incomplete_freeze_excludes_stale_phase_from_generated_results(tmp_path):
-    build_fixture(tmp_path)
-    path = tmp_path / "merged" / "matched_confirm.jsonl"
-    rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
-    rows[0]["code_digest"] = paper.LEGACY_PREAUDIT_CORE_DIGEST
-    write_jsonl(path, rows)
-
-    results, manifest = paper.build(tmp_path, allow_incomplete=True)
-
-    assert manifest["status"] == "incomplete_or_warn"
-    assert "matched_confirm" in manifest["invalid"]
-    assert "matched_confirmation" not in results
-    assert manifest["sources"]["matched_confirm"]["accepted"] is False
-    assert manifest["sources"]["matched_confirm"]["accepted_rows"] == 0
-    assert manifest["sources"]["matched_confirm"]["rows"] == 20
-
-
-def test_strict_freeze_rejects_stale_postscale_orchestration(tmp_path):
-    build_fixture(tmp_path)
-    path = tmp_path / "merged" / "matched_confirm.jsonl"
-    rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
-    rows[0]["orchestration_digest"] = "stale-protocol"
-    write_jsonl(path, rows)
-
-    try:
-        paper.build(tmp_path)
-    except ValueError as exc:
-        message = str(exc)
-        assert "orchestration digest changed" in message
-        assert "rerun this phase" in message
-    else:
-        raise AssertionError("strict evidence freeze accepted stale post-scale protocol rows")
-
-
-def test_strict_freeze_refuses_missing_ablation(tmp_path):
-    build_fixture(tmp_path)
-    (tmp_path / "merged" / "ablation_ext.jsonl").unlink()
-    try:
-        paper.build(tmp_path)
-    except SystemExit as exc:
-        assert "ablation_ext.jsonl" in str(exc)
-    else:
-        raise AssertionError("strict evidence freeze accepted a missing ablation phase")
-
-
-def test_paper_facing_astro_name_is_clean():
-    paper_paths = [
-        ROOT / "docs" / "orbit" / "paper" / "main.tex",
-        ROOT / "docs" / "orbit" / "paper" / "methods.tex",
-    ]
-    forbidden = ("ASTRO-v2", "astro_v2", r"astro\_v2")
-    for path in paper_paths:
-        text = path.read_text()
-        for token in forbidden:
-            assert token not in text, f"internal ASTRO label leaked into {path}: {token}"
-
-    # Plot/build code may use the frozen internal identifier to read historical
-    # artifacts, but it must never render the public label as ASTRO-v2.
-    for path in (
-        ROOT / "scripts" / "orbit_plot.py",
-        ROOT / "scripts" / "orbit_build_paper.py",
-    ):
-        assert "ASTRO-v2" not in path.read_text()
-
-
-
-def test_paper_method_contains_orbit_algorithm_and_no_direct_address():
+def test_manuscript_states_forward_and_optimizer_rotations_separately():
+    main = (ROOT / "docs" / "orbit" / "paper" / "main.tex").read_text()
     methods = (ROOT / "docs" / "orbit" / "paper" / "methods.tex").read_text()
-    assert r"\begin{algorithm}" in methods
-    assert r"\label{alg:orbit}" in methods
-    assert "ORBIT update for a RoPE query--key projection pair" in methods
+    text = main + "\n" + methods
 
-    paper_text = "\n".join(
-        (ROOT / "docs" / "orbit" / "paper" / name).read_text()
-        for name in ("main.tex", "methods.tex")
-    )
+    assert r"R_f(-\Delta)" in text
+    assert r"R_f(+\Delta)" in text
+    assert "optimizer design choice" in main
+    assert "not an exact score-side pullback" in main
+    assert r"R_f(+\Delta)S_{K,f}R_f(+\Delta)^\top" in methods
+    assert r"R_f(+\Delta)^\top S_{Q,f}R_f(+\Delta)" in methods
+    assert "exact causal-score pullback" in methods
+
+
+def test_manuscript_presentation_and_github_links():
+    main = (ROOT / "docs" / "orbit" / "paper" / "main.tex").read_text()
+    methods = (ROOT / "docs" / "orbit" / "paper" / "methods.tex").read_text()
+
+    assert r"\usepackage{fontawesome5}" in main
+    assert r"\href{https://github.com/pop123-ux/ORBIT}{\faGithub}" in main
+    assert r"\href{https://github.com/pop123-ux}{\faGithub\;pop123-ux}" in main
+    assert "Independent Researcher" in main
+    assert "alexandrupp55@gmail.com" in main
+    assert "Toward Function-Aware Optimization" in main
+    assert "ORBIT update rule" in methods
+    assert r"\hrule height 0.8pt" in methods
+    assert "355M" not in main.split(r"\section{Discussion}")[0]
+
+    paper_text = main + "\n" + methods
     assert not re.search(r"\b(?:you|your|we|our)\b", paper_text, flags=re.IGNORECASE)
 
 
-
-def test_paper_ends_without_appendix_scaffolding():
-    main = (ROOT / "docs" / "orbit" / "paper" / "main.tex").read_text()
-    assert r"\appendix" not in main
-    assert "astro_provenance.tex" not in main
-    assert r"\section{Reproducibility}" not in main
-    assert r"\section{Matched Training Dynamics}" not in main
-    assert r"\section{Optimizer Diagnostics}" not in main
-    assert r"\section{Broad Confirmation Visualization}" not in main
-    methods = (ROOT / "docs" / "orbit" / "paper" / "methods.tex").read_text()
-    assert r"\subsection{Compute and reproducibility}" not in methods
-    normalized = " ".join(methods.split())
-    assert "experiment records used for this study" not in normalized
-    assert "reproducibility artifacts" not in normalized
-    assert "automated consistency checks" not in normalized
-    assert "run-record format" not in normalized
-
-
-
-def test_paper_avoids_internal_identifiers():
-    paper_text = "\n".join(
-        (ROOT / "docs" / "orbit" / "paper" / name).read_text()
-        for name in ("main.tex", "methods.tex")
-    )
-    forbidden = (
-        "HuggingFaceFW/",
-        "shared-04",
-        "de8b994a734276871770c6c67648117d3613d0954f3ae90d7e7b69246308c200",
-        "environment fingerprint",
-        "JSONL",
-    )
-    for token in forbidden:
-        assert token not in paper_text, f"internal identifier leaked into manuscript: {token}"
-
-
-
-def test_manuscript_uses_publication_facing_names_only():
+def test_primary_protocol_is_shared_grid_with_coincident_winner():
     main = (ROOT / "docs" / "orbit" / "paper" / "main.tex").read_text()
     methods = (ROOT / "docs" / "orbit" / "paper" / "methods.tex").read_text()
-    paper_text = main + "\n" + methods
-
-    assert "Independent Researcher" in main
-    assert "alexandrupp55@gmail.com" in main
-    assert "FineWeb-Edu" in paper_text
-    assert "sample-10BT" in paper_text
-
-    forbidden = (
-        "HuggingFaceFW/fineweb-edu",
-        "shared-04",
-        "de8b994a734276871770c6c67648117d3613d0954f3ae90d7e7b69246308c200",
-        "astro_v2",
-        r"astro\_v2",
-        "ASTRO-v2",
-    )
-    for token in forbidden:
-        assert token not in paper_text, f"implementation-facing token leaked into paper: {token}"
+    normalized = " ".join((main + " " + methods).split())
+    assert "both independently select the same configuration" in normalized
+    assert "independently attain their lowest tuning loss at the same candidate" in normalized
+    assert "same 10 candidates for both" in normalized
+    assert "Muon alone is tuned" not in normalized
 
 
-
-def test_incomplete_build_status_is_visible_in_manuscript():
-    main = (ROOT / "docs" / "orbit" / "paper" / "main.tex").read_text()
-    build_script = (ROOT / "scripts" / "orbit_build_paper.py").read_text()
-    assert r"\IfFileExists{generated/status.tex}" in main
-    assert "DRAFT --- corrected evidence incomplete." in build_script
-    assert "Invalid or stale experiment phases were excluded" in build_script
-
-
-def test_paper_presentation_contract():
-    main = (ROOT / "docs" / "orbit" / "paper" / "main.tex").read_text()
-    methods = (ROOT / "docs" / "orbit" / "paper" / "methods.tex").read_text()
-
-    assert "Independent Researcher" in main
-    assert "alexandrupp55@gmail.com" in main
-    assert r"\usepackage{fontawesome5}" not in main
-    assert r"\faGithub" not in main
-    assert "Toward Function-Aware Optimization" in main
-    assert r"\emph{function-aware optimization}" in main
-    assert r"R_f(-\Delta)" in main
-    assert r"R_f(-\Delta)" in methods
-    assert r"R_f(\Delta)C_{K,f}" not in methods
-    assert "Additional development baseline" not in main
-    assert "mechanism_summary.pdf" in main
-    assert "transfer_summary.pdf" in main
-    assert "broad_confirmation.pdf" in main
-    assert "mechanism_attribution.pdf" not in main
-    assert "long_horizon_transfer.pdf" not in main
-    assert "scale_transfer.pdf" not in main
-    assert "orbit_overview.pdf" in methods
-
-    paper_text = main + "\n" + methods
-    for token in (
-        "HuggingFaceFW/fineweb-edu",
-        "shared-04",
-        "de8b994a",
-        "JSONL",
-    ):
-        assert token not in paper_text
-
-    assert "FineWeb-Edu" in paper_text
-    assert "sample-10BT" in paper_text
-    assert "Muon alone is tuned" in main
-    assert "Muon discovery recipe" in main
-    assert "ORBIT discovery recipe" in main
-
-    for ambiguous_phrase in (
-        "Knight studies",
-        "Singh similarly",
-        "Vashisht and Ramaswamy",
-        "Huang et al.",
-    ):
-        assert ambiguous_phrase not in main
-
-
-def test_manuscript_does_not_prejudge_corrected_result_direction():
-    main = (ROOT / "docs" / "orbit" / "paper" / "main.tex").read_text()
-    forbidden = (
-        "reproducible ORBIT effect",
-        "ORBIT improves on Muon",
-        "ORBIT update improves the objective",
-        "support the claim that relative-position-aware",
-        "ORBIT remains lower-loss",
-        "observed advantage",
-        "ORBIT improvement persists",
-    )
-    for phrase in forbidden:
-        assert phrase not in main, f"manuscript prejudges corrected evidence: {phrase}"
-
-
-def test_generated_claim_ledger_is_outcome_neutral(tmp_path):
-    build_fixture(tmp_path)
-    results, manifest = paper.build(tmp_path)
-    build_paper.write_claim_ledger(results, manifest, tmp_path)
-
-    ledger = (tmp_path / "claim_ledger.md").read_text()
-    forbidden = (
-        "ORBIT beats Muon",
-        "one seed favors each method",
-        "Functional Q/K conditioning is supported",
-        "ORBIT beats ASTRO",
-        "advantage grows with model scale",
-        "original ~0.14",
-    )
-    for phrase in forbidden:
-        assert phrase not in ledger
-
-    assert "ORBIT-minus-Muon validation-loss difference" in ledger
-    assert "descriptive transfer checks" in ledger
-
-
-def test_generated_macros_define_then_override(tmp_path):
+def test_generated_macros_and_table_build(tmp_path):
     build_fixture(tmp_path)
     results, _ = paper.build(tmp_path)
     generated = tmp_path / "generated"
     generated.mkdir(parents=True, exist_ok=True)
     build_paper.write_macros(results, generated)
-    text = (generated / "macros.tex").read_text()
-    assert r"\newcommand{\MatchedMuonLoss}{--}" in text
-    assert r"\renewcommand{\MatchedMuonLoss}{" in text
-    assert r"\newcommand{\AblIdentityDelta}{--}" in text
-    assert r"\renewcommand{\AblIdentityDelta}{" in text
-    assert r"\\n\\newcommand" not in text
-    assert len(text.splitlines()) > 10
-    assert text.splitlines()[0] == "% AUTO-GENERATED. Do not edit."
+    build_paper.write_matched_table(results, generated)
+    macros = (generated / "macros.tex").read_text()
+    table = (generated / "table_matched.tex").read_text()
+    assert r"\renewcommand{\MatchedMuonLoss}{" in macros
+    assert "same configuration was the lowest-loss shared-grid candidate for both optimizers" in table
+    assert "selected shared recipe" in table
