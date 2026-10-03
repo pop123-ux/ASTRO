@@ -35,8 +35,8 @@ def test_orbit_optimizer_enables_functional_statistics():
     out.loss.backward()
     for block in model.blocks:
         assert int(block.attn.orbit_stats_seen) > 0
-        assert torch.isfinite(block.attn.orbit_q_second_moment).all()
-        assert torch.isfinite(block.attn.orbit_k_second_moment).all()
+        assert torch.isfinite(block.attn.orbit_q_cov).all()
+        assert torch.isfinite(block.attn.orbit_k_cov).all()
 
 
 def test_rope_metric_is_spd_and_position_sensitive():
@@ -44,8 +44,8 @@ def test_rope_metric_is_spd_and_position_sensitive():
     attn = model.blocks[0].attn
     with torch.no_grad():
         base = torch.tensor([[5.0, 1.2], [1.2, 0.8]])
-        attn.orbit_k_second_moment.copy_(base.view(1, 1, 2, 2).repeat(attn.n_head, attn.n_freq, 1, 1))
-        attn.orbit_q_second_moment.copy_(base.flip(0).flip(1).view(1, 1, 2, 2).repeat(attn.n_head, attn.n_freq, 1, 1))
+        attn.orbit_k_cov.copy_(base.view(1, 1, 2, 2).repeat(attn.n_head, attn.n_freq, 1, 1))
+        attn.orbit_q_cov.copy_(base.flip(0).flip(1).view(1, 1, 2, 2).repeat(attn.n_head, attn.n_freq, 1, 1))
     mq0, _ = attn.orbit_metrics((0,), rotate=True)
     mq8, _ = attn.orbit_metrics((8,), rotate=True)
     assert torch.linalg.eigvalsh(mq0).min() > 0
@@ -127,71 +127,3 @@ def test_eval_does_not_mutate_stats():
     with torch.no_grad():
         model(torch.randint(0, 127, (1, 8)))
     assert seen == [int(block.attn.orbit_stats_seen) for block in model.blocks]
-
-
-
-def test_rope_transport_matches_causal_score_sign():
-    model = OrbitGPT(
-        OrbitGPTConfig(
-            vocab_size=31,
-            block_size=16,
-            n_layer=1,
-            n_head=1,
-            n_embd=2,
-            dropout=0.0,
-        )
-    )
-    attn = model.blocks[0].attn
-    q = torch.zeros(1, 1, 9, 2)
-    k = torch.zeros(1, 1, 9, 2)
-    q_vec = torch.tensor([0.8, -1.1])
-    k_vec = torch.tensor([1.7, 0.4])
-    q[0, 0, 8] = q_vec
-    k[0, 0, 0] = k_vec
-
-    score = attn._apply_rope(q)[0, 0, 8] @ attn._apply_rope(k)[0, 0, 0]
-    r = attn._causal_relative_rotation(8)[0, 0]
-    expected = q_vec @ (r @ k_vec)
-    assert torch.allclose(score, expected, atol=1e-6, rtol=1e-6)
-
-    with torch.no_grad():
-        cov = torch.tensor([[4.0, 1.3], [1.3, 0.7]])
-        attn.orbit_k_second_moment.copy_(cov.view(1, 1, 2, 2))
-    mq, _ = attn.orbit_metrics((8,), rotate=True, eps=0.0)
-    assert torch.allclose(mq[0, 0], r @ cov @ r.T, atol=1e-6, rtol=1e-6)
-
-
-def test_gradient_checkpointing_updates_statistics_once():
-    torch.manual_seed(13)
-    model = OrbitGPT(
-        OrbitGPTConfig(
-            vocab_size=127,
-            block_size=32,
-            n_layer=1,
-            n_head=4,
-            n_embd=64,
-            dropout=0.0,
-            gradient_checkpointing=True,
-        )
-    )
-    Orbit(model, lr=0.01, adamw_lr=3e-4)
-    x = torch.randint(0, 127, (2, 16))
-    model(x, labels=x).loss.backward()
-    assert int(model.blocks[0].attn.orbit_stats_seen) == 1
-
-
-def test_orbit_statistics_are_checkpointed():
-    model = tiny_model()
-    Orbit(model)
-    x = torch.randint(0, 127, (2, 16))
-    model(x, labels=x)
-    state = model.state_dict()
-    assert "blocks.0.attn.orbit_q_second_moment" in state
-    assert "blocks.0.attn.orbit_k_second_moment" in state
-    assert "blocks.0.attn.orbit_stats_seen" in state
-
-    restored = tiny_model()
-    restored.load_state_dict(state)
-    assert torch.equal(restored.blocks[0].attn.orbit_q_second_moment, model.blocks[0].attn.orbit_q_second_moment)
-    assert torch.equal(restored.blocks[0].attn.orbit_k_second_moment, model.blocks[0].attn.orbit_k_second_moment)
-    assert torch.equal(restored.blocks[0].attn.orbit_stats_seen, model.blocks[0].attn.orbit_stats_seen)

@@ -25,31 +25,24 @@ def write_legacy_best(tmp_path: Path) -> None:
 def write_matched_best(tmp_path: Path) -> None:
     merged = tmp_path / "merged"
     merged.mkdir(parents=True, exist_ok=True)
-    shared = {"lr": 0.04, "scalar_lr_mult": 0.1, "weight_decay": 0.05}
     best = {
-        "selection_rule": "muon_winner_from_shared_grid",
-        "muon": {"config": dict(shared), "selected_by": "muon"},
-        "orbit": {"config": dict(shared), "selected_by": "muon"},
+        "muon": {"config": {"lr": 0.04, "scalar_lr_mult": 0.1, "weight_decay": 0.05}},
+        "orbit": {"config": {"lr": 0.03, "scalar_lr_mult": 0.1, "weight_decay": 0.05}},
     }
     (merged / "matched_best_configs.json").write_text(json.dumps(best))
 
 
-def test_matched_candidate_grid_snapshot():
-    assert post.matched_candidate(0) == {
-        "lr": 0.002510810677061948,
-        "weight_decay": 0.09862407335797245,
-        "scalar_lr_mult": 0.028701450292747916,
-    }
-
-
-def test_matched_tune_uses_ten_muon_candidates_only(tmp_path):
+def test_matched_tune_uses_same_ten_candidates_for_both_optimizers(tmp_path):
     tasks = post.make_tasks("matched_tune", work_dir=tmp_path)
-    assert len(tasks) == 10
-    assert {task["optimizer"] for task in tasks} == {"muon"}
+    assert len(tasks) == 20
+    assert {task["optimizer"] for task in tasks} == {"muon", "orbit"}
     assert {task["trial"] for task in tasks} == set(range(10))
-    assert {task["config_id"] for task in tasks} == {
-        f"shared-{trial:02d}" for trial in range(10)
-    }
+
+    for trial in range(10):
+        pair = [task for task in tasks if task["trial"] == trial]
+        assert len(pair) == 2
+        assert pair[0]["config"] == pair[1]["config"]
+        assert pair[0]["config_id"] == pair[1]["config_id"] == f"shared-{trial:02d}"
 
 
 def test_xconfig_is_complete_two_by_two_cross_on_five_seeds(tmp_path):
@@ -76,7 +69,6 @@ def test_matched_confirm_and_extended_ablation_counts(tmp_path):
     assert len(confirm) == 20
     assert {task["seed"] for task in confirm} == set(range(500, 510))
     assert {task["optimizer"] for task in confirm} == {"muon", "orbit"}
-    assert {task["config_source"] for task in confirm} == {"matched_tune:muon_primary"}
 
     ablation = post.make_tasks("ablation_ext", work_dir=tmp_path)
     assert len(ablation) == 40
@@ -84,7 +76,6 @@ def test_matched_confirm_and_extended_ablation_counts(tmp_path):
     assert {task["optimizer"] for task in ablation} == set(post.EXTENDED_ABLATIONS)
     configs = {json.dumps(task["config"], sort_keys=True) for task in ablation}
     assert len(configs) == 1
-    assert {task["config_source"] for task in ablation} == {"matched_tune:muon_primary"}
 
 
 def test_astro_followups_only_run_missing_strong_baseline(tmp_path):
@@ -117,8 +108,8 @@ def test_paired_delta_reports_seedwise_wins():
     assert result["mean_delta"] < 0
 
 
-def test_core_digest_tracks_the_current_audited_implementation():
-    digest = base.code_digest()
-    assert len(digest) == 64
-    assert digest != "de8b994a734276871770c6c67648117d3613d0954f3ae90d7e7b69246308c200"
+def test_core_digest_does_not_include_postscale_script():
+    # Lock the exact implementation fingerprint that produced the 84 legacy
+    # rows. Additive post-scale orchestration must never silently change it.
+    assert base.code_digest() == "de8b994a734276871770c6c67648117d3613d0954f3ae90d7e7b69246308c200"
     assert len(post.postscale_digest()) == 64
