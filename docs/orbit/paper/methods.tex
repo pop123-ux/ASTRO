@@ -196,28 +196,37 @@ attention head and RoPE frequency pair. Its distinctive per-step matrix operatio
 therefore local $2\times2$ transforms rather than dense model-width preconditioners.
 
 Three controls isolate the update components while retaining the same Muon candidate,
-statistics path, structural constants, and Q/K update budget as full ORBIT. Writing the
-regularized full metrics as
-\begin{align}
+statistics path, structural constants, and Q/K update budget as full ORBIT. The regularized
+full metrics are
+\begin{equation}
+\begin{aligned}
 \bar M^{\mathrm{full}}_{Q,f}
 &=\mathbb{E}_{\Delta}\!\left[
 R_f(+\Delta)S_{K,f}R_f(+\Delta)^\top\right]+\epsilon I,\\
 \bar M^{\mathrm{full}}_{K,f}
 &=\mathbb{E}_{\Delta}\!\left[
-R_f(+\Delta)^\top S_{Q,f}R_f(+\Delta)\right]+\epsilon I,
-\end{align}
-the ablation metrics are
-\begin{align}
-\textbf{No-RoPE:}\qquad
+R_f(+\Delta)^\top S_{Q,f}R_f(+\Delta)\right]+\epsilon I.
+\end{aligned}
+\label{eq:ablation-full-metrics}
+\end{equation}
+The three ablation definitions are
+\begin{equation}
+\begin{aligned}
+\text{No-RoPE:}\quad
 &\bar M_{Q,f}=S_{K,f}+\epsilon I,
-&\bar M_{K,f}=S_{Q,f}+\epsilon I,\\
-\textbf{Diagonal:}\qquad
+\qquad
+\bar M_{K,f}=S_{Q,f}+\epsilon I,\\[0.25em]
+\text{Diagonal:}\quad
 &\bar M_{Q,f}=\operatorname{diag}\!\left(\bar M^{\mathrm{full}}_{Q,f}\right),
-&\bar M_{K,f}=\operatorname{diag}\!\left(\bar M^{\mathrm{full}}_{K,f}\right),\\
-\textbf{Identity:}\qquad
+\qquad
+\bar M_{K,f}=\operatorname{diag}\!\left(\bar M^{\mathrm{full}}_{K,f}\right),\\[0.25em]
+\text{Identity:}\quad
 &T_{Q,f}=I_2,
-&T_{K,f}=I_2.
-\end{align}
+\qquad
+T_{K,f}=I_2.
+\end{aligned}
+\label{eq:ablation-definitions}
+\end{equation}
 For No-RoPE and Diagonal,
 $T_{\{Q,K\},f}=\bar M_{\{Q,K\},f}^{-1/2}$ and the resulting Q/K candidates undergo the
 same joint Frobenius restoration as Equation~\ref{eq:joint-restore}. Identity bypasses the
