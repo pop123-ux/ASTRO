@@ -57,10 +57,11 @@ paired ORBIT-minus-Muon mean difference of \MatchedDelta{} nats (95\% CI
 \MatchedRuntimeOverhead{}, with peak allocated CUDA-memory difference
 \MatchedMemoryOverhead{}. Cross-configuration experiments quantify recipe sensitivity,
 while ablations isolate opposite-side Q/K conditioning, rotary transport, and full
-frequency-pair coupling. A longer-horizon 124M experiment is reported as a descriptive
-transfer check. More broadly, the study tests \emph{function-aware optimization} as a
-design principle: optimizer geometry can be specialized to the computation performed by a
-parameter block rather than determined only by tensor shape or gradient history.
+frequency-pair coupling. A longer-horizon 124M experiment provides a complementary transfer
+evaluation under three-times-longer training. More broadly, the study tests
+\emph{function-aware optimization} as a design principle: optimizer geometry can be
+specialized to the computation performed by a parameter block rather than determined only
+by tensor shape or gradient history.
 
 \smallskip
 \noindent\textbf{Code:} \href{https://github.com/pop123-ux/ORBIT}{\texttt{github.com/pop123-ux/ORBIT}}
@@ -110,8 +111,8 @@ from opposite-side second moments and explicit rotary transport;
 selection across unseen seeds while reporting paired effect size, runtime, and memory cost;
 \textbf{(3) mechanism ablations}, isolating opposite-side conditioning, rotary transport,
 and full frequency-pair coupling; and
-\textbf{(4) transfer evaluation}, extending the comparison to a longer 124M training
-horizon as a descriptive check outside the primary setting.
+\textbf{(4) transfer evaluation}, extending the comparison to a 124M training horizon three
+times longer than the primary setting.
 
 \section{Related Work}
 \paragraph{Matrix and spectral optimization.}
@@ -234,7 +235,19 @@ Across all three baselines, the mean differences remain ORBIT-favoring, providin
 complementary indication that the observed behavior extends to a three-times-longer training
 horizon under independently frozen method-specific recipes. The two-seed design makes this a
 targeted transfer test, while the ten-seed matched comparison remains the higher-powered
-estimate of the 900-step mechanism effect.
+estimate of the 900-step mechanism effect (Figure~\ref{fig:horizon-transfer}).
+
+\IfFileExists{figures/horizon_transfer.pdf}{%
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.72\linewidth]{horizon_transfer.pdf}
+\caption{Long-horizon transfer at 124M. Validation loss after 2700 optimizer steps under
+each method's independently frozen discovery recipe. Points denote the two runs and
+horizontal segments denote the method mean. ORBIT attains the lowest mean validation loss
+among the compared methods in this extended-training setting.}
+\label{fig:horizon-transfer}
+\end{figure}}{}
+\FloatBarrier
 
 \subsection{Broader optimizer context}
 The independently tuned 124M benchmark provides secondary context across the wider
@@ -282,7 +295,11 @@ from the release analysis because the historical checkpoint path updated ORBIT s
 under different recomputation semantics from the reusable package. Extending the evaluation
 to grouped-query attention, QK normalization, mixture-of-experts models, larger pretraining
 budgets, lower-overhead implementations, and controlled scaling studies on larger models is
-an important next step.
+an important next step. More generally, ORBIT suggests a research program in which optimizer
+geometry is specialized to architectural computations whenever an inexpensive local metric
+can be constructed. Extension across broader architectures and compute regimes is encouraged,
+using the accompanying implementation as a basis for further investigation of function-aware
+conditioning.
 
 \section{Conclusion}
 ORBIT provides a concrete example of function-aware optimization for rotary attention. It
@@ -293,8 +310,8 @@ the conditioning changes direction without changing the aggregate step budget.
 The matched experiment isolates the ORBIT update at a shared frozen recipe, the crossed
 configuration study quantifies optimizer--recipe interaction, and the ablations separate the
 contributions of opposite-side conditioning, rotary transport, and within-pair coupling. The
-longer-horizon transfer check provides an additional view of behavior beyond the primary
-900-step setting.
+longer-horizon transfer experiment provides complementary evidence on behavior under a
+three-times-longer training horizon.
 
 More broadly, the results motivate a wider research direction: optimizers need not treat all
 parameter matrices as interchangeable objects. Known architectural computations can define
