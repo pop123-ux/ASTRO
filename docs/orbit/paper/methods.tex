@@ -195,11 +195,35 @@ The additional ORBIT state consists of two $2\times2$ second-moment matrices for
 attention head and RoPE frequency pair. Its distinctive per-step matrix operations are
 therefore local $2\times2$ transforms rather than dense model-width preconditioners.
 
-Three controls isolate the update components. \textbf{Identity} keeps the ORBIT training
-path and statistics collection but disables functional preconditioning. \textbf{No-RoPE}
-uses Q/K second-moment metrics without rotary transport. \textbf{Diagonal} retains
-transported per-frequency scaling while removing off-diagonal coupling within each
-$2\times2$ pair.
+Three controls isolate the update components while retaining the same Muon candidate,
+statistics path, structural constants, and Q/K update budget as full ORBIT. Writing the
+regularized full metrics as
+\begin{align}
+\bar M^{\mathrm{full}}_{Q,f}
+&=\mathbb{E}_{\Delta}\!\left[
+R_f(+\Delta)S_{K,f}R_f(+\Delta)^\top\right]+\epsilon I,\\
+\bar M^{\mathrm{full}}_{K,f}
+&=\mathbb{E}_{\Delta}\!\left[
+R_f(+\Delta)^\top S_{Q,f}R_f(+\Delta)\right]+\epsilon I,
+\end{align}
+the ablation metrics are
+\begin{align}
+\textbf{No-RoPE:}\qquad
+&\bar M_{Q,f}=S_{K,f}+\epsilon I,
+&\bar M_{K,f}=S_{Q,f}+\epsilon I,\\
+\textbf{Diagonal:}\qquad
+&\bar M_{Q,f}=\operatorname{diag}\!\left(\bar M^{\mathrm{full}}_{Q,f}\right),
+&\bar M_{K,f}=\operatorname{diag}\!\left(\bar M^{\mathrm{full}}_{K,f}\right),\\
+\textbf{Identity:}\qquad
+&T_{Q,f}=I_2,
+&T_{K,f}=I_2.
+\end{align}
+For No-RoPE and Diagonal,
+$T_{\{Q,K\},f}=\bar M_{\{Q,K\},f}^{-1/2}$ and the resulting Q/K candidates undergo the
+same joint Frobenius restoration as Equation~\ref{eq:joint-restore}. Identity bypasses the
+functional preconditioner; equivalently $T_Q=T_K=I$ and $\rho=1$, so its Q/K directions are
+the underlying Muon candidates. Thus the three controls respectively test rotary transport,
+within-frequency off-diagonal coupling, and the functional preconditioner as a whole.
 
 \section{Experimental Setup}
 \subsection{Models and data}
