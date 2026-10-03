@@ -210,7 +210,7 @@ MLPs with $4d$ hidden width, and zero dropout. Learned absolute position embeddi
 replaced by RoPE with base 10,000. Attention uses separate $q_{\mathrm{proj}}$,
 $k_{\mathrm{proj}}$, and $v_{\mathrm{proj}}$ matrices.
 
-The corpus is FineWeb-Edu, using the \emph{sample-10BT} configuration from Hugging Face~\href{https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu}{\raisebox{-0.08ex}{\faSmileBeam}}.
+The corpus is FineWeb-Edu, using the \emph{sample-10BT} configuration from \href{https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu}{Hugging Face}.
 Text is tokenized with the GPT-2 tokenizer. A fixed stream of 12.4M tokens is shared across
 runs: the first 400,000 tokens form the validation pool and the next 12,000,000 tokens form
 the training pool. Every training step samples random contiguous 512-token windows from
@@ -273,11 +273,11 @@ is the sole primary confirmatory analysis.}
 >{\raggedright\arraybackslash}p{1.65cm}
 >{\raggedright\arraybackslash}X
 >{\centering\arraybackslash}p{1.30cm}
-@{\hspace{0.95em}}
+@{\hspace{1.25em}}
 >{\raggedright\arraybackslash}p{2.45cm}
 @{}}
 \toprule
-Study & Setting & Selection / control policy & Replication & Methods \\
+Study & Setting & Selection / control policy & Replication & \hspace{0.15em}Methods \\
 \midrule
 Broad benchmark &
 124M, 900 steps &
