@@ -38,10 +38,9 @@ second-moment matrices of the unrotated query and key coordinates. The optimizer
 in the paper defines
 \begin{align}
 M_{Q,f} &= \mathbb{E}_{\Delta}\!\left[
-R_f(+\Delta)S_{K,f}R_f(+\Delta)^\top\right],\\
+R_f(+\Delta)S_{K,f}R_f(+\Delta)^\top\right],\label{eq:orbit-metric-q}\\
 M_{K,f} &= \mathbb{E}_{\Delta}\!\left[
-R_f(+\Delta)^\top S_{Q,f}R_f(+\Delta)\right].
-\label{eq:orbit-metrics}
+R_f(+\Delta)^\top S_{Q,f}R_f(+\Delta)\right].\label{eq:orbit-metric-k}
 \end{align}
 Thus the optimizer transports opposite-side second moments in the orientation inverse to
 the forward score's $R_f(-\Delta)$. This $R_f(+\Delta)$ choice is part of the ORBIT
@@ -111,7 +110,7 @@ parameter-space step magnitude.
 For a RoPE query--key projection pair, define the frequency-wise preconditioners
 $\mathcal T_Q=\operatorname{blkdiag}_f(M_{Q,f}^{-1/2})$ and
 $\mathcal T_K=\operatorname{blkdiag}_f(M_{K,f}^{-1/2})$, where $M_Q,M_K$ use the
-optimizer-side $R(+\Delta)$ transport in Equation~\ref{eq:orbit-metrics}. Then
+optimizer-side $R(+\Delta)$ transport in Equations~\ref{eq:orbit-metric-q}--\ref{eq:orbit-metric-k}. Then
 \[
 \bigl(\widetilde U_Q,\widetilde U_K\bigr)
 =
@@ -274,7 +273,7 @@ is the sole primary confirmatory analysis.}
 >{\raggedright\arraybackslash}p{1.65cm}
 >{\raggedright\arraybackslash}X
 >{\centering\arraybackslash}p{1.30cm}
-@{\hspace{0.55em}}
+@{\hspace{0.95em}}
 >{\raggedright\arraybackslash}p{2.45cm}
 @{}}
 \toprule
@@ -337,4 +336,3 @@ from recipe selection. Ablation intervals are secondary mechanism analyses and a
 without multiplicity adjustment; the long-horizon cell is a descriptive transfer check
 rather than a high-powered inferential test. End-to-end wall-clock time and peak allocated
 CUDA memory are reported alongside loss.
-
