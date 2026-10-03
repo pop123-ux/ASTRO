@@ -20,7 +20,7 @@
 \setlength{\abovecaptionskip}{4pt}
 \setlength{\belowcaptionskip}{2pt}
 
-\title{ORBIT\,\href{https://github.com/pop123-ux/ORBIT}{\faGithub}: Function-Space Optimization for Rotary Query--Key Interactions\\[0.35em]\large\itshape Toward Function-Aware Optimization}
+\title{ORBIT: Function-Space Optimization for Rotary Query--Key Interactions\\[0.35em]\large\itshape Toward Function-Aware Optimization}
 \author{Pop Alexandru\\[-0.1em]\small Independent Researcher\\[-0.1em]\small ``Avram Iancu'' Theoretical High School, Cluj-Napoca, Romania\\[-0.1em]\small \href{mailto:alexandrupp55@gmail.com}{alexandrupp55@gmail.com}\\[-0.1em]\small \href{https://github.com/pop123-ux}{\faGithub\;pop123-ux}}
 \date{}
 
@@ -61,6 +61,9 @@ frequency-pair coupling. A longer-horizon 124M experiment is reported as a descr
 transfer check. More broadly, the study tests \emph{function-aware optimization} as a
 design principle: optimizer geometry can be specialized to the computation performed by a
 parameter block rather than determined only by tensor shape or gradient history.
+
+\smallskip
+\noindent\textbf{Code:} \href{https://github.com/pop123-ux/ORBIT}{\texttt{github.com/pop123-ux/ORBIT}}
 \end{abstract}
 
 \section{Introduction}
@@ -88,9 +91,9 @@ orientation of the forward score's $R_f(-\Delta)$. This is an explicit optimizer
 choice, not a claim that ORBIT implements the exact score-gradient metric. A single joint
 Frobenius restoration prevents the conditioning from changing the total Q/K step budget.
 The distinctive ORBIT operations are local $2\times2$ matrix functions. This provides a
-concrete instance of \emph{function-aware optimization}: the optimizer uses the known
-structure of the computation in which Q/K parameters participate to define a local update
-geometry, rather than relying only on generic parameter shape or gradient statistics.
+concrete instance of function-aware optimization: the optimizer uses the known structure of
+the computation in which Q/K parameters participate to define a local update geometry,
+rather than relying only on generic parameter shape or gradient statistics.
 
 Optimizer comparisons are unusually sensitive to tuning policy. For the primary comparison,
 Muon and ORBIT are evaluated on the same ten deterministic candidates on one tuning seed.
@@ -99,7 +102,6 @@ two winners coincide, yielding one shared recipe that is frozen before held-out 
 evaluation. Separate crossed-recipe experiments quantify optimizer--recipe interaction.
 Full selection and evaluation details are given in Section~\ref{sec:evaluation-protocol}.
 
-\Needspace{9\baselineskip}
 \paragraph{Contributions.}
 The main contributions are:
 \textbf{(1) RoPE-informed Q/K optimizer geometry}, a frequency-local preconditioner built
@@ -118,53 +120,49 @@ orthogonalized direction~\cite{jordan2024muon}; later work showed that weight de
 update-scale calibration make this family viable at substantially larger language-model
 scale~\cite{liu2025muon}. More general structured preconditioners include K-FAC, which
 approximates layerwise Fisher blocks with Kronecker factors~\cite{martens2015kfac}, and
-Shampoo, which maintains dimension-wise preconditioners from gradient statistics
-~\cite{gupta2018shampoo}. PRISM adds anisotropic spectral shaping to Muon-like first-order
-updates using low-rank curvature information~\cite{yang2026prism}. ORBIT differs from
-these approaches by constructing a compact Q/K metric from RoPE frequency structure and
-opposite-side activation statistics.
+Shampoo, which maintains dimension-wise preconditioners from gradient statistics~\cite{gupta2018shampoo}.
+PRISM adds anisotropic spectral shaping to Muon-like first-order updates using low-rank
+curvature information~\cite{yang2026prism}. ORBIT differs from these approaches by
+constructing a compact Q/K metric from RoPE frequency structure and opposite-side activation
+statistics.
 
 \paragraph{Optimization under architectural geometry.}
 Recent work increasingly argues that optimizers should respect invariances or induced
-weight-space geometry. \emph{Riemannian Gradient Descent for Low-Rank
-Architectures}~\cite{knight2026} treats QK/VO products as low-rank optimization objects.
-\emph{Dead-Direction Conditioners}~\cite{shirodkar2026ddc} develops gauge-equivariant
-conditioners for architectural symmetries, including a per-head attention rotation matched
-to RoPE. \emph{The Loss Does Not See the Basis, but Adam Does}~\cite{singh2026lossbasis}
+weight-space geometry. Riemannian Gradient Descent for Low-Rank Architectures~\cite{knight2026riemannian}
+treats QK/VO products as low-rank optimization objects. Dead-Direction Conditioners~\cite{shirodkar2026dead}
+develops gauge-equivariant conditioners for architectural symmetries, including a per-head
+attention rotation matched to RoPE. The Loss Does Not See the Basis, but Adam Does~\cite{singh2026basis}
 shows that optimizer behavior can depend on arbitrary factor bases even when the represented
-function is unchanged, with Q/K products serving as attention invariants. In
-parameter-efficient adaptation, LoRA-TSD and ISO-LoRA optimize the induced tangent-space
-weight update rather than treating low-rank factors independently
-~\cite{andriianov2026loratsd,zhu2026isolora}. ORBIT is complementary: it uses architectural
-Q/K and RoPE structure to define a small training-time preconditioner without constructing
-a full function-space pullback.
+function is unchanged, with Q/K products serving as attention invariants. In parameter-efficient
+adaptation, LoRA-TSD and ISO-LoRA optimize the induced tangent-space weight update rather
+than treating low-rank factors independently~\cite{andriianov2026loratsd,zhu2026isolora}.
+ORBIT is complementary: it uses architectural Q/K and RoPE structure to define a small
+training-time preconditioner without constructing a full function-space pullback.
 
 \paragraph{Query--key and RoPE structure.}
-\emph{Faster Query-Key Learning Sharpens Attention}~\cite{vashisht2026fasterqk} shows
-that the relative learning speed of QK and OV circuits changes attention concentration,
-reinforcing the distinct functional role of QK optimization. \emph{Spectral Query-Key
-Product Weight Steering}~\cite{tiwari2026qksteering} directly edits singular modes of the
-query--key product as a training-free intervention. RoFormer introduced the rotation
-structure that turns absolute Q/K rotations into relative-position interactions
-~\cite{su2021roformer}; LeRoPE makes those frequencies learnable
-~\cite{karypis2026lerope}; and \emph{RoPE Attention Is an Exact Forward-Pass Gradient Step
-with Softmax Intact}~\cite{huang2026ropegradient} derives an exact gradient-step
-representation of the RoPE-softmax forward pass. These works analyze or modify attention
-geometry, but do not use opposite-side Q/K second moments together with optimizer-side
-rotary transport to precondition Q/K parameter updates during pretraining.
+Faster Query-Key Learning Sharpens Attention~\cite{vashisht2026qk} shows that the relative
+learning speed of QK and OV circuits changes attention concentration, reinforcing the
+distinct functional role of QK optimization. Spectral Query-Key Product Weight Steering~\cite{tiwari2026spectral}
+directly edits singular modes of the query--key product as a training-free intervention.
+RoFormer introduced the rotation structure that turns absolute Q/K rotations into
+relative-position interactions~\cite{su2021roformer}; LeRoPE makes those frequencies
+learnable~\cite{karypis2026lerope}; and RoPE Attention Is an Exact Forward-Pass Gradient
+Step with Softmax Intact~\cite{huang2026rope} derives an exact gradient-step representation
+of the RoPE-softmax forward pass. These works analyze or modify attention geometry, but do
+not use opposite-side Q/K second moments together with optimizer-side rotary transport to
+precondition Q/K parameter updates during pretraining.
 
 \paragraph{Positioning.}
 The cited prior work does not introduce the specific training-time construction evaluated
 here: per-frequency $2\times2$ Q/K metrics built from opposite-side activation statistics,
 transported with the optimizer orientation $R(+\Delta)$, applied to Muon candidates, and
 followed by one joint Q/K Frobenius restoration. ORBIT's contribution is this optimizer
-geometry and the controlled experiments used to isolate its effect, rather than a claim that
-the metric is an exact causal-score pullback.
+geometry and the controlled experiments used to isolate its effect, rather than a claim
+that the metric is an exact causal-score pullback.
 
 \input{methods.tex}
 
 \section{Results}
-
 \subsection{Shared hyperparameters isolate the update-rule difference}
 The primary comparison evaluates Muon and ORBIT on the same ten deterministic 900-step
 candidate configurations on one tuning seed. Each method independently selects its
@@ -177,8 +175,8 @@ The paired ORBIT-minus-Muon difference was \MatchedDelta{} nats, with a 95\% con
 interval of [\MatchedCILow{}, \MatchedCIHigh{}]. ORBIT has the lower validation loss on
 \MatchedWins{} of the ten held-out paired runs (Table~\ref{tab:matched}). Because the
 held-out comparison uses an identical frozen configuration for both methods, this contrast
-estimates their update-rule difference at that shared recipe; uncertainty from the preceding
-recipe-selection step is not included in the confidence interval.
+estimates their update-rule difference at that shared recipe; uncertainty from the
+preceding recipe-selection step is not included in the confidence interval.
 
 The mean end-to-end wall-clock difference is \MatchedRuntimeOverhead{} relative to Muon,
 and the recorded peak allocated CUDA-memory difference is \MatchedMemoryOverhead{}.
@@ -189,24 +187,32 @@ and the recorded peak allocated CUDA-memory difference is \MatchedMemoryOverhead
 \subsection{Crossed discovery recipes separate update-rule and recipe effects}
 The optimizer-by-configuration cross-over makes the tuning confound explicit. When both
 methods use the Muon discovery recipe, the ORBIT-minus-Muon difference is
-\XConfigMechanismMuon{} nats, with ORBIT lower on
-\XConfigMechanismMuonWins{} paired seeds. Under the ORBIT discovery recipe, the
-corresponding difference is \XConfigMechanismOrbit{} nats, with ORBIT lower on
-\XConfigMechanismOrbitWins{} paired seeds. These cells quantify how the update-rule
-difference changes with the surrounding hyperparameters.
+\XConfigMechanismMuon{} nats, with ORBIT lower on \XConfigMechanismMuonWins{} paired seeds.
+Under the ORBIT discovery recipe, the corresponding difference is \XConfigMechanismOrbit{}
+nats, with ORBIT lower on \XConfigMechanismOrbitWins{} paired seeds. These cells quantify
+how the update-rule difference changes with the surrounding hyperparameters.
 
 Recipe choice itself has a larger effect than the matched mechanism contrast. Moving Muon
 from its own discovery recipe to the ORBIT discovery recipe changes validation loss by
-\XConfigRecipeMuon{} nats, while the analogous change for ORBIT is
-\XConfigRecipeOrbit{} nats. The cross-over separates update-rule and recipe effects without
-treating the independently tuned gap as a mechanism-only estimate.
+\XConfigRecipeMuon{} nats, while the analogous change for ORBIT is \XConfigRecipeOrbit{}
+nats. The cross-over separates update-rule and recipe effects without treating the
+independently tuned gap as a mechanism-only estimate.
+
+\IfFileExists{figures/mechanism_summary.pdf}{%
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.94\linewidth]{mechanism_summary.pdf}
+\caption{Mechanism isolation. \textbf{(a)} Crossed optimizer--recipe experiment.
+\textbf{(b)} Paired mechanism ablations with 95\% confidence intervals; negative values
+favor full ORBIT.}
+\label{fig:mechanism-summary}
+\end{figure}}{}
 
 \subsection{Ablations isolate conditioning, rotary transport, and frequency-pair coupling}
 The expanded ten-seed ablation tests each component under the same matched recipe and ORBIT
-statistics path. Relative to the \textbf{identity control}, the full-minus-control
-difference is \AblIdentityDelta{} nats, with 95\% CI
-[\AblIdentityCILow{}, \AblIdentityCIHigh{}], and full ORBIT is lower on
-\AblIdentityWins{} paired seeds.
+statistics path. Relative to the \textbf{identity control}, the full-minus-control difference
+is \AblIdentityDelta{} nats, with 95\% CI [\AblIdentityCILow{}, \AblIdentityCIHigh{}], and
+full ORBIT is lower on \AblIdentityWins{} paired seeds.
 
 Relative to the \textbf{no-RoPE control}, which retains opposite-side second-moment
 conditioning but removes rotary transport, the difference is \AblNoRoPEDelta{} nats, with
@@ -215,59 +221,45 @@ conditioning but removes rotary transport, the difference is \AblNoRoPEDelta{} n
 
 Relative to the \textbf{diagonal control}, which removes off-diagonal coupling within each
 transported $2\times2$ metric, the difference is \AblDiagDelta{} nats, with 95\% CI
-[\AblDiagCILow{}, \AblDiagCIHigh{}], and full ORBIT is lower on
-\AblDiagWins{} paired seeds. Together these contrasts measure the incremental contribution
-of the three design choices without assuming their direction in advance
-(Figure~\ref{fig:mechanism}).
-
-\IfFileExists{figures/mechanism_summary.pdf}{%
-\begin{figure}[!t]
-\centering
-\includegraphics[width=0.98\linewidth]{mechanism_summary.pdf}
-\caption{Mechanism isolation. \textbf{(a)} Crossed optimizer--recipe experiment.
-\textbf{(b)} Paired mechanism ablations with 95\% confidence intervals; negative values
-favor full ORBIT.}
-\label{fig:mechanism}
-\end{figure}}{}
-\FloatBarrier
+[\AblDiagCILow{}, \AblDiagCIHigh{}], and full ORBIT is lower on \AblDiagWins{} paired
+seeds. Together these contrasts measure the incremental contribution of the three design
+choices without assuming their direction in advance (Figure~\ref{fig:mechanism-summary}).
 
 \subsection{Long-horizon transfer}
 The long-horizon experiment preserves each optimizer's independently frozen discovery
 recipe and probes behavior outside the primary 124M/900-step setting. At 124M and 2700
-steps, the two paired seeds give mean ORBIT-minus-baseline differences of
-\HorizonVsMuon{} nats versus Muon, \HorizonVsNorMuon{} versus NorMuon, and
-\HorizonVsAstro{} versus ASTRO. Because these cells use independently frozen recipes and
-only two seeds, their effect sizes are not directly comparable with the matched 900-step
-mechanism estimate and are treated as descriptive transfer checks rather than confirmatory
-evidence.
+steps, the two paired seeds give mean ORBIT-minus-baseline differences of \HorizonVsMuon{}
+nats versus Muon, \HorizonVsNorMuon{} versus NorMuon, and \HorizonVsAstro{} versus ASTRO.
+Because these cells use independently frozen recipes and only two seeds, their effect sizes
+are not directly comparable with the matched 900-step mechanism estimate and are treated as
+descriptive transfer checks rather than confirmatory evidence.
 
 \subsection{Broader optimizer context}
 The independently tuned 124M benchmark provides secondary context across the wider
 optimizer set. ASTRO reaches mean validation loss \BroadAstroLoss{}, ORBIT
-\BroadOrbitLoss{}, NorMuon \BroadNorMuonLoss{}, and Muon \BroadMuonLoss{}.
-Each method was selected from a shallow optimizer-specific discovery budget, so these
-numbers combine optimizer behavior with recipe selection and should not be interpreted as
-a ranking of isolated update rules.
-
-Figure~\ref{fig:broad-context} provides broader exploratory context under
-optimizer-specific recipes. The matched Muon--ORBIT experiment remains the primary
-mechanism-isolated estimate of the update-rule difference.
+\BroadOrbitLoss{}, NorMuon \BroadNorMuonLoss{}, and Muon \BroadMuonLoss{}. Each method was
+selected from a shallow optimizer-specific discovery budget, so these numbers combine
+optimizer behavior with recipe selection and should not be interpreted as a ranking of
+isolated update rules.
 
 \IfFileExists{figures/broad_confirmation.pdf}{%
-\begin{figure}[!t]
+\begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.72\linewidth]{broad_confirmation.pdf}
 \caption{Broader 124M optimizer context under independently selected recipes. Points show
 mean validation loss across five seeds; error bars show one standard deviation.}
 \label{fig:broad-context}
 \end{figure}}{}
-
 \FloatBarrier
 
+Figure~\ref{fig:broad-context} provides broader exploratory context under optimizer-specific
+recipes. The matched Muon--ORBIT experiment remains the primary mechanism-isolated estimate
+of the update-rule difference.
+
 \section{Discussion}
-The matched experiment is the primary estimate because it holds the selected training
-recipe fixed between Muon and ORBIT. Its paired mean, confidence interval, and win count
-provide the direct evidence for the sign and magnitude of the update-rule difference.
+The matched experiment is the primary estimate because it holds the selected training recipe
+fixed between Muon and ORBIT. Its paired mean, confidence interval, and win count provide the
+direct evidence for the sign and magnitude of the update-rule difference.
 
 The three ablations answer separate mechanism questions: identity tests whether the
 function-aware preconditioner matters at all; no-RoPE tests the incremental effect of rotary
@@ -322,7 +314,6 @@ optimized according to the computation it performs, with the aim of reducing los
 improving training efficiency. Instead of one optimizer geometry for an entire model,
 future training may use the right geometry for each computation.
 
-\FloatBarrier
 \bibliographystyle{plain}
 \bibliography{references}
 \end{document}
