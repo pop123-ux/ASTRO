@@ -17,10 +17,10 @@ use the ordinary Muon update, while embeddings, the tied language-model head, bi
 normalization vectors use the auxiliary AdamW path described in
 Section~\ref{sec:training-setup}.
 
-\subsection{RoPE-conditioned query--key geometry}
+\subsection{RoPE-informed query--key optimizer geometry}
 For a query at position $i$ attending to a causal key at position $j\le i$, define the
-non-negative displacement $\Delta=i-j$. The implementation applies $R_f(i)$ to the query
-and $R_f(j)$ to the key, so orthogonality of the RoPE rotations gives
+non-negative displacement $\Delta=i-j$. The model applies $R_f(i)$ to the query and
+$R_f(j)$ to the key, so orthogonality of the RoPE rotations gives
 \begin{equation}
   s_{ij,f}
   =(R_f(i)q_{i,f})^\top(R_f(j)k_{j,f})
@@ -28,36 +28,42 @@ and $R_f(j)$ to the key, so orthogonality of the RoPE rotations gives
   =q_{i,f}^{\top}R_f(-\Delta)k_{j,f}.
   \label{eq:rope-score}
 \end{equation}
-For an unrotated query perturbation $\delta q_f$,
-$\delta s_f=\delta q_f^\top R_f(-\Delta)k_f$. Therefore the expected squared score
-movement is a quadratic form whose metric depends on the opposite-side second moment. Let
-$S_{Q,f}$ and $S_{K,f}$ denote exponential-moving-average $2\times2$ uncentered second-moment matrices of the
-unrotated query and key coordinates. ORBIT defines
+Equation~\ref{eq:rope-score} describes the forward attention interaction and identifies a
+frequency-local rotary coordinate system. ORBIT uses that structure to define an
+optimizer-side transport, but it does not claim to implement the exact quadratic pullback
+of the causal score.
+
+Let $S_{Q,f}$ and $S_{K,f}$ denote exponential-moving-average $2\times2$ uncentered
+second-moment matrices of the unrotated query and key coordinates. The optimizer evaluated
+in the paper defines
 \begin{align}
 M_{Q,f} &= \mathbb{E}_{\Delta}\!\left[
-R_f(-\Delta)S_{K,f}R_f(-\Delta)^\top\right],\\
+R_f(+\Delta)S_{K,f}R_f(+\Delta)^\top\right],\\
 M_{K,f} &= \mathbb{E}_{\Delta}\!\left[
-R_f(-\Delta)^\top S_{Q,f}R_f(-\Delta)\right].
+R_f(+\Delta)^\top S_{Q,f}R_f(+\Delta)\right].
 \label{eq:orbit-metrics}
 \end{align}
-The expectation is approximated by a uniform average over the fixed log-spaced
-causal-distance grid
-$\mathcal{D}=\{1,2,4,8,16,32,64,128\}$. The eight nonzero offsets span short to
+Thus the optimizer transports opposite-side second moments in the orientation inverse to
+the forward score's $R_f(-\Delta)$. This $R_f(+\Delta)$ choice is part of the ORBIT
+optimizer specification: it defines a RoPE-informed optimization geometry rather than an
+exact score-gradient metric.
+
+The expectation is approximated by a uniform average over the fixed log-spaced distance
+grid $\mathcal{D}=\{1,2,4,8,16,32,64,128\}$. The eight nonzero offsets span short to
 moderate causal separations on a logarithmic scale while keeping transport cost fixed;
-$\Delta=0$ is omitted so that this average probes nonzero relative-position transport.
-This is a design approximation rather than an empirical estimate of the token-pair distance
+$\Delta=0$ is omitted so that the average probes nonzero rotary transport. The grid is a
+design approximation rather than an empirical estimate of the token-pair distance
 distribution: activation second moments are estimated over tokens, then transported across
-the chosen distance grid.
+the chosen offsets.
 
 The resulting $M_{Q,f}$ and $M_{K,f}$ are output-coordinate factors, not complete
-parameter-space pullbacks. For example, $\delta q_f=\delta W_{Q,f}x$ means an exact
+parameter-space pullbacks. For example, $\delta q_f=\delta W_{Q,f}x$ means a full
 quadratic metric on $\delta W_{Q,f}$ would also contain statistics of the input activation
 $x$. ORBIT deliberately keeps only the frequency-local $2\times2$ output-side factor and
-applies it as a left preconditioner. This is the tractable local approximation evaluated in
-the experiments. Second moments are
-updated once per logical training step with EMA coefficient $\beta=0.95$ after the first
-observation. In the 355M runs, gradient-checkpoint recomputation is excluded from statistics
-collection so that checkpointing does not change the EMA cadence.
+applies it as a left preconditioner. This is the tractable local optimizer geometry
+evaluated in the experiments. Second moments are updated with EMA coefficient $\beta=0.95$
+after the first observation. All release analyses reported here use the non-checkpointed
+124M model, so one model forward contributes one statistics update.
 
 \subsection{ORBIT preconditioning}
 Let $U_Q$ and $U_K$ be the Muon candidates from Equation~\ref{eq:muon-candidate}. For each
@@ -66,16 +72,16 @@ head and RoPE frequency pair,
 \widehat U_{Q,f} &= M_{Q,f}^{-1/2}U_{Q,f},\\
 \widehat U_{K,f} &= M_{K,f}^{-1/2}U_{K,f}.
 \end{align}
-The metric is local to the pre-softmax rotary Q/K score; it is not a full-model Fisher
-matrix, Hessian, or exact natural-gradient metric. The matrices are regularized by
-$10^{-5}I$, their effective condition number is capped at 100, and the inverse square root
-is evaluated analytically for each symmetric positive $2\times2$ matrix. For the
-regularized effective metric $M$, the choice
-$T=M^{-1/2}$ satisfies $T^\top M T=I$, so the local quadratic form is whitened rather
-than inverted as aggressively as an $M^{-1}$ step. The ORBIT-specific structural constants
-used throughout the campaign---$\beta=0.95$, functional power 1, $\epsilon=10^{-5}$,
-condition cap 100, and $\mathcal D$ above---were fixed protocol values and were not selected
-using held-out matched-confirmation outcomes.
+The metric is a local optimizer-side construction; it is not a full-model Fisher matrix,
+Hessian, exact natural-gradient metric, or exact causal-score pullback. The matrices are
+regularized by $10^{-5}I$, their effective condition number is capped at 100, and the
+inverse square root is evaluated analytically for each symmetric positive $2\times2$
+matrix. For the regularized effective metric $M$, the choice $T=M^{-1/2}$ satisfies
+$T^\top M T=I$, so the local quadratic geometry encoded by ORBIT is whitened rather than
+inverted as aggressively as an $M^{-1}$ step. The ORBIT-specific structural constants used
+throughout the campaign---$\beta=0.95$, functional power 1, $\epsilon=10^{-5}$, condition
+cap 100, and $\mathcal D$ above---were fixed protocol values and were not selected using
+held-out matched-confirmation outcomes.
 
 A single joint restoration factor then preserves the total Q/K update budget:
 \begin{equation}
@@ -90,9 +96,9 @@ A single joint restoration factor then preserves the total Q/K update budget:
 \label{eq:joint-restore}
 \end{equation}
 Because $\|U\|_F=\|\operatorname{vec}(U)\|_2$, the Frobenius norm is the Euclidean
-magnitude of the matrix update when viewed as a parameter vector. The functional metric
-therefore changes the geometry of the joint Q/K update while the restoration fixes its
-aggregate parameter-space step magnitude.
+magnitude of the matrix update when viewed as a parameter vector. The ORBIT metric therefore
+changes the geometry of the joint Q/K update while the restoration fixes its aggregate
+parameter-space step magnitude.
 
 \medskip
 \noindent\fbox{%
@@ -104,7 +110,8 @@ aggregate parameter-space step magnitude.
 \vspace{0.55em}
 For a RoPE query--key projection pair, define the frequency-wise preconditioners
 $\mathcal T_Q=\operatorname{blkdiag}_f(M_{Q,f}^{-1/2})$ and
-$\mathcal T_K=\operatorname{blkdiag}_f(M_{K,f}^{-1/2})$. Then
+$\mathcal T_K=\operatorname{blkdiag}_f(M_{K,f}^{-1/2})$, where $M_Q,M_K$ use the
+optimizer-side $R(+\Delta)$ transport in Equation~\ref{eq:orbit-metrics}. Then
 \[
 \bigl(\widetilde U_Q,\widetilde U_K\bigr)
 =
@@ -141,10 +148,10 @@ step-by-step specification in Algorithm~\ref{alg:orbit}.
 \centering
 \includegraphics[width=0.97\linewidth]{orbit_overview.pdf}
 \caption{ORBIT update pathway. Muon candidate directions are reshaped using Q/K second-moment
-statistics transported through RoPE relative-position rotations, producing frequency-local
-$2\times2$ metrics. Analytic inverse-square-root preconditioning is followed by joint
-Frobenius-norm restoration before the parameter update. Other parameter classes retain
-their standard Muon or auxiliary AdamW path.}
+statistics transported with the optimizer-side $R(+\Delta)$ rotary transform, producing
+frequency-local $2\times2$ metrics. Analytic inverse-square-root preconditioning is followed
+by joint Frobenius-norm restoration before the parameter update. Other parameter classes
+retain their standard Muon or auxiliary AdamW path.}
 \label{fig:orbit-overview}
 \end{figure}}{}
 
@@ -165,9 +172,9 @@ $\epsilon=10^{-5}$ and $\mathcal D=\{1,2,4,8,16,32,64,128\}$ in the reported exp
 \State $U_K \gets \operatorname{MuonCandidate}(G_K+\mu m_K)$
 \For{each attention head $h$ and RoPE frequency pair $f$}
     \State $M_{Q,f} \gets |\mathcal D|^{-1}\!\sum_{\Delta\in\mathcal D}
-    R_f(-\Delta)S_{K,f}R_f(-\Delta)^\top+\epsilon I$
+    R_f(+\Delta)S_{K,f}R_f(+\Delta)^\top+\epsilon I$
     \State $M_{K,f} \gets |\mathcal D|^{-1}\!\sum_{\Delta\in\mathcal D}
-    R_f(-\Delta)^\top S_{Q,f}R_f(-\Delta)+\epsilon I$
+    R_f(+\Delta)^\top S_{Q,f}R_f(+\Delta)+\epsilon I$
     \State $T_{Q,f} \gets \operatorname{InvSqrt}_{2\times2}(M_{Q,f})$
     \State $T_{K,f} \gets \operatorname{InvSqrt}_{2\times2}(M_{K,f})$
     \State $\widehat U_{Q,f} \gets T_{Q,f}U_{Q,f}$; \quad
@@ -191,49 +198,46 @@ therefore local $2\times2$ transforms rather than dense model-width precondition
 
 Three controls isolate the update components. \textbf{Identity} keeps the ORBIT training
 path and statistics collection but disables functional preconditioning. \textbf{No-RoPE}
-uses Q/K second-moment metrics without relative-position rotation. \textbf{Diagonal} retains
-RoPE-aware per-frequency scaling while removing off-diagonal coupling within each
+uses Q/K second-moment metrics without rotary transport. \textbf{Diagonal} retains
+transported per-frequency scaling while removing off-diagonal coupling within each
 $2\times2$ pair.
 
 \section{Experimental Setup}
 \subsection{Models and data}
-All reported comparisons use the same decoder implementation within a given size. The
-124M model has 12 layers, 12 attention heads, width 768, and approximately 124M parameters.
-The 355M model has 24 layers, 16 heads, width 1024, and uses gradient checkpointing. Both
-use context length 512, GPT-2 token embeddings with tied input/output weights, pre-norm
-Transformer blocks, GELU MLPs with $4d$ hidden width, and zero dropout. Learned absolute
-position embeddings are replaced by RoPE with base 10,000. Attention uses separate
-$q_{\mathrm{proj}}$, $k_{\mathrm{proj}}$, and $v_{\mathrm{proj}}$ matrices.
+All release analyses use the same 124M decoder implementation: 12 layers, 12 attention
+heads, width 768, and approximately 124M parameters. The model uses context length 512,
+GPT-2 token embeddings with tied input/output weights, pre-norm Transformer blocks, GELU
+MLPs with $4d$ hidden width, and zero dropout. Learned absolute position embeddings are
+replaced by RoPE with base 10,000. Attention uses separate $q_{\mathrm{proj}}$,
+$k_{\mathrm{proj}}$, and $v_{\mathrm{proj}}$ matrices.
 
 The corpus is FineWeb-Edu, using the \emph{sample-10BT} configuration from Hugging Face.
 Text is tokenized with the GPT-2 tokenizer. A fixed stream of 12.4M tokens is shared across
 runs: the first 400,000 tokens form the validation pool and the next 12,000,000 tokens form
-the training pool.
-Every training step samples random contiguous 512-token windows from that pool with a
-seeded generator. In paired cells, methods with the same run seed therefore receive the
-same sequence of sampled training windows. Evaluation uses a fixed, separate generator and
-averages 20 validation batches, so all runs use the same evaluation-window sequence.
+the training pool. Every training step samples random contiguous 512-token windows from
+that pool with a seeded generator. In paired cells, methods with the same run seed therefore
+receive the same sequence of sampled training windows. Evaluation uses a fixed, separate
+generator and averages 20 validation batches, so all runs use the same evaluation-window
+sequence.
 
 \subsection{Training setup}
 \label{sec:training-setup}
 All optimizers use the same warmup--cosine multiplier. The first 10\% of steps are warmup;
 the remaining schedule follows a cosine decay ending at $0.1$ times the peak learning rate.
 For ORBIT, the auxiliary AdamW rate is stored as a fixed ratio to the matrix learning rate,
-so scheduling the matrix rate applies the identical multiplier to both paths. Global gradient
-norm is clipped at 1.0. Training uses CUDA autocast in float16 with
-gradient scaling. The 124M model uses batch size 8 (4,096 sampled tokens per optimizer
-step); the 355M model uses batch size 4 (2,048 sampled tokens per step). The latter
-difference is disclosed because it prevents interpreting the 355M result as a pure
-model-size scaling experiment. Reported wall-clock time starts immediately before the
-training loop and ends after the fixed 20-batch validation pass, so it is an end-to-end
-per-run measure rather than optimizer-step time alone. Peak allocated CUDA memory is reported in GiB.
+so scheduling the matrix rate applies the identical multiplier to both paths. Global
+gradient norm is clipped at 1.0. Training uses CUDA autocast in float16 with gradient
+scaling. The 124M model uses batch size 8 (4,096 sampled tokens per optimizer step).
+Reported wall-clock time starts immediately before the training loop and ends after the
+fixed 20-batch validation pass, so it is an end-to-end per-run measure rather than
+optimizer-step time alone. Peak allocated CUDA memory is reported in GiB.
 
 \subsection{Baselines and hyperparameter selection}
 The broad campaign includes AdamW, Muon, NorMuon, AdaMuon, ASTRO, and ORBIT. ASTRO is a
-previously developed Muon variant used only as a reference baseline; its matrix path combines
-Nesterov-style momentum, a Newton--Schulz/polar transform, post-polar row-wise adaptation,
-and norm-preserving redistribution, with an Adam-like auxiliary path for non-matrix
-parameters.
+previously developed Muon variant used only as a reference baseline; its matrix path
+combines Nesterov-style momentum, a Newton--Schulz/polar transform, post-polar row-wise
+adaptation, and norm-preserving redistribution, with an Adam-like auxiliary path for
+non-matrix parameters.
 
 Every optimizer receives the same number of tuned dimensions in the broad campaign.
 Muon-family methods search learning rate in $[2\times10^{-3},10^{-1}]$, weight decay in
@@ -243,19 +247,19 @@ AdaMuon uses its published natural learning-rate range but the same weight-decay
 auxiliary-rate policy. Five discovery trials are used per optimizer in the broad campaign.
 
 The primary Muon--ORBIT comparison uses ten deterministic 900-step candidate
-configurations drawn once from the Muon search space and evaluated for Muon on one fixed
-tuning seed. The lowest-loss Muon candidate is frozen before the ten held-out matched-confirmation
-seeds are evaluated and is then applied unchanged to both Muon and ORBIT. The same setting is reused in the expanded ORBIT ablation. Thus the
-held-out comparison is an identical-recipe test in which ORBIT outcomes do not influence
-the primary recipe; its confidence interval remains conditional on the preceding Muon
-selection step.
+configurations drawn once from the Muon-family search space and applied identically to both
+update rules on one fixed tuning seed. Muon and ORBIT independently attain their lowest
+tuning loss at the same candidate. That coincident winner is frozen before the ten held-out
+matched-confirmation seeds are evaluated, and the same shared setting is reused in the
+expanded ORBIT ablation. Thus the held-out comparison is an identical-recipe test, while its
+uncertainty remains conditional on the preceding shared-grid selection.
 
 \subsection{Evaluation protocol}
 \label{sec:evaluation-protocol}
 The evaluation is organized into complementary study blocks rather than a single benchmark:
-broad optimizer context, matched mechanism isolation, component ablations, and transfer
-across training horizon and model size. Table~\ref{tab:protocol} summarizes the evidence
-hierarchy and the selection policy used in each block.
+broad optimizer context, matched mechanism isolation, component ablations, and a longer
+training-horizon transfer check. Table~\ref{tab:protocol} summarizes the evidence hierarchy
+and the selection policy used in each block.
 
 \begin{table}[H]
 \centering
@@ -290,7 +294,7 @@ Muon, ORBIT \\
 
 \textbf{Matched confirmation} &
 124M, 900 steps &
-\textbf{Primary:} Muon tuned over 10 candidates; its winner is frozen and shared &
+\textbf{Primary:} same 10 candidates for both; common winner frozen before held-out evaluation &
 $n=10$ paired &
 Muon, ORBIT \\
 
@@ -305,43 +309,32 @@ Long-horizon transfer &
 Fixed method-specific recipes &
 $n=2$/method &
 Muon, NorMuon, ASTRO, ORBIT \\
-
-Scale transfer &
-355M, 900 steps &
-Fixed method-specific recipes; batch size 4 with checkpointing &
-$n=2$/method &
-Muon, NorMuon, ASTRO, ORBIT \\
 \bottomrule
 \end{tabularx}
 
 \vspace{0.35em}
 \begin{minipage}{0.98\linewidth}
 \small
-The Muon-selected configuration uses matrix learning rate
-\MatchedSharedLR{}, weight decay \MatchedSharedWeightDecay{}, and auxiliary AdamW
-multiplier \MatchedSharedAuxMult{} (auxiliary learning rate \MatchedSharedAuxLR{}).
-Paired runs use the same run seed and therefore the same sampled training-window sequence;
-all runs use the same fixed validation-window generator.
+The common winning configuration uses matrix learning rate \MatchedSharedLR{}, weight decay
+\MatchedSharedWeightDecay{}, and auxiliary AdamW multiplier \MatchedSharedAuxMult{}
+(auxiliary learning rate \MatchedSharedAuxLR{}). Paired runs use the same run seed and
+therefore the same sampled training-window sequence; all runs use the same fixed
+validation-window generator.
 \end{minipage}
 \end{table}
 
 At 124M, 300, 900, and 2700 optimizer steps correspond respectively to approximately
 1.23M, 3.69M, and 11.06M sampled training tokens for the discovery, primary, and
 long-horizon regimes.
-The 355M transfer uses 1.84M sampled training tokens at 900 steps because of its smaller
-batch size.
 
 \paragraph{Statistical analysis.}
 The primary estimand is the paired per-run validation-loss difference, ORBIT minus Muon.
 Reported statistics include the paired mean, sample standard deviation, paired-run win
 count, and a two-sided 95\% Student-$t$ confidence interval for the mean paired difference.
 The matched Muon--ORBIT comparison is the sole primary confirmatory contrast. Its confidence
-interval is conditional on the selected Muon recipe and does not incorporate
-uncertainty from recipe selection. Ablation intervals are secondary mechanism analyses and
-are reported without multiplicity adjustment; the long-horizon and 355M cells are
-descriptive transfer checks rather than high-powered inferential tests. End-to-end
-wall-clock time and peak allocated CUDA memory are reported alongside loss.
-
-
-
+interval is conditional on the selected shared recipe and does not incorporate uncertainty
+from recipe selection. Ablation intervals are secondary mechanism analyses and are reported
+without multiplicity adjustment; the long-horizon cell is a descriptive transfer check
+rather than a high-powered inferential test. End-to-end wall-clock time and peak allocated
+CUDA memory are reported alongside loss.
 
