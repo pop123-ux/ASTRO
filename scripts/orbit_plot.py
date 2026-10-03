@@ -170,16 +170,6 @@ def plot_transfer_summary(horizon_rows: list[dict], _scale_rows: list[dict], out
     ax.set_xticks(range(len(order)), [names[m] for m in order])
     ax.set_ylabel("Validation loss")
     ax.set_title("124M / 2700 steps")
-    ax.text(
-        0.98,
-        0.97,
-        "dots = individual seeds\nhorizontal line = mean",
-        transform=ax.transAxes,
-        ha="right",
-        va="top",
-        fontsize=8.2,
-        color="0.35",
-    )
     save(fig, out, "horizon_transfer")
 
 
