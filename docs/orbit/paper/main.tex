@@ -231,20 +231,21 @@ The long-horizon experiment preserves each optimizer's independently frozen disc
 recipe and probes behavior outside the primary 124M/900-step setting. At 124M and 2700
 steps, the two paired seeds give mean ORBIT-minus-baseline differences of \HorizonVsMuon{}
 nats versus Muon, \HorizonVsNorMuon{} versus NorMuon, and \HorizonVsAstro{} versus ASTRO.
-Across all three baselines, the mean differences remain ORBIT-favoring, providing a
-complementary indication that the observed behavior extends to a three-times-longer training
-horizon under independently frozen method-specific recipes. The two-seed design makes this a
-targeted transfer test, while the ten-seed matched comparison remains the higher-powered
-estimate of the 900-step mechanism effect (Figure~\ref{fig:horizon-transfer}).
+In Figure~\ref{fig:horizon-transfer}, each dot represents one of the two evaluation seeds
+for that optimizer, and the horizontal segment marks their mean. Across all three baselines,
+the mean differences remain ORBIT-favoring, providing a complementary indication that the
+observed behavior extends to a three-times-longer training horizon under independently
+frozen method-specific recipes. The two-seed design makes this a targeted transfer test,
+while the ten-seed matched comparison remains the higher-powered estimate of the 900-step
+mechanism effect.
 
 \IfFileExists{figures/horizon_transfer.pdf}{%
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.72\linewidth]{horizon_transfer.pdf}
 \caption{Long-horizon transfer at 124M. Validation loss after 2700 optimizer steps under
-each method's independently frozen discovery recipe. Points denote the two runs and
-horizontal segments denote the method mean. ORBIT attains the lowest mean validation loss
-among the compared methods in this extended-training setting.}
+each method's independently frozen discovery recipe. ORBIT attains the lowest mean
+validation loss among the compared methods in this extended-training setting.}
 \label{fig:horizon-transfer}
 \end{figure}}{}
 \FloatBarrier
