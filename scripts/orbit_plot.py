@@ -102,12 +102,11 @@ def plot_orbit_overview(out: Path) -> None:
     ax.text(6.10, 3.62, "ORBIT: RoPE-informed Q/K optimizer update",
             ha="center", va="center", fontsize=12.0)
     ax.text(
-        2.25, 0.72,
-        r"Other hidden matrices $\rightarrow$ standard Muon"
-        "\n"
-        r"Embeddings / biases / norms $\rightarrow$ auxiliary AdamW"
-        "\nInference graph unchanged",
-        ha="left", va="center", fontsize=8.5, color="black", linespacing=1.25,
+        6.10, 0.68,
+        r"Other hidden matrices $\rightarrow$ standard Muon   |   "
+        r"Embeddings / biases / norms $\rightarrow$ auxiliary AdamW   |   "
+        r"Inference graph unchanged",
+        ha="center", va="center", fontsize=8.3, color="black",
     )
     ax.annotate("", xy=(11.30, 1.68), xytext=(11.30, 1.14),
                 arrowprops=dict(arrowstyle="->", lw=1.15, color="0.35"))
