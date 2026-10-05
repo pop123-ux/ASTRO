@@ -266,10 +266,12 @@ optimizer-step time alone. Peak allocated CUDA memory is reported in GiB.
 
 \subsection{Baselines and hyperparameter selection}
 The broad campaign includes AdamW, Muon, NorMuon, AdaMuon, ASTRO, and ORBIT. ASTRO is a
-previously developed Muon variant used only as a reference baseline; its matrix path
-combines Nesterov-style momentum, a Newton--Schulz/polar transform, post-polar row-wise
-adaptation, and norm-preserving redistribution, with an Adam-like auxiliary path for
-non-matrix parameters.
+previously developed Muon-family optimizer included only as a secondary reference baseline.
+Its matrix path combines Nesterov-style momentum, a Newton--Schulz/polar transform,
+post-polar row-wise adaptation, and norm-preserving redistribution, with an Adam-like
+auxiliary path for non-matrix parameters. ASTRO is not part of the primary mechanism
+comparison and is not analyzed here as a competing function-aware optimization method; the
+primary controlled comparison in this work is ORBIT versus Muon.
 
 Every optimizer receives the same number of tuned dimensions in the broad campaign.
 Muon-family methods search learning rate in $[2\times10^{-3},10^{-1}]$, weight decay in
